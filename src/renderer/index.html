@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>MQTT Looter</title>
+    <link rel="stylesheet" type="text/css" href="css/main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <style>
         body {
@@ -16,20 +18,52 @@
         }
         
         .sidebar {
-            width: 320px;
-            background-color: #2c3e50;
-            color: white;
-            padding: 20px;
-            overflow-y: auto;
+                width: 320px;
+                background-color: #ffffff; /* Changed to white */
+                color: #333333; /* Changed text color for contrast */
+                padding: 20px;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+                border-right: 1px solid #e0e0e0; /* Add subtle border */
+            }
+    
+        .sidebar-header {
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .sidebar-logo {
+            width: 32px;
+            height: 32px;
+            background-color: #007bff;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .sidebar-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333333;
+            margin: 0;
         }
         
         .sidebar h2 {
+            color: #333333; /* Changed for visibility on white background */
             margin-top: 0;
-            color: #ecf0f1;
-            border-bottom: 2px solid #34495e;
-            padding-bottom: 10px;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: 600;
         }
         
         .connection-list {
@@ -40,106 +74,157 @@
         }
         
         .connection-item {
-                background-color: #34495e;
-                margin: 10px 0;
-                padding: 15px;
-                border-radius: 5px;
-                cursor: pointer;
-                border-left: 4px solid #95a5a6;
-                border: 2px solid transparent; /* Add border for hover/active states */
-                transition: all 0.3s;
-                position: relative;
-            }
-            
+            background-color: #f8f9fa; /* Lighter gray for disconnected */
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            border-left: 4px solid #6c757d; /* Darker gray border */
+            border: 2px solid transparent;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+    
         .connection-item:hover {
-                background-color: #4a5f7a;
-                border: 2px solid #3498db; /* Blue border on hover */
-                transform: translateX(2px); /* Slight movement on hover */
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            }
+            background-color: #e9ecef;
+            border: 2px solid #007bff;
+            transform: translateX(2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
         
         .connection-item.active {
-                border-left-color: #2ecc71;
-                background-color: #4a5f7a;
-                border: 2px solid #2ecc71; /* Green border for active */
-                box-shadow: 0 6px 12px rgba(46, 204, 113, 0.3); /* Green glow */
-                transform: translateX(4px); /* More movement for active */
-            }
+            border-left-color: #28a745; /* Green for active */
+            background-color: #e9ecef;
+            border: 2px solid #28a745;
+            box-shadow: 0 6px 12px rgba(40, 167, 69, 0.2);
+            transform: translateX(4px);
+        }
         
         .connection-item.active::before {
-                content: "▶";
-                position: absolute;
-                left: -10px;
-                top: 50%;
-                transform: translateY(-50%);
-                color: #2ecc71;
-                font-size: 16px;
-                font-weight: bold;
-            }
+            content: "▶";
+            position: absolute;
+            left: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #28a745;
+            font-size: 16px;
+            font-weight: bold;
+        }
         
         .connection-item.connected {
-                border-left-color: #2ecc71;
-                background-color: #27ae60;
-                border-right: 4px solid #2ecc71; /* Additional visual indicator */
-            }
+            border-left-color: #28a745; /* Lighter green */
+            background-color: #d4edda; /* Light green background */
+            border-right: 4px solid #28a745;
+        }
         
         .connection-item.connected:hover {
-                border: 2px solid #2ecc71;
-                background-color: #229954;
-            }
+            border: 2px solid #28a745;
+            background-color: #c3e6cb;
+        }
+        
+        .connection-item.connecting {
+            border-left-color: #ffc107;
+            background-color: #fff3cd; /* Light yellow background */
+            border-right: 4px solid #ffc107;
+        }
+        
+        .connection-item.connecting:hover {
+            border: 2px solid #ffc107;
+            background-color: #ffeaa7;
+        }
         
         .connection-item.disconnected {
-                border-left-color: #95a5a6;
-                background-color: #95a5a6;
-            }
+            border-left-color: #6c757d; /* Darker gray */
+            background-color: #f8f9fa; /* Light gray background */
+        }
         
         .connection-item.disconnected:hover {
-                border: 2px solid #7f8c8d;
-                background-color: #85929e;
-            }
+            border: 2px solid #6c757d;
+            background-color: #e9ecef;
+        }
         
         .connection-item.error {
-                border-left-color: #e74c3c;
-                background-color: #e74c3c;
-                border-right: 4px solid #c0392b; /* Additional error indicator */
-            }
+            border-left-color: #dc3545; /* Red for error */
+            background-color: #f8d7da; /* Light red background */
+            border-right: 4px solid #dc3545; /* Red border instead of green */
+        }
         
         .connection-item.error:hover {
-                border: 2px solid #e74c3c;
-                background-color: #cb4335;
-            }
+            border: 2px solid #dc3545;
+            background-color: #f1aeb5;
+        }
         
         .connection-name {
-                font-weight: bold;
-                margin-bottom: 5px;
-                font-size: 16px;
-            }
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 16px;
+            color: #333333; /* Ensure text is visible */
+        }
         
         .connection-url {
             font-size: 0.9em;
-            color: #bdc3c7;
+            color: #6c757d; /* Darker gray for better contrast */
             margin-bottom: 8px;
         }
-        
+            
         .connection-status {
             font-size: 0.8em;
             margin-bottom: 8px;
+            color: #333333; /* Base color, will be overridden by inline styles */
         }
         
         .connection-controls {
             display: flex;
-            gap: 5px;
-            margin-top: 10px;
+            gap: 8px;
+            margin-top: 12px;
+            justify-content: space-between; /* Better spacing */
+            align-items: center;
         }
         
         .connection-controls button {
             flex: 1;
             padding: 8px 12px;
             border: none;
-            border-radius: 3px;
+            border-radius: 5px;
             cursor: pointer;
             font-size: 12px;
             font-weight: bold;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            min-height: 32px;
+            box-sizing: border-box;
+        }
+
+        .power-btn {
+            background-color: #6c757d; /* Darker gray for disconnected */
+            color: white;
+            flex: 1.5;
+        }
+
+        .power-btn.connected {
+            background-color: #28a745; /* Lighter green for better visibility */
+        }
+
+        .power-btn.connecting {
+            background-color: #ffc107;
+            animation: pulse 1.5s infinite;
+        }
+
+        .power-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .power-btn.connected:hover {
+            background-color: #219a52;
+        }
+
+        .power-btn.connecting:hover {
+            background-color: #e67e22;
         }
         
         .connect-btn {
@@ -163,23 +248,34 @@
         .edit-btn {
             background-color: #3498db;
             color: white;
+            flex: 1;
         }
-        
+
         .edit-btn:hover {
             background-color: #2980b9;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
         
         .delete-btn {
             background-color: #e74c3c;
             color: white;
+            flex: 1;
         }
-        
+
         .delete-btn:hover {
             background-color: #c0392b;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .btn-icon {
+            font-size: 14px;
+            font-weight: normal;
         }
         
         .add-connection-btn {
-            background-color: #27ae60;
+            background-color: #28a745; /* Lighter green */
             color: white;
             border: none;
             padding: 15px;
@@ -192,9 +288,9 @@
             margin-top: 20px;
             transition: all 0.3s;
         }
-        
+    
         .add-connection-btn:hover {
-            background-color: #219a52;
+            background-color: #218838;
             transform: scale(1.1);
         }
         
@@ -642,23 +738,38 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
         }
+                /* Pulse animation for connecting state */
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* Responsive adjustments for smaller buttons */
+        @media (max-width: 400px) {
+            .connection-controls button {
+                padding: 6px 8px;
+                font-size: 11px;
+            }
+            
+            .btn-icon {
+                font-size: 12px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">M</div>
+            <h1 class="sidebar-title">MQTTLooter</h1>
+        </div>
         <h2>MQTT Connections</h2>
         <ul id="connection-list" class="connection-list"></ul>
         <button id="add-connection-btn" class="add-connection-btn">+</button>
     </div>
     
     <div class="main-content">
-        <div class="header">
-            <h1>MQTT Topic Explorer</h1>
-            <div class="connection-indicator">
-                <span id="connection-text" class="connection-text">No connection</span>
-                <div id="status-dot" class="status-dot"></div>
-            </div>
-        </div>
         
         <div class="content-area">
             <div class="tree-panel">
@@ -743,6 +854,6 @@
     
     <!-- Load Toastify before renderer.js -->
     <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-    <script src="renderer.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>

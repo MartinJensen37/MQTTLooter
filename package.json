@@ -3,7 +3,7 @@
   "productName": "MQTTLooter",
   "version": "1.0.0",
   "description": "An MQTT client for exploring topics and messages.",
-  "main": "src/index.js",
+  "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder",
