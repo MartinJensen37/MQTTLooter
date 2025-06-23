@@ -24,7 +24,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico"
+      "icon": "assets/MQTTLooter_logo_tiny.ico"
     },
     "nsis": {
       "oneClick": false,

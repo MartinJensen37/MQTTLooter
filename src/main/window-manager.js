@@ -12,15 +12,13 @@ class WindowManager {
             height: 900,
             minWidth: 800,
             minHeight: 600,
+            icon: path.join(__dirname, '../../assets/MQTTLooter_logo_tiny.png'), 
             show: false,
             webPreferences: {
                 nodeIntegration: true,
                 contextIsolation: false,
                 enableRemoteModule: false,
-                // Remove preload since we're using nodeIntegration
-                // preload: path.join(__dirname, '../preload/preload.js')
-            },
-            icon: path.join(__dirname, '../../assets/icon.ico')
+            }
         });
 
         await this.mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
