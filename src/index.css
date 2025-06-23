@@ -1,0 +1,38 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+}
+
+.tree-view {
+    width: 300px;
+    height: 100vh;
+    overflow-y: auto;
+    background-color: #fff;
+    border-right: 1px solid #ccc;
+    padding: 10px;
+}
+
+.tree-view ul {
+    list-style-type: none;
+    padding-left: 20px;
+}
+
+.tree-view li {
+    margin: 5px 0;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fafafa;
+    transition: background-color 0.3s;
+}
+
+.tree-view li:hover {
+    background-color: #e0e0e0;
+}
+
+.message {
+    font-size: 14px;
+    color: #333;
+}
