@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>MQTT Looter</title>
     <link rel="stylesheet" type="text/css" href="css/main.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
     <style>
         body {
@@ -39,16 +38,20 @@
         
         .sidebar-logo {
             width: 32px;
-            height: 32px;
-            background-color: #007bff;
-            border-radius: 6px;
+            height: 35px;
             display: flex;
             align-items: center;
             justify-content: center;
             margin-right: 12px;
-            color: white;
-            font-weight: bold;
-            font-size: 16px;
+            border-radius: 6px;
+            overflow: hidden; /* Ensures image doesn't overflow the container */
+        }
+
+        .logo-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Maintains aspect ratio */
+            background-color: transparent;
         }
         
         .sidebar-title {
@@ -761,7 +764,9 @@
 <body>
     <div class="sidebar">
         <div class="sidebar-header">
-            <div class="sidebar-logo">M</div>
+            <div class="sidebar-logo">
+                <div class="logo-fallback" style="display: none;">M</div>
+            </div>
             <h1 class="sidebar-title">MQTTLooter</h1>
         </div>
         <h2>MQTT Connections</h2>
