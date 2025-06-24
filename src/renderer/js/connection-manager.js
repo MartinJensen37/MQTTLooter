@@ -3,10 +3,16 @@ const MQTTClient = require('./mqtt-client');
 const { generateClientId } = require('./utils');
 
 class ConnectionManager extends EventEmitter {
-    constructor() {
+    constructor(topicTree = null) {
         super();
         this.connections = {};
         this.activeConnection = null;
+        this.topicTree = topicTree; // Reference to the TopicTree instance
+    }
+
+    // Set the TopicTree reference (called from app.js)
+    setTopicTree(topicTree) {
+        this.topicTree = topicTree;
     }
 
     async loadConnections() {
@@ -21,7 +27,6 @@ class ConnectionManager extends EventEmitter {
                         client: null,
                         connected: false,
                         hasError: false,
-                        topicTree: conn.topicTree || {},
                         subscriptionTopics: conn.subscriptionTopics || ['#'],
                         clientId: conn.clientId || generateClientId()
                     };
@@ -43,8 +48,7 @@ class ConnectionManager extends EventEmitter {
                 clientId: conn.clientId,
                 username: conn.username,
                 password: conn.password,
-                subscriptionTopics: conn.subscriptionTopics || ['#'],
-                topicTree: conn.topicTree || {}
+                subscriptionTopics: conn.subscriptionTopics || ['#']
             };
         });
         localStorage.setItem('mqttConnections', JSON.stringify(connectionsToSave));
@@ -59,7 +63,6 @@ class ConnectionManager extends EventEmitter {
             ...connectionData,
             clientId: connectionData.clientId || generateClientId(),
             subscriptionTopics: connectionData.subscriptionTopics || ['#'],
-            topicTree: {},
             client: null,
             connected: false,
             hasError: false
@@ -111,8 +114,10 @@ class ConnectionManager extends EventEmitter {
             connection.hasError = false;
             connection.connecting = false;
             
-            // CLEAR TOPIC TREE WHEN CONNECTION IS UPDATED
-            connection.topicTree = {};
+            // Clear TopicTree data for this connection
+            if (this.topicTree) {
+                this.topicTree.clearConnectionData(id);
+            }
             
             // Update connection data
             Object.assign(connection, connectionData);
@@ -120,6 +125,9 @@ class ConnectionManager extends EventEmitter {
             // If this was the active connection, clear it temporarily
             if (this.activeConnection && this.activeConnection.id === id) {
                 this.activeConnection = null;
+                if (this.topicTree) {
+                    this.topicTree.render(null);
+                }
             }
             
             this.saveConnections();
@@ -148,14 +156,23 @@ class ConnectionManager extends EventEmitter {
         }
     }
 
-    deleteConnection(id) {
+    async deleteConnection(id) {
         console.log('Deleting connection:', id);
         if (this.connections[id]) {
             this.disconnectConnection(id);
+            
+            // Clear TopicTree data for this connection
+            if (this.topicTree) {
+                await this.topicTree.clearConnectionData(id);
+            }
+            
             delete this.connections[id];
             
             if (this.activeConnection && this.activeConnection.id === id) {
                 this.activeConnection = null;
+                if (this.topicTree) {
+                    this.topicTree.render(null);
+                }
             }
             
             this.saveConnections();
@@ -188,14 +205,19 @@ class ConnectionManager extends EventEmitter {
         connection.hasError = false;
         connection.connecting = true; // Set connecting state
         
-        // CLEAR TOPIC TREE BEFORE CONNECTING
-        connection.topicTree = {};
+        // Clear TopicTree data for this connection
+        if (this.topicTree) {
+            this.topicTree.clearConnectionData(connectionId);
+        }
         
         // Set as active connection immediately (before actually connecting)
         this.activeConnection = connection;
         
         // Re-render to show the connection as active but with empty tree
         this.render();
+        if (this.topicTree) {
+            this.topicTree.render(connection);
+        }
         this.emit('active-connection-changed', connection);
 
         // Create new client
@@ -209,14 +231,25 @@ class ConnectionManager extends EventEmitter {
             connection.hasError = false;
             connection.connecting = false;
             this.render(); // Update UI to show connected state
+            if (this.topicTree) {
+                this.topicTree.render(connection);
+            }
             this.emit('connection-connected', connection);
         });
 
         connection.client.on('message', (topic, message) => {
+            console.log('ConnectionManager: Message received', { connectionId, topic, message });
+            
             // Only process messages if this is still the active connection
             if (this.activeConnection && this.activeConnection.id === connectionId) {
-                this.updateTreeStructure(connection, topic, message);
+                // Send message to TopicTree - THIS IS THE CRITICAL PART!
+                if (this.topicTree) {
+                    this.topicTree.updateTopic(connectionId, topic, message);
+                }
+                
                 this.emit('message-received', connectionId, topic, message);
+            } else {
+                console.log('ConnectionManager: Ignoring message - not active connection');
             }
         });
 
@@ -226,6 +259,9 @@ class ConnectionManager extends EventEmitter {
             connection.hasError = true;
             connection.connecting = false;
             this.render(); // Update UI to show error state
+            if (this.topicTree) {
+                this.topicTree.render(connection);
+            }
             this.emit('connection-error', connection, err);
         });
 
@@ -234,6 +270,9 @@ class ConnectionManager extends EventEmitter {
             connection.connected = false;
             connection.connecting = false;
             this.render(); // Update UI
+            if (this.topicTree) {
+                this.topicTree.render(connection);
+            }
             this.emit('connection-disconnected', connection);
         });
 
@@ -247,10 +286,13 @@ class ConnectionManager extends EventEmitter {
             connection.connecting = false;
             connection.client = null;
             this.render();
+            if (this.topicTree) {
+                this.topicTree.render(connection);
+            }
         }
     }
 
-    disconnectConnection(connectionId) {
+    async disconnectConnection(connectionId) {
         console.log('Disconnecting connection:', connectionId);
         const connection = this.connections[connectionId];
         
@@ -311,18 +353,23 @@ class ConnectionManager extends EventEmitter {
             connection.hasError = false;
             connection.connecting = false;
             
-            // CLEAR TOPIC TREE DATA ON DISCONNECT
-            connection.topicTree = {};
+            // Clear TopicTree data for this connection
+            if (this.topicTree) {
+                await this.topicTree.clearConnectionData(connectionId);
+            }
             
             // If this was the active connection, clear it
             if (this.activeConnection && this.activeConnection.id === connectionId) {
                 this.activeConnection = null;
+                if (this.topicTree) {
+                    this.topicTree.render(null);
+                }
             }
             
             // Emit disconnection event
             this.emit('connection-disconnected', connection);
             
-            // Save the updated state (without topic tree)
+            // Save the updated state
             this.saveConnections();
             
             // Re-render to update the UI
@@ -334,42 +381,8 @@ class ConnectionManager extends EventEmitter {
         }
     }
 
-    updateTreeStructure(connection, topic, message) {
-        if (!connection) return;
-        
-        const parts = topic.split('/');
-        let current = connection.topicTree;
-        
-        for (let i = 0; i < parts.length; i++) {
-            const part = parts[i];
-            
-            if (!current[part]) {
-                current[part] = {
-                    children: {},
-                    messages: [],
-                    isExpanded: true,
-                    fullTopic: null
-                };
-            }
-            
-            if (i === parts.length - 1) {
-                current[part].fullTopic = topic;
-                current[part].messages.unshift({
-                    value: message,
-                    timestamp: new Date().toISOString()
-                });
-                
-                // Keep only the last 50 messages per topic
-                if (current[part].messages.length > 50) {
-                    current[part].messages = current[part].messages.slice(0, 50);
-                }
-            }
-            
-            current = current[part].children;
-        }
-        
-        this.saveConnections();
-    }
+    // Remove the old updateTreeStructure method as it's no longer needed
+    // The TopicTree handles its own structure now
 
     render() {
         console.log('Rendering connections, count:', Object.keys(this.connections).length);
@@ -500,6 +513,11 @@ class ConnectionManager extends EventEmitter {
             // Re-render to update visual states
             this.render();
             
+            // Update TopicTree with new active connection
+            if (this.topicTree) {
+                this.topicTree.render(connection);
+            }
+            
             // Emit event for other components
             this.emit('active-connection-changed', connection);
         } else if (connection && !connection.connected) {
@@ -512,6 +530,11 @@ class ConnectionManager extends EventEmitter {
             // Re-render to update visual states
             this.render();
             
+            // Clear TopicTree
+            if (this.topicTree) {
+                this.topicTree.render(null);
+            }
+            
             // Emit event to clear displays
             this.emit('active-connection-changed', null);
         }
@@ -523,6 +546,10 @@ class ConnectionManager extends EventEmitter {
 
     getConnectionCount() {
         return Object.keys(this.connections).length;
+    }
+
+    getActiveConnection() {
+        return this.activeConnection;
     }
 }
 

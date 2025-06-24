@@ -8,8 +8,11 @@ class MQTTLooterApp {
     constructor() {
         this.connectionManager = new ConnectionManager();
         this.topicTree = new TopicTree();
-        this.messagePanel = new MessagePanel();
+        this.messagePanel = new MessagePanel(this.topicTree); // Pass topicTree parameter
         this.modalManager = new ModalManager();
+        
+        // Connect ConnectionManager and TopicTree
+        this.connectionManager.setTopicTree(this.topicTree);
         
         this.initialize();
     }
@@ -34,7 +37,7 @@ class MQTTLooterApp {
             });
         }
 
-            // Connection Manager events
+        // Connection Manager events
         this.connectionManager.on('connection-added', (connection) => {
             showToast(`Connection "${connection.name}" added successfully`, 'success');
             this.render();
@@ -81,16 +84,18 @@ class MQTTLooterApp {
             this.render();
         });
 
+        // CRITICAL FIX: Only update message panel, never trigger full re-renders
         this.connectionManager.on('message-received', (connectionId, topic, message) => {
             const activeConnection = this.connectionManager.activeConnection;
             if (activeConnection && activeConnection.id === connectionId && activeConnection.connected) {
-                this.topicTree.render(activeConnection);
+                // ONLY update the message panel - no other updates
                 this.messagePanel.updateIfSelected(topic, message);
+                // TopicTree will handle its own internal updates without triggering events
             }
         });
 
         this.connectionManager.on('active-connection-changed', (connection) => {
-            console.log('Active connection changed to:', connection.name);
+            console.log('Active connection changed to:', connection?.name || 'none');
             // Always clear first, then render with new connection
             this.topicTree.clear();
             this.messagePanel.clear();
@@ -98,10 +103,13 @@ class MQTTLooterApp {
             this.updateConnectionIndicator();
         });
 
-        // Topic Tree events
+        // Topic Tree events - ONLY for user-initiated selections
         this.topicTree.on('topic-selected', (topic) => {
             const activeConnection = this.connectionManager.activeConnection;
-            this.messagePanel.showTopicMessages(topic, activeConnection);
+            if (activeConnection) {
+                // Only reload messages when user actually clicks on a topic
+                this.messagePanel.showTopicMessages(topic, activeConnection);
+            }
         });
 
         this.topicTree.on('selection-cleared', () => {
@@ -139,10 +147,6 @@ class MQTTLooterApp {
 
     render() {
         this.connectionManager.render();
-        const activeConnection = this.connectionManager.activeConnection;
-        this.topicTree.render(activeConnection);
-        
-        // Update connection indicator
         this.updateConnectionIndicator();
     }
 

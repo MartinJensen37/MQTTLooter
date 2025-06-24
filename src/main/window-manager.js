@@ -12,7 +12,7 @@ class WindowManager {
             height: 900,
             minWidth: 800,
             minHeight: 600,
-            icon: path.join(__dirname, '../../assets/MQTTLooter_logo_tiny.png'), 
+            icon: path.join(__dirname, '../../assets/MQTTLooter_logo_small.png'), 
             show: false,
             webPreferences: {
                 nodeIntegration: true,

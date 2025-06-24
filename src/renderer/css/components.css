@@ -255,6 +255,16 @@
     font-weight: 500;
 }
 
+.tree-node-header.node-updated {
+    background-color: #e8f5e8 !important;
+    transition: background-color 0.3s ease;
+}
+
+.tree-node-header.node-updated .message-payload {
+    color: #28a745;
+    font-weight: bold;
+}
+
 .tree-expand-icon {
     width: 18px;
     text-align: center;
@@ -299,6 +309,135 @@
     margin: 0;
     padding: 0;
     margin-left: 22px;
+}
+
+/* Message panel styles - Modern card theme */
+.topic-info {
+    position: sticky;
+    top: 0;
+    background: white !important;
+    z-index: 10;
+    padding: 15px;
+    border-bottom: 2px solid #dee2e6 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.message-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 0;
+    flex-wrap: wrap;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    padding: 15px;
+}
+
+.message-actions .btn {
+    flex: 0 0 auto;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.message-log {
+    padding: 20px;
+    background: #f5f5f5;
+    min-height: 400px;
+    scroll-behavior: smooth;
+}
+
+/* Modern card-style message items */
+.message-item {
+    background: white;
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    transition: all 0.2s ease;
+    border-left: 4px solid #28a745;
+    position: relative;
+}
+
+.message-item:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    transform: translateY(-1px);
+    border-left-color: #20c997;
+}
+
+.message-item:last-child {
+    margin-bottom: 0;
+}
+
+/* Remove any alternating background colors */
+.message-item:nth-child(odd),
+.message-item:nth-child(even),
+.message-item:nth-of-type(odd),
+.message-item:nth-of-type(even) {
+    background: white !important;
+}
+
+.message-timestamp {
+    color: #6c757d;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    text-align: left;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.message-value {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+    white-space: pre-wrap;
+    text-align: left;
+    color: #2d3748;
+    background: #f7fafc;
+    padding: 12px 16px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    margin: 0;
+}
+
+/* New message highlight */
+.message-item.new-message {
+    background: #f0fff4 !important;
+    border-left-color: #38a169;
+    animation: fadeInHighlight 0.5s ease-out;
+}
+
+.message-item.new-message .message-value {
+    background: #e6fffa;
+    border-color: #9ae6b4;
+}
+
+/* Toggle slider styles */
+.toggle-slider.active {
+    background: #28a745 !important;
+}
+
+.toggle-slider.active div {
+    transform: translateX(16px) !important;
+}
+
+.copy-topic-btn:hover,
+.auto-scroll-btn:hover {
+    background: #e9ecef !important;
+    border-color: #adb5bd !important;
+}
+
+/* Animation for new messages */
+@keyframes fadeInHighlight {
+    0% {
+        background: #c6f6d5;
+        transform: scale(1.02);
+    }
+    100% {
+        background: #f0fff4;
+        transform: scale(1);
+    }
 }
 
 /* Modal styles */
@@ -454,6 +593,7 @@
     margin-top: 20px;
 }
 
+/* General button styles */
 .btn {
     padding: 10px 20px;
     border: none;
@@ -461,6 +601,12 @@
     cursor: pointer;
     font-size: 14px;
     font-weight: bold;
+    transition: all 0.2s ease;
+}
+
+.btn:hover {
+    opacity: 0.8;
+    transform: translateY(-1px);
 }
 
 .btn-primary {
@@ -486,14 +632,39 @@
     font-size: 13px;
 }
 
-/* Message action buttons */
-.message-actions {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 15px;
-    flex-wrap: wrap;
+/* Keyframes for animations */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
 }
 
-.message-actions .btn {
-    flex: 0 0 auto;
+/* FORCE all message items to be white - override ANY alternating colors */
+.message-item,
+.message-item:nth-child(odd),
+.message-item:nth-child(even),
+.message-item:nth-of-type(odd),
+.message-item:nth-of-type(even),
+.message-log .message-item,
+.message-log .message-item:nth-child(odd),
+.message-log .message-item:nth-child(even),
+.message-log .message-item:nth-of-type(odd),
+.message-log .message-item:nth-of-type(even),
+div.message-item,
+div.message-item:nth-child(odd),
+div.message-item:nth-child(even) {
+    background: white !important;
+    background-color: white !important;
+    opacity: 0.7;
+}
+
+/* Override any possible zebra striping from parent elements */
+.message-log > *:nth-child(odd),
+.message-log > *:nth-child(even) {
+    background: white !important;
+    background-color: white !important;
+    opacity: 0.7;
 }
