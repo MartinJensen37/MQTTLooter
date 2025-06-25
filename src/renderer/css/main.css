@@ -1,0 +1,41 @@
+@import url('./themes.css');
+@import url('./components.css');
+@import url('./layout.css');
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Animations */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 400px) {
+    .connection-controls button {
+        padding: 6px 8px;
+        font-size: 11px;
+    }
+    
+    .btn-icon {
+        font-size: 12px;
+    }
+}

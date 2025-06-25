@@ -3,7 +3,7 @@
   "productName": "MQTTLooter",
   "version": "1.0.0",
   "description": "An MQTT client for exploring topics and messages.",
-  "main": "src/index.js",
+  "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder",
@@ -19,11 +19,12 @@
     },
     "files": [
       "src/**/*",
+      "assets/**/*",
       "package.json"
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico"
+      "icon": "assets/MQTTLooter_logo_tiny.ico"
     },
     "nsis": {
       "oneClick": false,
