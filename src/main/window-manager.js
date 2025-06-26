@@ -18,6 +18,7 @@ class WindowManager {
                 nodeIntegration: true,
                 contextIsolation: false,
                 enableRemoteModule: false,
+                webSecurity: false // Add this for development
             }
         });
 

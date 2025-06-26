@@ -58,7 +58,7 @@ function showToast(message, type = 'info') {
             if (document.body.contains(toast)) {
                 document.body.removeChild(toast);
             }
-        }, 3000);
+        }, 2500);
     }
 }
 

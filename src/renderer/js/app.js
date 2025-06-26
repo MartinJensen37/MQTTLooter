@@ -3,18 +3,51 @@ const TopicTree = require('./js/topic-tree');
 const MessagePanel = require('./js/message-panel');
 const ModalManager = require('./js/modal-manager');
 const { showToast } = require('./js/utils');
-
 class MQTTLooterApp {
     constructor() {
         this.connectionManager = new ConnectionManager();
         this.topicTree = new TopicTree();
-        this.messagePanel = new MessagePanel(this.topicTree); // Pass topicTree parameter
+        this.messagePanel = new MessagePanel(this.topicTree);
         this.modalManager = new ModalManager();
         
         // Connect ConnectionManager and TopicTree
         this.connectionManager.setTopicTree(this.topicTree);
         
+        // Track window visibility
+        this.isWindowVisible = true;
+        this.setupVisibilityHandling();
+        
         this.initialize();
+    }
+
+    setupVisibilityHandling() {
+        // Handle window focus/blur events
+        window.addEventListener('focus', () => {
+            this.isWindowVisible = true;
+            console.log('Window focused - forcing updates');
+            this.topicTree.forceUpdate();
+            this.messagePanel.refreshWhenVisible();
+        });
+
+        window.addEventListener('blur', () => {
+            // Don't disable updates when window loses focus
+            // Background processing should continue
+            console.log('Window blurred - continuing background processing');
+        });
+
+        // Handle visibility change (minimize/restore)
+        document.addEventListener('visibilitychange', () => {
+            this.isWindowVisible = !document.hidden;
+            console.log('Visibility changed:', this.isWindowVisible ? 'visible' : 'hidden');
+            
+            if (this.isWindowVisible) {
+                // Force refresh when window becomes visible
+                setTimeout(() => {
+                    this.topicTree.forceUpdate();
+                    this.messagePanel.refreshWhenVisible();
+                }, 100);
+            }
+        });
     }
 
     async initialize() {
@@ -45,7 +78,6 @@ class MQTTLooterApp {
 
         this.connectionManager.on('connection-updated', (connection) => {
             showToast(`Connection "${connection.name}" updated successfully`, 'success');
-            // Clear everything when connection is updated
             this.topicTree.clear();
             this.messagePanel.clear();
             this.render();
@@ -53,7 +85,6 @@ class MQTTLooterApp {
 
         this.connectionManager.on('connection-deleted', (connectionId) => {
             showToast('Connection deleted', 'info');
-            // Clear everything when connection is deleted
             this.topicTree.clear();
             this.messagePanel.clear();
             this.render();
@@ -63,7 +94,6 @@ class MQTTLooterApp {
             console.log('Connection disconnected:', connection.name);
             showToast(`Disconnected from ${connection.name}`, 'info');
             
-            // Always clear when ANY connection disconnects if it was active
             if (this.connectionManager.activeConnection && 
                 this.connectionManager.activeConnection.id === connection.id) {
                 this.topicTree.clear();
@@ -75,7 +105,6 @@ class MQTTLooterApp {
 
         this.connectionManager.on('connection-connected', (connection) => {
             showToast(`Connected to ${connection.name}`, 'success');
-            // Render with the connected connection
             this.render();
         });
 
@@ -84,30 +113,28 @@ class MQTTLooterApp {
             this.render();
         });
 
-        // CRITICAL FIX: Only update message panel, never trigger full re-renders
+        // CRITICAL: Always process messages regardless of window visibility
         this.connectionManager.on('message-received', (connectionId, topic, message) => {
             const activeConnection = this.connectionManager.activeConnection;
             if (activeConnection && activeConnection.id === connectionId && activeConnection.connected) {
-                // ONLY update the message panel - no other updates
+                // Always update message panel if topic is selected
                 this.messagePanel.updateIfSelected(topic, message);
-                // TopicTree will handle its own internal updates without triggering events
+                // TopicTree handles its own updates in background
             }
         });
 
         this.connectionManager.on('active-connection-changed', (connection) => {
             console.log('Active connection changed to:', connection?.name || 'none');
-            // Always clear first, then render with new connection
             this.topicTree.clear();
             this.messagePanel.clear();
             this.topicTree.render(connection);
             this.updateConnectionIndicator();
         });
 
-        // Topic Tree events - ONLY for user-initiated selections
+        // Topic Tree events - ONLY for actual user selections
         this.topicTree.on('topic-selected', (topic) => {
             const activeConnection = this.connectionManager.activeConnection;
             if (activeConnection) {
-                // Only reload messages when user actually clicks on a topic
                 this.messagePanel.showTopicMessages(topic, activeConnection);
             }
         });
@@ -153,10 +180,11 @@ class MQTTLooterApp {
     updateConnectionIndicator() {
         const connectionText = document.getElementById('connection-text');
         const statusDot = document.getElementById('status-dot');
-        const activeConnection = this.connectionManager.activeConnection;
         
         if (!connectionText || !statusDot) return;
-
+        
+        const activeConnection = this.connectionManager.activeConnection;
+        
         if (!activeConnection) {
             connectionText.textContent = 'No connection';
             statusDot.className = 'status-dot';

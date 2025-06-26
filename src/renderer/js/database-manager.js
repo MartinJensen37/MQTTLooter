@@ -2,13 +2,76 @@ class DatabaseManager {
     constructor() {
         this.db = null;
         this.dbName = 'MQTTLooterDB';
-        this.dbVersion = 2; // Changed from 1 to 2 to force upgrade
+        this.dbVersion = 3; // Increment for new rate tracking features
         this.isInitialized = false;
-        this.messageQueue = []; // Queue for batching messages
+        this.messageQueue = [];
         this.isProcessingQueue = false;
         this.batchTimeout = null;
-        this.BATCH_SIZE = 50; // Process messages in batches
-        this.BATCH_DELAY = 100; // Wait 100ms before processing batch
+        this.BATCH_SIZE = 50;
+        this.BATCH_DELAY = 100;
+        
+        // Enhanced rate tracking that persists across window visibility changes
+        this.topicRates = new Map(); // Store real-time rates
+        this.rateUpdateInterval = null;
+        this.startRateTracking();
+    }
+
+    startRateTracking() {
+        // Update rates every 1 second, regardless of window visibility
+        this.rateUpdateInterval = setInterval(() => {
+            this.updateMessageRates();
+        }, 1000);
+    }
+
+    updateMessageRates() {
+        const now = Date.now();
+        const windowSize = 10000; // 10 second window for rate calculation
+        
+        for (const [topicId, data] of this.topicRates.entries()) {
+            // Remove old timestamps
+            data.timestamps = data.timestamps.filter(ts => now - ts < windowSize);
+            
+            // Calculate rate (messages per second)
+            data.rate = data.timestamps.length / (windowSize / 1000);
+            
+            // Update peak rate
+            if (data.rate > (data.peakRate || 0)) {
+                data.peakRate = data.rate;
+                data.peakRateTime = now;
+            }
+            
+            // Clean up inactive topics (no activity for 2 minutes)
+            if (data.timestamps.length === 0 && now - data.lastActivity > 120000) {
+                this.topicRates.delete(topicId);
+            }
+        }
+    }
+
+    getTopicMessageRate(connectionId, topic) {
+        const topicId = `${connectionId}:${topic}`;
+        const rateData = this.topicRates.get(topicId);
+        return rateData ? rateData.rate : 0;
+    }
+
+    getTopicPeakRate(connectionId, topic) {
+        const topicId = `${connectionId}:${topic}`;
+        const rateData = this.topicRates.get(topicId);
+        return rateData ? (rateData.peakRate || 0) : 0;
+    }
+
+    getAllTopicRates(connectionId) {
+        const rates = {};
+        for (const [topicId, data] of this.topicRates.entries()) {
+            if (topicId.startsWith(`${connectionId}:`)) {
+                const topic = topicId.substring(`${connectionId}:`.length);
+                rates[topic] = {
+                    current: data.rate,
+                    peak: data.peakRate || 0,
+                    peakTime: data.peakRateTime
+                };
+            }
+        }
+        return rates;
     }
 
     async init() {
@@ -27,7 +90,6 @@ class DatabaseManager {
                 this.db = request.result;
                 this.isInitialized = true;
                 console.log('Database opened successfully');
-                console.log('Available object stores:', Array.from(this.db.objectStoreNames));
                 resolve();
             };
 
@@ -35,48 +97,52 @@ class DatabaseManager {
                 const db = event.target.result;
                 console.log('Upgrading database from version', event.oldVersion, 'to', event.newVersion);
 
-                // Delete existing stores if they exist (for clean upgrade)
+                // Delete existing stores if they exist
                 if (db.objectStoreNames.contains('messages')) {
                     db.deleteObjectStore('messages');
-                    console.log('Deleted existing messages store');
                 }
                 if (db.objectStoreNames.contains('topicMetadata')) {
                     db.deleteObjectStore('topicMetadata');
-                    console.log('Deleted existing topicMetadata store');
                 }
 
                 // Create messages store
-                console.log('Creating messages object store...');
                 const messagesStore = db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
                 messagesStore.createIndex('connectionId', 'connectionId', { unique: false });
                 messagesStore.createIndex('topic', 'topic', { unique: false });
                 messagesStore.createIndex('timestamp', 'timestamp', { unique: false });
                 messagesStore.createIndex('connectionTopic', ['connectionId', 'topic'], { unique: false });
-                console.log('Messages store created with indexes');
 
-                // Create metadata store for topic summaries
-                console.log('Creating topicMetadata object store...');
+                // Create enhanced metadata store with rate tracking
                 const metadataStore = db.createObjectStore('topicMetadata', { keyPath: 'id' });
                 metadataStore.createIndex('connectionId', 'connectionId', { unique: false });
-                console.log('TopicMetadata store created with indexes');
-
-                console.log('Database upgrade completed');
             };
         });
     }
 
-    // Add message to queue for batch processing
     async addMessage(connectionId, topic, message) {
-        console.log('Adding message:', { connectionId, topic, message });
-
+        const topicId = `${connectionId}:${topic}`;
+        
+        // Track rate immediately
+        if (!this.topicRates.has(topicId)) {
+            this.topicRates.set(topicId, {
+                timestamps: [],
+                rate: 0,
+                peakRate: 0,
+                peakRateTime: null,
+                lastActivity: Date.now()
+            });
+        }
+        
+        const rateData = this.topicRates.get(topicId);
+        rateData.timestamps.push(Date.now());
+        rateData.lastActivity = Date.now();
+        
+        // Continue with existing message processing
         if (!this.isInitialized) {
-            console.error('Database not initialized');
             throw new Error('Database not initialized');
         }
 
-        // Verify object stores exist
         if (!this.db.objectStoreNames.contains('messages') || !this.db.objectStoreNames.contains('topicMetadata')) {
-            console.error('Required object stores not found:', Array.from(this.db.objectStoreNames));
             throw new Error('Database object stores not found');
         }
 
@@ -87,10 +153,8 @@ class DatabaseManager {
             timestamp: new Date().toISOString()
         };
 
-        // Add to queue
         this.messageQueue.push(messageData);
 
-        // Start processing if not already processing
         if (!this.isProcessingQueue) {
             this.scheduleQueueProcessing();
         }
@@ -98,6 +162,71 @@ class DatabaseManager {
         return messageData;
     }
 
+    // Rest of the methods remain the same but with enhanced metadata tracking
+    async processBatch(messages) {
+        return new Promise((resolve, reject) => {
+            if (!this.db.objectStoreNames.contains('messages') || !this.db.objectStoreNames.contains('topicMetadata')) {
+                reject(new Error('Object stores not found'));
+                return;
+            }
+
+            const transaction = this.db.transaction(['messages', 'topicMetadata'], 'readwrite');
+            const messagesStore = transaction.objectStore('messages');
+            const metadataStore = transaction.objectStore('topicMetadata');
+
+            let completed = 0;
+            const total = messages.length;
+
+            transaction.oncomplete = () => {
+                resolve();
+            };
+
+            transaction.onerror = () => {
+                reject(transaction.error);
+            };
+
+            for (const messageData of messages) {
+                const messageRequest = messagesStore.add(messageData);
+                
+                messageRequest.onsuccess = () => {
+                    completed++;
+                    
+                    const metadataId = `${messageData.connectionId}:${messageData.topic}`;
+                    const metadataRequest = metadataStore.get(metadataId);
+                    
+                    metadataRequest.onsuccess = () => {
+                        const topicId = `${messageData.connectionId}:${messageData.topic}`;
+                        const rateData = this.topicRates.get(topicId);
+                        
+                        const metadata = metadataRequest.result || {
+                            id: metadataId,
+                            connectionId: messageData.connectionId,
+                            topic: messageData.topic,
+                            messageCount: 0,
+                            lastMessage: null,
+                            lastTimestamp: null,
+                            currentRate: 0,
+                            peakRate: 0
+                        };
+
+                        metadata.messageCount++;
+                        metadata.lastMessage = messageData.message;
+                        metadata.lastTimestamp = messageData.timestamp;
+                        
+                        // Store rate information in metadata
+                        if (rateData) {
+                            metadata.currentRate = rateData.rate;
+                            metadata.peakRate = Math.max(metadata.peakRate || 0, rateData.peakRate || 0);
+                        }
+
+                        metadataStore.put(metadata);
+                    };
+                };
+            }
+        });
+    }
+
+    // Keep the existing methods for backwards compatibility
     scheduleQueueProcessing() {
         if (this.batchTimeout) {
             clearTimeout(this.batchTimeout);
@@ -116,7 +245,6 @@ class DatabaseManager {
         this.isProcessingQueue = true;
 
         try {
-            // Process messages in batches
             while (this.messageQueue.length > 0) {
                 const batch = this.messageQueue.splice(0, this.BATCH_SIZE);
                 await this.processBatch(batch);
@@ -128,75 +256,11 @@ class DatabaseManager {
         }
     }
 
-    async processBatch(messages) {
-        return new Promise((resolve, reject) => {
-            // Verify stores exist before creating transaction
-            if (!this.db.objectStoreNames.contains('messages') || !this.db.objectStoreNames.contains('topicMetadata')) {
-                console.error('Object stores not found for transaction');
-                reject(new Error('Object stores not found'));
-                return;
-            }
-
-            const transaction = this.db.transaction(['messages', 'topicMetadata'], 'readwrite');
-            const messagesStore = transaction.objectStore('messages');
-            const metadataStore = transaction.objectStore('topicMetadata');
-
-            let completed = 0;
-            const total = messages.length;
-
-            transaction.oncomplete = () => {
-                console.log(`Batch processed: ${total} messages`);
-                resolve();
-            };
-
-            transaction.onerror = () => {
-                console.error('Batch transaction failed:', transaction.error);
-                reject(transaction.error);
-            };
-
-            // Process each message in the batch
-            for (const messageData of messages) {
-                // Add message
-                const messageRequest = messagesStore.add(messageData);
-                
-                messageRequest.onsuccess = () => {
-                    completed++;
-                    
-                    // Update metadata for this topic
-                    const metadataId = `${messageData.connectionId}:${messageData.topic}`;
-                    const metadataRequest = metadataStore.get(metadataId);
-                    
-                    metadataRequest.onsuccess = () => {
-                        const metadata = metadataRequest.result || {
-                            id: metadataId,
-                            connectionId: messageData.connectionId,
-                            topic: messageData.topic,
-                            messageCount: 0,
-                            lastMessage: null,
-                            lastTimestamp: null
-                        };
-
-                        metadata.messageCount++;
-                        metadata.lastMessage = messageData.message;
-                        metadata.lastTimestamp = messageData.timestamp;
-
-                        metadataStore.put(metadata);
-                    };
-                };
-
-                messageRequest.onerror = () => {
-                    console.error('Error adding message:', messageRequest.error);
-                };
-            }
-        });
-    }
-
     async getTopicMessages(connectionId, topic, limit = 100, offset = 0) {
         if (!this.isInitialized) {
             throw new Error('Database not initialized');
         }
 
-        // Verify stores exist
         if (!this.db.objectStoreNames.contains('messages')) {
             throw new Error('Messages object store not found');
         }
@@ -206,7 +270,7 @@ class DatabaseManager {
             const store = transaction.objectStore('messages');
             const index = store.index('connectionTopic');
             const range = IDBKeyRange.only([connectionId, topic]);
-            const request = index.openCursor(range, 'prev'); // Get newest first
+            const request = index.openCursor(range, 'prev');
 
             const messages = [];
             let skipped = 0;
@@ -240,7 +304,6 @@ class DatabaseManager {
             throw new Error('Database not initialized');
         }
 
-        // Verify stores exist
         if (!this.db.objectStoreNames.contains('topicMetadata')) {
             throw new Error('TopicMetadata object store not found');
         }
@@ -251,7 +314,17 @@ class DatabaseManager {
             const request = store.get(metadataId);
 
             request.onsuccess = () => {
-                resolve(request.result);
+                const result = request.result;
+                if (result) {
+                    // Enhance with real-time rate data
+                    const topicId = metadataId;
+                    const rateData = this.topicRates.get(topicId);
+                    if (rateData) {
+                        result.currentRate = rateData.rate;
+                        result.peakRate = Math.max(result.peakRate || 0, rateData.peakRate || 0);
+                    }
+                }
+                resolve(result);
             };
 
             request.onerror = () => {
@@ -260,7 +333,23 @@ class DatabaseManager {
         });
     }
 
+    // Add cleanup method
+    cleanup() {
+        if (this.rateUpdateInterval) {
+            clearInterval(this.rateUpdateInterval);
+            this.rateUpdateInterval = null;
+        }
+    }
+
+    // Rest of existing methods remain the same...
     async clearConnectionData(connectionId) {
+        // Clear rate tracking for this connection
+        for (const [topicId] of this.topicRates.entries()) {
+            if (topicId.startsWith(`${connectionId}:`)) {
+                this.topicRates.delete(topicId);
+            }
+        }
+
         if (!this.isInitialized) {
             throw new Error('Database not initialized');
         }
@@ -268,7 +357,6 @@ class DatabaseManager {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['messages', 'topicMetadata'], 'readwrite');
             
-            // Clear messages
             const messagesStore = transaction.objectStore('messages');
             const messagesIndex = messagesStore.index('connectionId');
             const messagesRequest = messagesIndex.openCursor(IDBKeyRange.only(connectionId));
@@ -281,7 +369,6 @@ class DatabaseManager {
                 }
             };
 
-            // Clear metadata
             const metadataStore = transaction.objectStore('topicMetadata');
             const metadataIndex = metadataStore.index('connectionId');
             const metadataRequest = metadataIndex.openCursor(IDBKeyRange.only(connectionId));
@@ -295,7 +382,6 @@ class DatabaseManager {
             };
 
             transaction.oncomplete = () => {
-                console.log('Connection data cleared for:', connectionId);
                 resolve();
             };
 

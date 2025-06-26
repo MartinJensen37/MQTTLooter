@@ -10,11 +10,40 @@ class TopicTree extends EventEmitter {
         this.currentActiveConnection = null;
         this.dbManager = null;
         this.isInitialized = false;
-        this.treeStructure = {}; // Lightweight tree structure with counts only
-        this.renderPending = false; // Add render throttling
-        this.updateThrottle = new Map(); // Throttle updates per topic
+        this.treeStructure = {};
+        this.renderPending = false;
+        this.updateThrottle = new Map();
+        
+        // Enhanced background update system
+        this.backgroundUpdateInterval = null;
+        this.lastStructureUpdate = Date.now();
+        this.pendingStructureUpdates = new Set();
+        this.forceUpdateInterval = null;
+        
         this.setupEventHandlers();
         this.initDatabase();
+        this.startBackgroundUpdates();
+        this.startForceUpdates();
+    }
+
+    startBackgroundUpdates() {
+        // Always update tree structure regardless of visibility
+        this.backgroundUpdateInterval = setInterval(() => {
+            if (this.currentActiveConnection && this.pendingStructureUpdates.size > 0) {
+                console.log('Background tree update with', this.pendingStructureUpdates.size, 'pending updates');
+                this.scheduleRender();
+                this.pendingStructureUpdates.clear();
+            }
+        }, 1000);
+    }
+
+    startForceUpdates() {
+        // Force visual updates every 5 seconds if window is visible
+        this.forceUpdateInterval = setInterval(() => {
+            if (!document.hidden && this.currentActiveConnection) {
+                this.scheduleRender();
+            }
+        }, 5000);
     }
 
     async initDatabase() {
@@ -39,17 +68,22 @@ class TopicTree extends EventEmitter {
         });
     }
 
+    // Modified to handle background updates better
     async updateTopic(connectionId, topic, message) {
-        // Throttle updates per topic to prevent spam
+        // Always process the update immediately - don't throttle data processing
+        await this.performTopicUpdate(connectionId, topic, message);
+        
+        // Only throttle visual updates, not data updates
         const throttleKey = `${connectionId}:${topic}`;
         if (this.updateThrottle.has(throttleKey)) {
             clearTimeout(this.updateThrottle.get(throttleKey));
         }
         
-        this.updateThrottle.set(throttleKey, setTimeout(async () => {
-            await this.performTopicUpdate(connectionId, topic, message);
+        // Use shorter throttle when window is visible
+        const throttleDelay = document.hidden ? 500 : 100;
+        this.updateThrottle.set(throttleKey, setTimeout(() => {
             this.updateThrottle.delete(throttleKey);
-        }, 100)); // 100ms throttle
+        }, throttleDelay));
     }
 
     async performTopicUpdate(connectionId, topic, message) {
@@ -65,20 +99,20 @@ class TopicTree extends EventEmitter {
         }
         
         try {
-            // Store message in IndexedDB
+            // Store message in IndexedDB - ALWAYS, regardless of window state
             await this.dbManager.addMessage(connectionId, topic, message);
             
-            // Update lightweight tree structure
+            // Update tree structure - ALWAYS
             await this.updateTreeStructure(connectionId, topic);
             
-            // Only update if this is for the current active connection
+            // Track pending updates
+            this.pendingStructureUpdates.add(`${connectionId}:${topic}`);
+            this.lastStructureUpdate = Date.now();
+            
+            // Only update display if this is for the current active connection AND window is visible
             if (this.currentActiveConnection && this.currentActiveConnection.id === connectionId) {
-                // SMART UPDATE: Only update the specific node instead of full re-render
-                this.updateTopicNodeDisplay(topic, message);
-                
-                // If the selected topic matches the updated topic, emit event
-                if (this.selectedTopic === topic) {
-                    this.emit('topic-selected', topic);
+                if (!document.hidden) {
+                    this.updateTopicNodeDisplay(topic, message);
                 }
             }
         } catch (error) {
@@ -86,7 +120,15 @@ class TopicTree extends EventEmitter {
         }
     }
 
-    // NEW METHOD: Update only the specific topic node instead of full re-render
+    forceUpdate() {
+        console.log('TopicTree: Force update requested');
+        if (this.currentActiveConnection) {
+            // Clear pending flag to force immediate render
+            this.renderPending = false;
+            this.scheduleRender();
+        }
+    }
+
     updateTopicNodeDisplay(topic, message) {
         if (!this.currentActiveConnection) return;
         
@@ -199,15 +241,18 @@ class TopicTree extends EventEmitter {
         return null;
     }
 
-    // Modified: Only do full render when explicitly needed
     scheduleRender() {
         if (this.renderPending) return;
         
         this.renderPending = true;
-        requestAnimationFrame(async () => {
+        
+        // Use different timing based on visibility
+        const renderDelay = document.hidden ? 1000 : 0;
+        
+        setTimeout(async () => {
             await this.render(this.currentActiveConnection);
             this.renderPending = false;
-        });
+        }, renderDelay);
     }
 
     async updateTreeStructure(connectionId, topic) {
@@ -458,9 +503,15 @@ class TopicTree extends EventEmitter {
     }
 
     selectTopic(topic) {
-        this.selectedTopic = topic;
-        this.scheduleRender();
-        this.emit('topic-selected', topic);
+        // Only emit if this is actually a different selection
+        if (this.selectedTopic !== topic) {
+            this.selectedTopic = topic;
+            this.scheduleRender();
+            this.emit('topic-selected', topic);
+        } else {
+            // Just update the visual state without emitting
+            this.scheduleRender();
+        }
     }
 
     clearSelection() {
@@ -473,16 +524,32 @@ class TopicTree extends EventEmitter {
         this.selectedTopic = null;
         this.currentActiveConnection = null;
         this.treeView.innerHTML = '';
+        this.pendingStructureUpdates.clear();
         
         // Clear throttle timers
         this.updateThrottle.forEach(timer => clearTimeout(timer));
         this.updateThrottle.clear();
+        
+        // Clear intervals
+        if (this.backgroundUpdateInterval) {
+            clearInterval(this.backgroundUpdateInterval);
+            this.backgroundUpdateInterval = null;
+        }
+        
+        if (this.forceUpdateInterval) {
+            clearInterval(this.forceUpdateInterval);
+            this.forceUpdateInterval = null;
+        }
         
         const treeHeader = document.querySelector('.tree-header');
         if (treeHeader) {
             treeHeader.className = 'tree-header';
             treeHeader.innerHTML = 'Topic Tree';
         }
+        
+        // Restart background updates
+        this.startBackgroundUpdates();
+        this.startForceUpdates();
     }
 
     async getTopicMessages(connectionId, topic, limit = 100, offset = 0) {
