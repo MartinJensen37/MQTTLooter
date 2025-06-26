@@ -1,5 +1,6 @@
 const EventEmitter = require('events');
-const { escapeHtml, formatTimestamp } = require('./utils');
+const path = require('path');
+const { escapeHtml, formatTimestamp } = require(path.join(__dirname, 'utils.js'));
 
 class MessagePanel extends EventEmitter {
     constructor(topicTree) {
@@ -23,69 +24,17 @@ class MessagePanel extends EventEmitter {
         this.isDbReady = false;
         this.maxDisplayMessages = 300;
         this.updateThrottle = null;
-        this.messageCount = 0;
-        this.lastCountUpdate = 0;
         this.userScrolledAway = false;
         this.autoScrollEnabled = false;
-        this.countUpdateThrottle = null;
         this.headerCreated = false;
-        this.lastDisplayedCount = 0;
         
-        // Enhanced rate tracking that works in background
-        this.messageRateHistory = new Map();
-        this.rateUpdateInterval = null;
-        this.backgroundMessageCount = 0; // Track messages even when window is hidden
-        
-        // Enhanced throttling system - works in background
-        this.pendingCountUpdate = false;
-        this.messagesReceivedSinceLastUpdate = 0;
-        this.lastUpdateTime = 0;
+        // Simple throttling for display updates
+        this.displayUpdateThrottle = null;
         this.messageReceiveRate = 0;
-        this.rateCalculationWindow = 5000; // 5 seconds
         this.messageTimestamps = [];
+        this.rateCalculationWindow = 5000; // 5 seconds
         
         this.setupEventHandlers();
-        this.startContinuousRateTracking();
-    }
-
-    startContinuousRateTracking() {
-        // Track rates continuously regardless of window visibility
-        this.rateUpdateInterval = setInterval(() => {
-            this.updateContinuousRates();
-        }, 1000);
-    }
-
-    updateContinuousRates() {
-        if (this.currentTopic && this.currentConnection && this.dbManager) {
-            // Get current rate from database manager
-            const rate = this.dbManager.getTopicMessageRate(this.currentConnection.id, this.currentTopic);
-            const peakRate = this.dbManager.getTopicPeakRate(this.currentConnection.id, this.currentTopic);
-            
-            this.messageReceiveRate = rate;
-            
-            // Store rate history
-            if (!this.messageRateHistory.has(this.currentTopic)) {
-                this.messageRateHistory.set(this.currentTopic, []);
-            }
-            
-            const history = this.messageRateHistory.get(this.currentTopic);
-            history.push({ 
-                timestamp: Date.now(), 
-                rate,
-                peakRate
-            });
-            
-            // Keep only last 5 minutes of history
-            const cutoff = Date.now() - 300000;
-            this.messageRateHistory.set(this.currentTopic, 
-                history.filter(entry => entry.timestamp > cutoff)
-            );
-            
-            // Update display if window is visible
-            if (!document.hidden) {
-                this.updateRateDisplay();
-            }
-        }
     }
 
     async initializeDbManager() {
@@ -141,13 +90,20 @@ class MessagePanel extends EventEmitter {
         });
     }
 
-    // Helper function to break topic path at slashes with max width
+    // Get message count directly from topic tree (single source of truth)
+    getCurrentMessageCount() {
+        if (!this.currentTopic || !this.currentConnection || !this.topicTree) {
+            return 0;
+        }
+        
+        return this.topicTree.getTopicMessageCount(this.currentConnection.id, this.currentTopic);
+    }
+
     formatTopicPath(topic, maxLength = 60) {
         if (topic.length <= maxLength) {
             return topic;
         }
         
-        // Find the best place to break at a slash
         const parts = topic.split('/');
         let currentLine = '';
         let result = '';
@@ -163,7 +119,6 @@ class MessagePanel extends EventEmitter {
                     result += currentLine + '\n';
                     currentLine = part;
                 } else {
-                    // Part itself is too long, just add it
                     result += part + '\n';
                     currentLine = '';
                 }
@@ -177,69 +132,12 @@ class MessagePanel extends EventEmitter {
         return result.trim();
     }
 
-    // Helper method to find node data in tree structure (same as in topic-tree.js)
-    findNodeData(treeData, topic) {
-        if (!treeData) return null;
-        
-        const parts = topic.split('/');
-        let current = treeData;
-        
-        for (let i = 0; i < parts.length; i++) {
-            const part = parts[i];
-            if (!current[part]) return null;
-            
-            if (i === parts.length - 1) {
-                return current[part]; // This is the final node
-            }
-            current = current[part].children;
-        }
-        
-        return null;
-    }
-
-    // Get message count from topic tree if available
-    getTopicMessageCount() {
-        if (this.currentTopic && this.currentConnection && this.topicTree) {
-            // Try to get count from topic tree's tree structure
-            const treeData = this.topicTree.treeStructure[this.currentConnection.id];
-            if (treeData) {
-                const nodeData = this.findNodeData(treeData, this.currentTopic);
-                if (nodeData && nodeData.messageCount !== undefined) {
-                    return nodeData.messageCount;
-                }
-            }
-        }
-        // Fall back to background count or local count
-        return this.backgroundMessageCount > 0 ? this.backgroundMessageCount : this.messageCount;
-    }
-
     refreshWhenVisible() {
         console.log('MessagePanel: Refreshing when visible');
         
         if (this.currentTopic && this.currentConnection) {
-            // Update message count from database
-            this.updateMessageCountFromDatabase();
-            
-            // Update rate display
-            this.updateRateDisplay();
-            
-            // Check for new messages that arrived while window was hidden
+            this.updateDisplay();
             this.loadLatestMessages();
-        }
-    }
-
-    async updateMessageCountFromDatabase() {
-        if (!this.currentTopic || !this.currentConnection || !this.isDbReady) return;
-        
-        try {
-            const metadata = await this.dbManager.getTopicMetadata(`${this.currentConnection.id}:${this.currentTopic}`);
-            if (metadata) {
-                this.backgroundMessageCount = metadata.messageCount;
-                this.messageCount = metadata.messageCount;
-                this.updateMessageCountDisplay();
-            }
-        } catch (error) {
-            console.error('Error updating message count from database:', error);
         }
     }
 
@@ -247,11 +145,9 @@ class MessagePanel extends EventEmitter {
         if (!this.currentTopic || !this.currentConnection || !this.isDbReady) return;
         
         try {
-            // Get count of messages in database
-            const metadata = await this.dbManager.getTopicMetadata(`${this.currentConnection.id}:${this.currentTopic}`);
-            if (metadata && metadata.messageCount > this.currentMessages.length) {
-                console.log(`Found ${metadata.messageCount - this.currentMessages.length} new messages while window was hidden`);
-                // Refresh the display to show new messages
+            const currentCount = this.getCurrentMessageCount();
+            if (currentCount > this.currentMessages.length) {
+                console.log(`Found ${currentCount - this.currentMessages.length} new messages while window was hidden`);
                 this.showTopicMessages(this.currentTopic, this.currentConnection);
             }
         } catch (error) {
@@ -321,27 +217,91 @@ class MessagePanel extends EventEmitter {
         }
     }
 
-    // Enhanced updateIfSelected - continues to work in background
-    async updateIfSelected(topic, message) {
-        // Always update background counters
+    // Simplified update method - just updates display when called
+    updateIfSelected(topic, message) {
         if (this.currentTopic === topic && this.currentConnection) {
-            this.backgroundMessageCount++;
+            // Track message rate
+            this.trackMessageRate();
             
-            // Only update display if window is visible and database is ready
-            if (!document.hidden && this.isDbReady && this.headerCreated) {
-                if (this.updateThrottle) {
-                    clearTimeout(this.updateThrottle);
-                }
-                
-                this.updateThrottle = setTimeout(() => {
-                    this.appendNewMessage(message);
-                    this.updateThrottle = null;
-                }, 25);
+            // Throttled display update
+            this.scheduleDisplayUpdate(message);
+        }
+    }
+
+    trackMessageRate() {
+        const now = Date.now();
+        this.messageTimestamps.push(now);
+        this.messageTimestamps = this.messageTimestamps.filter(ts => now - ts < this.rateCalculationWindow);
+        this.messageReceiveRate = this.messageTimestamps.length / (this.rateCalculationWindow / 1000);
+    }
+
+    scheduleDisplayUpdate(message = null) {
+        if (this.displayUpdateThrottle) {
+            clearTimeout(this.displayUpdateThrottle);
+        }
+        
+        // Adaptive delay based on message rate
+        let delay = 50;
+        if (this.messageReceiveRate > 50) delay = 200;
+        else if (this.messageReceiveRate > 20) delay = 100;
+        else if (this.messageReceiveRate > 5) delay = 75;
+        
+        this.displayUpdateThrottle = setTimeout(() => {
+            this.updateDisplay();
+            if (message && !document.hidden && this.headerCreated) {
+                this.appendNewMessage(message);
+            }
+            this.displayUpdateThrottle = null;
+        }, delay);
+    }
+
+    updateDisplay() {
+        // Update count display
+        const messageCountArea = this.messageDetails.querySelector('.message-count-area');
+        if (messageCountArea) {
+            const countText = messageCountArea.querySelector('.count-text');
+            const rateText = messageCountArea.querySelector('.rate-text');
+            
+            if (countText) {
+                const count = this.getCurrentMessageCount();
+                countText.textContent = `${count} messages`;
             }
             
-            // Always update smart count system
-            this.smartCountUpdate();
+            if (rateText) {
+                this.updateRateDisplay(rateText);
+            }
         }
+    }
+
+    updateRateDisplay(rateText) {
+        const rate = Math.round(this.messageReceiveRate * 10) / 10;
+        
+        let rateDisplay = '';
+        let color = '#6c757d';
+        
+        if (rate >= 1000) {
+            rateDisplay = `${(rate / 1000).toFixed(1)}k msg/sec`;
+            color = '#dc3545';
+        } else if (rate >= 100) {
+            rateDisplay = `${Math.round(rate)} msg/sec`;
+            color = '#fd7e14';
+        } else if (rate >= 10) {
+            rateDisplay = `${rate.toFixed(1)} msg/sec`;
+            color = '#ffc107';
+        } else if (rate >= 1) {
+            rateDisplay = `${rate.toFixed(1)} msg/sec`;
+            color = '#28a745';
+        } else if (rate > 0) {
+            rateDisplay = `${rate.toFixed(1)} msg/sec`;
+            color = '#6c757d';
+        } else {
+            rateDisplay = '0 msg/sec';
+            color = '#6c757d';
+        }
+        
+        rateText.textContent = rateDisplay;
+        rateText.style.color = color;
+        rateText.style.fontWeight = rate > 0 ? '500' : '400';
     }
 
     appendNewMessage(message) {
@@ -358,10 +318,6 @@ class MessagePanel extends EventEmitter {
         `;
         
         messageLog.insertBefore(messageElement, messageLog.firstChild);
-        
-        // Smart count update with adaptive throttling
-        this.smartCountUpdate();
-        
         this.limitDisplayedMessages();
         
         if (this.autoScrollEnabled) {
@@ -373,160 +329,9 @@ class MessagePanel extends EventEmitter {
         }
     }
 
-    // Enhanced smart count update - works in background
-    smartCountUpdate() {
-        const now = Date.now();
-        this.messagesReceivedSinceLastUpdate++;
-        
-        // Track message timestamps for rate calculation
-        this.messageTimestamps.push(now);
-        this.messageTimestamps = this.messageTimestamps.filter(ts => now - ts < this.rateCalculationWindow);
-        
-        // Calculate current rate
-        this.messageReceiveRate = this.messageTimestamps.length / (this.rateCalculationWindow / 1000);
-        
-        // Determine update strategy based on visibility and rate
-        const timeSinceLastUpdate = now - this.lastUpdateTime;
-        let shouldUpdate = false;
-        let updateDelay = document.hidden ? 2000 : 50; // Longer delay when hidden
-        
-        if (this.messageReceiveRate > 50) {
-            shouldUpdate = this.messagesReceivedSinceLastUpdate >= 20 || timeSinceLastUpdate >= 5000;
-            updateDelay = document.hidden ? 5000 : 100;
-        } else if (this.messageReceiveRate > 20) {
-            shouldUpdate = this.messagesReceivedSinceLastUpdate >= 10 || timeSinceLastUpdate >= 2000;
-            updateDelay = document.hidden ? 3000 : 75;
-        } else if (this.messageReceiveRate > 5) {
-            shouldUpdate = this.messagesReceivedSinceLastUpdate >= 5 || timeSinceLastUpdate >= 1000;
-            updateDelay = document.hidden ? 2000 : 50;
-        } else {
-            shouldUpdate = this.messagesReceivedSinceLastUpdate >= 1 || timeSinceLastUpdate >= 500;
-            updateDelay = document.hidden ? 1000 : 25;
-        }
-        
-        if (shouldUpdate) {
-            this.scheduleCountUpdate(updateDelay);
-        }
-    }
-
-    // Enhanced scheduling with adaptive delay
-    scheduleCountUpdate(delay = 50) {
-        // Cancel any pending update
-        if (this.countUpdateThrottle) {
-            clearTimeout(this.countUpdateThrottle);
-        }
-        
-        // If we already have a pending update that's about to fire, don't schedule another
-        if (this.pendingCountUpdate) {
-            return;
-        }
-        
-        this.pendingCountUpdate = true;
-        
-        this.countUpdateThrottle = setTimeout(() => {
-            this.updateMessageCountDisplay();
-            this.countUpdateThrottle = null;
-            this.pendingCountUpdate = false;
-            this.messagesReceivedSinceLastUpdate = 0;
-            this.lastUpdateTime = Date.now();
-        }, delay);
-    }
-
-    updateRateDisplay() {
-        const messageCountArea = this.messageDetails.querySelector('.message-count-area');
-        if (messageCountArea) {
-            const rateText = messageCountArea.querySelector('.rate-text');
-            if (rateText) {
-                const rate = Math.round(this.messageReceiveRate * 10) / 10;
-                const peakRate = this.dbManager ? this.dbManager.getTopicPeakRate(this.currentConnection.id, this.currentTopic) : 0;
-                
-                let rateDisplay = '';
-                let color = '#6c757d';
-                
-                if (rate >= 1000) {
-                    rateDisplay = `${(rate / 1000).toFixed(1)}k msg/sec`;
-                    color = '#dc3545';
-                } else if (rate >= 100) {
-                    rateDisplay = `${Math.round(rate)} msg/sec`;
-                    color = '#fd7e14';
-                } else if (rate >= 10) {
-                    rateDisplay = `${rate.toFixed(1)} msg/sec`;
-                    color = '#ffc107';
-                } else if (rate >= 1) {
-                    rateDisplay = `${rate.toFixed(1)} msg/sec`;
-                    color = '#28a745';
-                } else if (rate > 0) {
-                    rateDisplay = `${rate.toFixed(1)} msg/sec`;
-                    color = '#6c757d';
-                } else {
-                    rateDisplay = '0 msg/sec';
-                    color = '#6c757d';
-                }
-                
-                // Add peak rate if available and significantly different
-                if (peakRate > rate * 1.5) {
-                    const peakDisplay = peakRate >= 1000 ? (peakRate/1000).toFixed(1)+'k' : Math.round(peakRate);
-                    rateDisplay += ` (peak: ${peakDisplay})`;
-                }
-                
-                rateText.textContent = rateDisplay;
-                rateText.style.color = color;
-                rateText.style.fontWeight = rate > 0 ? '500' : '400';
-            }
-        }
-    }
-
-    // Enhanced message count display using background count
-    updateMessageCountDisplay() {
-        try {
-            const messageCountArea = this.messageDetails.querySelector('.message-count-area');
-            
-            if (messageCountArea) {
-                // Use background count if available
-                const displayCount = this.backgroundMessageCount > 0 ? this.backgroundMessageCount : this.getTopicMessageCount();
-                
-                if (displayCount !== this.lastDisplayedCount) {
-                    const countText = messageCountArea.querySelector('.count-text');
-                    if (countText) {
-                        countText.textContent = `${displayCount} messages`;
-                        
-                        // Visual feedback for high-rate updates
-                        if (this.messageReceiveRate > 10 && !document.hidden) {
-                            countText.style.transition = 'color 0.2s';
-                            countText.style.color = '#007bff';
-                            setTimeout(() => {
-                                countText.style.color = '#495057';
-                            }, 200);
-                        }
-                    }
-                    this.lastDisplayedCount = displayCount;
-                }
-                
-                // Always update rate display
-                this.updateRateDisplay();
-            }
-        } catch (error) {
-            console.warn('Error updating message count:', error);
-        }
-    }
-
-    // Method to manually refresh the message count (called externally)
-    refreshMessageCount() {
-        // Force immediate update
-        if (this.countUpdateThrottle) {
-            clearTimeout(this.countUpdateThrottle);
-            this.countUpdateThrottle = null;
-            this.pendingCountUpdate = false;
-        }
-        this.updateMessageCountDisplay();
-        this.messagesReceivedSinceLastUpdate = 0;
-        this.lastUpdateTime = Date.now();
-    }
-
     limitDisplayedMessages() {
         const messageItems = this.messageDetails.querySelectorAll('.message-item');
         if (messageItems.length > this.maxDisplayMessages) {
-            // Remove oldest messages (from the end since newest are at the top)
             for (let i = this.maxDisplayMessages; i < messageItems.length; i++) {
                 messageItems[i].remove();
             }
@@ -537,7 +342,6 @@ class MessagePanel extends EventEmitter {
         const exportBtn = this.messageDetails.querySelector('.export-btn');
         if (!exportBtn) return;
         
-        // Create dropdown menu
         const dropdown = document.createElement('div');
         dropdown.className = 'export-dropdown';
         dropdown.style.cssText = `
@@ -563,11 +367,9 @@ class MessagePanel extends EventEmitter {
             </div>
         `;
         
-        // Position relative to button
         exportBtn.style.position = 'relative';
         exportBtn.appendChild(dropdown);
         
-        // Close dropdown when clicking outside
         const closeDropdown = (e) => {
             if (!exportBtn.contains(e.target)) {
                 dropdown.remove();
@@ -580,11 +382,9 @@ class MessagePanel extends EventEmitter {
         }, 0);
     }
 
-    // Create static header that won't be regenerated
     createTopicHeader(topic) {
         const formattedTopic = this.formatTopicPath(topic);
         
-        // Common button style
         const buttonStyle = `
             padding: 8px 16px; 
             font-size: 14px; 
@@ -644,7 +444,6 @@ class MessagePanel extends EventEmitter {
         return headerHTML;
     }
 
-    // Create separate message count area with rate display
     createMessageCountArea() {
         return `
             <div class="message-count-area" style="background: #e9ecef; padding: 8px 15px; border-radius: 6px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 20px; border: 1px solid #dee2e6;">
@@ -659,7 +458,6 @@ class MessagePanel extends EventEmitter {
         `;
     }
 
-    // Setup event listeners for the header buttons
     setupHeaderEventListeners() {
         const copyBtn = this.messageDetails.querySelector('.copy-topic-btn');
         const exportBtn = this.messageDetails.querySelector('.export-btn');
@@ -683,7 +481,6 @@ class MessagePanel extends EventEmitter {
         }
     }
 
-    // Render only the message list without touching the header
     renderMessageList(messages) {
         const messageLog = this.messageDetails.querySelector('.message-log');
         if (!messageLog) return;
@@ -701,23 +498,10 @@ class MessagePanel extends EventEmitter {
         this.currentConnection = connection;
         this.currentPage = 0;
         this.currentMessages = [];
-        this.messageCount = 0;
-        this.backgroundMessageCount = 0;
-        this.lastCountUpdate = Date.now();
         this.userScrolledAway = false;
         this.headerCreated = false;
-        this.lastDisplayedCount = 0;
-        
-        // Reset adaptive throttling state
-        this.pendingCountUpdate = false;
-        this.messagesReceivedSinceLastUpdate = 0;
-        this.lastUpdateTime = 0;
         this.messageTimestamps = [];
-        
-        // Load rate history for this topic
-        if (this.dbManager) {
-            this.messageReceiveRate = this.dbManager.getTopicMessageRate(connection.id, topic);
-        }
+        this.messageReceiveRate = 0;
 
         if (!connection || !topic) {
             this.showNoSelection();
@@ -745,12 +529,7 @@ class MessagePanel extends EventEmitter {
             );
             
             this.currentMessages = messages;
-            this.messageCount = messages.length;
-            this.backgroundMessageCount = messages.length;
             this.renderMessages(topic, messages, true);
-            
-            // Update from database metadata
-            this.updateMessageCountFromDatabase();
         } catch (error) {
             console.error('Error loading messages:', error);
             this.showError(topic, error.message);
@@ -775,7 +554,6 @@ class MessagePanel extends EventEmitter {
             
             if (newMessages.length > 0) {
                 this.currentMessages = [...this.currentMessages, ...newMessages];
-                // Only re-render the message list, not the header
                 this.renderMessageList(this.currentMessages);
             }
         } catch (error) {
@@ -805,7 +583,6 @@ class MessagePanel extends EventEmitter {
     renderMessages(topic, messages, resetScroll = true) {
         const scrollTop = resetScroll ? 0 : this.messageDetails.scrollTop;
         
-        // Only create header once per topic - never recreate it
         if (!this.headerCreated) {
             this.messageDetails.innerHTML = 
                 this.createTopicHeader(topic) + 
@@ -816,11 +593,8 @@ class MessagePanel extends EventEmitter {
             setTimeout(() => this.updateAutoScrollButton(), 0);
         }
         
-        // Always update the message list
         this.renderMessageList(messages);
-        
-        // Update the count after rendering
-        setTimeout(() => this.updateMessageCountDisplay(), 0);
+        this.updateDisplay();
         
         if (!resetScroll) {
             this.messageDetails.scrollTop = scrollTop;
@@ -835,7 +609,6 @@ class MessagePanel extends EventEmitter {
             return;
         }
 
-        // Close dropdown if open
         const dropdown = this.messageDetails.querySelector('.export-dropdown');
         if (dropdown) {
             dropdown.remove();
@@ -896,21 +669,14 @@ class MessagePanel extends EventEmitter {
         }
 
         try {
-            // Clear messages from database
             await this.dbManager.clearTopicMessages(this.currentConnection.id, this.currentTopic);
             
-            // Reset counters and reload
-            this.messageCount = 0;
-            this.backgroundMessageCount = 0;
             this.currentMessages = [];
             this.currentPage = 0;
-            this.lastDisplayedCount = 0;
             
-            // Only refresh the message list, not the entire display
             this.renderMessageList([]);
-            this.updateMessageCountDisplay();
+            this.updateDisplay();
             
-            // Emit event for other components
             this.emit('messages-cleared', { topic: this.currentTopic });
             
             console.log(`Cleared messages for topic: ${this.currentTopic}`);
@@ -925,40 +691,23 @@ class MessagePanel extends EventEmitter {
         this.currentConnection = null;
         this.currentMessages = [];
         this.currentPage = 0;
-        this.messageCount = 0;
-        this.backgroundMessageCount = 0;
         this.userScrolledAway = false;
         this.autoScrollEnabled = false;
         this.headerCreated = false;
-        this.lastDisplayedCount = 0;
-        
-        // Reset rate tracking
-        this.pendingCountUpdate = false;
-        this.messagesReceivedSinceLastUpdate = 0;
-        this.lastUpdateTime = 0;
-        this.messageReceiveRate = 0;
         this.messageTimestamps = [];
+        this.messageReceiveRate = 0;
         
         if (this.updateThrottle) {
             clearTimeout(this.updateThrottle);
             this.updateThrottle = null;
         }
         
-        if (this.countUpdateThrottle) {
-            clearTimeout(this.countUpdateThrottle);
-            this.countUpdateThrottle = null;
-        }
-        
-        // Clean up continuous rate tracking
-        if (this.rateUpdateInterval) {
-            clearInterval(this.rateUpdateInterval);
-            this.rateUpdateInterval = null;
+        if (this.displayUpdateThrottle) {
+            clearTimeout(this.displayUpdateThrottle);
+            this.displayUpdateThrottle = null;
         }
         
         this.showNoSelection();
-        
-        // Restart continuous tracking
-        this.startContinuousRateTracking();
     }
 }
 

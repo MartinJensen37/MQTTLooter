@@ -1,56 +1,35 @@
 const EventEmitter = require('events');
-const { escapeHtml } = require('./utils');
-const DatabaseManager = require('./database-manager');
+const path = require('path');
+const { escapeHtml } = require(path.join(__dirname, 'utils.js'));
+const DatabaseManager = require(path.join(__dirname, 'database-manager.js'));
 
 class TopicTree extends EventEmitter {
     constructor() {
         super();
-        this.treeView = document.getElementById('tree-view');
+        this.dbManager = null; // Will be initialized when needed
+        this.treeStructure = {};
         this.selectedTopic = null;
         this.currentActiveConnection = null;
-        this.dbManager = null;
+        this.renderScheduled = false;
         this.isInitialized = false;
-        this.treeStructure = {};
-        this.renderPending = false;
-        this.updateThrottle = new Map();
         
-        // Enhanced background update system
-        this.backgroundUpdateInterval = null;
-        this.lastStructureUpdate = Date.now();
-        this.pendingStructureUpdates = new Set();
-        this.forceUpdateInterval = null;
+        // Single source of truth for message counts
+        this.messageCounts = {}; // connectionId:topic -> count
         
-        this.setupEventHandlers();
-        this.initDatabase();
-        this.startBackgroundUpdates();
-        this.startForceUpdates();
-    }
-
-    startBackgroundUpdates() {
-        // Always update tree structure regardless of visibility
-        this.backgroundUpdateInterval = setInterval(() => {
-            if (this.currentActiveConnection && this.pendingStructureUpdates.size > 0) {
-                console.log('Background tree update with', this.pendingStructureUpdates.size, 'pending updates');
-                this.scheduleRender();
-                this.pendingStructureUpdates.clear();
-            }
-        }, 1000);
-    }
-
-    startForceUpdates() {
-        // Force visual updates every 5 seconds if window is visible
-        this.forceUpdateInterval = setInterval(() => {
-            if (!document.hidden && this.currentActiveConnection) {
-                this.scheduleRender();
-            }
-        }, 5000);
+        // Track known topics to detect new ones
+        this.knownTopics = new Set();
+        
+        // Simple throttling for rendering
+        this.renderThrottle = null;
+        
+        // Don't initialize immediately - wait for first use
     }
 
     async initDatabase() {
         try {
             console.log('TopicTree: Initializing database...');
             this.dbManager = new DatabaseManager();
-            await this.dbManager.init();
+            await this.dbManager.init(); // Use the correct method name
             this.isInitialized = true;
             console.log('TopicTree: Database initialized successfully');
             this.emit('database-ready');
@@ -60,485 +39,355 @@ class TopicTree extends EventEmitter {
         }
     }
 
-    setupEventHandlers() {
-        this.treeView.addEventListener('click', (e) => {
-            if (e.target === this.treeView) {
-                this.clearSelection();
-            }
-        });
+    // Single method to get message count (used by both TopicTree and MessagePanel)
+    getTopicMessageCount(connectionId, topic) {
+        const key = `${connectionId}:${topic}`;
+        return this.messageCounts[key] || 0;
     }
 
-    // Modified to handle background updates better
+    // Single method to update message count
+    updateTopicMessageCount(connectionId, topic, newCount) {
+        const key = `${connectionId}:${topic}`;
+        const oldCount = this.messageCounts[key] || 0;
+        
+        if (newCount !== oldCount) {
+            this.messageCounts[key] = newCount;
+            this.updateTopicInStructure(connectionId, topic, newCount);
+            this.scheduleRender();
+        }
+    }
+
+    // Increment message count (for real-time updates)
+    incrementTopicMessageCount(connectionId, topic) {
+        const key = `${connectionId}:${topic}`;
+        const currentCount = this.messageCounts[key] || 0;
+        this.updateTopicMessageCount(connectionId, topic, currentCount + 1);
+    }
+
+    // This is the method that ConnectionManager expects to exist
     async updateTopic(connectionId, topic, message) {
-        // Always process the update immediately - don't throttle data processing
-        await this.performTopicUpdate(connectionId, topic, message);
-        
-        // Only throttle visual updates, not data updates
-        const throttleKey = `${connectionId}:${topic}`;
-        if (this.updateThrottle.has(throttleKey)) {
-            clearTimeout(this.updateThrottle.get(throttleKey));
-        }
-        
-        // Use shorter throttle when window is visible
-        const throttleDelay = document.hidden ? 500 : 100;
-        this.updateThrottle.set(throttleKey, setTimeout(() => {
-            this.updateThrottle.delete(throttleKey);
-        }, throttleDelay));
-    }
-
-    async performTopicUpdate(connectionId, topic, message) {
-        // Wait for database to be ready
+        // Initialize database if not already done
         if (!this.isInitialized) {
-            await new Promise((resolve) => {
-                if (this.isInitialized) {
-                    resolve();
-                } else {
-                    this.once('database-ready', resolve);
-                }
-            });
+            if (!this.dbManager) {
+                await this.initDatabase();
+            }
         }
-        
+
+        if (!this.isInitialized) {
+            console.warn('TopicTree: Database still not initialized, skipping update');
+            return;
+        }
+
         try {
-            // Store message in IndexedDB - ALWAYS, regardless of window state
+            // Store message in database
             await this.dbManager.addMessage(connectionId, topic, message);
             
-            // Update tree structure - ALWAYS
-            await this.updateTreeStructure(connectionId, topic);
-            
-            // Track pending updates
-            this.pendingStructureUpdates.add(`${connectionId}:${topic}`);
-            this.lastStructureUpdate = Date.now();
-            
-            // Only update display if this is for the current active connection AND window is visible
-            if (this.currentActiveConnection && this.currentActiveConnection.id === connectionId) {
-                if (!document.hidden) {
-                    this.updateTopicNodeDisplay(topic, message);
-                }
-            }
+            // Update local counts
+            await this.handleNewMessage(connectionId, topic, message);
         } catch (error) {
             console.error('TopicTree: Error updating topic:', error);
         }
     }
 
-    forceUpdate() {
-        console.log('TopicTree: Force update requested');
-        if (this.currentActiveConnection) {
-            // Clear pending flag to force immediate render
-            this.renderPending = false;
-            this.scheduleRender();
-        }
-    }
+    // Handle new messages - simplified
+    async handleNewMessage(connectionId, topic, message) {
+        if (!this.isInitialized) return;
 
-    updateTopicNodeDisplay(topic, message) {
-        if (!this.currentActiveConnection) return;
+        const topicKey = `${connectionId}:${topic}`;
+        const isNewTopic = !this.knownTopics.has(topicKey);
         
-        const connectionId = this.currentActiveConnection.id;
-        const nodeData = this.findNodeData(this.treeStructure[connectionId], topic);
-        if (!nodeData) return;
-        
-        // Find the DOM element for this topic
-        const topicElement = this.findTopicDOMElement(topic);
-        if (topicElement) {
-            this.updateSingleNodeInfo(topicElement, nodeData, message);
-        }
-    }
-
-    // NEW METHOD: Find the DOM element for a specific topic
-    findTopicDOMElement(topic) {
-        const headers = this.treeView.querySelectorAll('.tree-node-header');
-        for (const header of headers) {
-            if (this.getTopicPathFromElement(header) === topic) {
-                return header;
-            }
-        }
-        return null;
-    }
-
-    // NEW METHOD: Get topic path from DOM element
-    getTopicPathFromElement(headerElement) {
-        const pathParts = [];
-        let currentElement = headerElement;
-        
-        while (currentElement && currentElement.classList.contains('tree-node-header')) {
-            const nameElement = currentElement.querySelector('.tree-node-name');
-            if (nameElement) {
-                pathParts.unshift(nameElement.textContent);
-            }
+        if (isNewTopic) {
+            console.log('TopicTree: New topic discovered:', topic);
+            this.knownTopics.add(topicKey);
             
-            // Move up to parent tree node
-            const parentNode = currentElement.closest('.tree-node').parentElement;
-            if (parentNode && parentNode.classList.contains('tree-children')) {
-                const grandParent = parentNode.parentElement;
-                if (grandParent && grandParent.classList.contains('tree-node')) {
-                    currentElement = grandParent.querySelector('.tree-node-header');
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
+            // For new topics, start with count of 1
+            this.updateTopicMessageCount(connectionId, topic, 1);
+        } else {
+            // For existing topics, just increment
+            this.incrementTopicMessageCount(connectionId, topic);
         }
-        
-        return pathParts.join('/');
     }
 
-    // NEW METHOD: Update just the info for a single node
-    updateSingleNodeInfo(headerElement, nodeData, message) {
-        const valueElement = headerElement.querySelector('.tree-node-value');
-        if (!valueElement) return;
-        
-        const hasChildren = Object.keys(nodeData.children || {}).length > 0;
-        const hasMessages = nodeData.fullTopic && nodeData.messageCount > 0;
-        
-        let infoHTML = '';
-        
-        if (hasChildren) {
-            const parts = [];
-            if (nodeData.topicCount > 0) parts.push(`${nodeData.topicCount} topic${nodeData.topicCount !== 1 ? 's' : ''}`);
-            if (nodeData.messageCount > 0) parts.push(`${nodeData.messageCount} message${nodeData.messageCount !== 1 ? 's' : ''}`);
-            infoHTML = parts.join(', ');
-        }
-        
-        // Add current topic's message info if it has messages
-        if (hasMessages) {
-            const currentInfo = `${nodeData.messageCount} msg${nodeData.messageCount !== 1 ? 's' : ''}`;
-            const messagePayload = message ? 
-                `<span class="message-payload">${escapeHtml(message)}</span>` : '';
-            
-            if (infoHTML) {
-                infoHTML += ` | ${currentInfo}${messagePayload ? ': ' + messagePayload : ''}`;
-            } else {
-                infoHTML = `${currentInfo}${messagePayload ? ': ' + messagePayload : ''}`;
-            }
-        }
-        
-        valueElement.innerHTML = infoHTML;
-        
-        // Add visual feedback for updated nodes
-        headerElement.classList.add('node-updated');
-        setTimeout(() => {
-            headerElement.classList.remove('node-updated');
-        }, 1000);
-    }
-
-    // NEW METHOD: Find node data in tree structure
-    findNodeData(treeData, topic) {
-        if (!treeData) return null;
-        
-        const parts = topic.split('/');
-        let current = treeData;
-        
-        for (let i = 0; i < parts.length; i++) {
-            const part = parts[i];
-            if (!current[part]) return null;
-            
-            if (i === parts.length - 1) {
-                return current[part]; // This is the final node
-            }
-            current = current[part].children;
-        }
-        
-        return null;
-    }
-
-    scheduleRender() {
-        if (this.renderPending) return;
-        
-        this.renderPending = true;
-        
-        // Use different timing based on visibility
-        const renderDelay = document.hidden ? 1000 : 0;
-        
-        setTimeout(async () => {
-            await this.render(this.currentActiveConnection);
-            this.renderPending = false;
-        }, renderDelay);
-    }
-
-    async updateTreeStructure(connectionId, topic) {
+    // Update topic in tree structure
+    updateTopicInStructure(connectionId, topic, messageCount) {
         if (!this.treeStructure[connectionId]) {
             this.treeStructure[connectionId] = {};
         }
 
         const parts = topic.split('/');
         let current = this.treeStructure[connectionId];
-        
+
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
             
             if (!current[part]) {
                 current[part] = {
-                    children: {},
-                    isExpanded: true,
-                    fullTopic: null,
                     messageCount: 0,
-                    topicCount: 0
+                    lastUpdate: Date.now(),
+                    children: {}
                 };
             }
-            
+
+            // If this is the final part (the actual topic), update its data
             if (i === parts.length - 1) {
-                // This is the final topic node
-                current[part].fullTopic = topic;
-                const metadata = await this.dbManager.getTopicMetadata(`${connectionId}:${topic}`);
-                if (metadata) {
-                    current[part].messageCount = metadata.messageCount;
-                    current[part].lastMessage = metadata.lastMessage;
-                }
+                current[part].messageCount = messageCount;
+                current[part].lastUpdate = Date.now();
             }
-            
+
             current = current[part].children;
         }
-        
-        // Update counts up the tree
-        this.updateCounts(this.treeStructure[connectionId]);
     }
 
-    updateCounts(node) {
-        for (const [key, value] of Object.entries(node)) {
-            let childTopicCount = 0;
-            let childMessageCount = 0;
+    // Throttled render scheduling
+    scheduleRender() {
+        if (this.renderThrottle) {
+            clearTimeout(this.renderThrottle);
+        }
+        
+        this.renderThrottle = setTimeout(() => {
+            this.render();
+            this.renderThrottle = null;
+        }, 100); // Simple 100ms throttle
+    }
+
+    async loadTreeStructure(connectionId) {
+        if (!this.isInitialized) {
+            console.warn('TopicTree: Database not initialized yet');
+            // Try to initialize
+            if (!this.dbManager) {
+                await this.initDatabase();
+            }
+            if (!this.isInitialized) {
+                return;
+            }
+        }
+
+        try {
+            console.log('TopicTree: Loading tree structure for connection:', connectionId);
             
-            if (Object.keys(value.children).length > 0) {
-                this.updateCounts(value.children);
+            const topics = await this.dbManager.getAllTopics(connectionId);
+            console.log('TopicTree: Found topics:', topics.length);
+            
+            // Clear existing structure for this connection
+            this.treeStructure[connectionId] = {};
+            
+            // Load all topic counts and build structure
+            for (const topicData of topics) {
+                const topic = topicData.topic;
+                const count = topicData.messageCount || 0;
                 
-                // Sum up children counts
-                for (const child of Object.values(value.children)) {
-                    if (child.fullTopic) {
-                        childTopicCount++;
-                        childMessageCount += child.messageCount || 0;
-                    }
-                    childTopicCount += child.topicCount || 0;
-                    childMessageCount += child.messageCount || 0;
-                }
+                // Update our single source of truth
+                const key = `${connectionId}:${topic}`;
+                this.messageCounts[key] = count;
+                this.knownTopics.add(key);
+                
+                // Build tree structure
+                this.updateTopicInStructure(connectionId, topic, count);
             }
             
-            value.topicCount = childTopicCount;
-            if (!value.fullTopic) {
-                value.messageCount = childMessageCount;
-            }
+            this.render();
+            
+        } catch (error) {
+            console.error('TopicTree: Error loading tree structure:', error);
         }
     }
 
-    async render(activeConnection = null) {
-        this.currentActiveConnection = activeConnection;
-        
-        if (!activeConnection || (this.selectedTopic && this.currentActiveConnection && this.currentActiveConnection.id !== activeConnection.id)) {
-            this.selectedTopic = null;
+    render(connection = null) {
+        if (connection) {
+            this.currentActiveConnection = connection;
         }
-        
-        this.updateTreeHeader(activeConnection);
-        await this.renderTreeNodes(activeConnection);
-    }
 
-    updateTreeHeader(activeConnection) {
-        const treeHeader = document.querySelector('.tree-header');
-        if (!treeHeader) {
-            console.warn('TopicTree: .tree-header element not found');
+        if (!this.currentActiveConnection) {
+            this.clearTreeView();
             return;
         }
 
-        if (activeConnection) {
-            treeHeader.className = 'tree-header has-active-connection';
-            treeHeader.innerHTML = `
-                Topic Tree
-                <div class="active-connection-name">Viewing: ${escapeHtml(activeConnection.name)}</div>
-            `;
-        } else {
-            treeHeader.className = 'tree-header';
-            treeHeader.innerHTML = 'Topic Tree';
-        }
-    }
-
-    async renderTreeNodes(activeConnection) {
-        if (!this.treeView) {
-            console.error('TopicTree: tree-view element not found');
-            return;
-        }
-        
-        this.treeView.innerHTML = '';
-        
-        if (!activeConnection) {
-            this.showEmptyState('No active connection');
-            return;
-        }
-        
-        if (!activeConnection.connected) {
-            this.showEmptyState('No active connection');
-            return;
-        }
-        
-        const treeData = this.treeStructure[activeConnection.id];
+        const connectionId = this.currentActiveConnection.id;
+        const treeData = this.treeStructure[connectionId];
         
         if (!treeData || Object.keys(treeData).length === 0) {
-            this.showWaitingState();
+            this.showLoadingState();
+            // Load data if we don't have it
+            this.loadTreeStructure(connectionId);
             return;
         }
-        
-        // Only render visible (expanded) nodes
-        await this.renderVisibleNodes(treeData, this.treeView, 0);
+
+        this.renderTreeStructure(treeData);
+        this.updateTreeHeader();
     }
 
-    showEmptyState(message) {
-        const emptyMessage = document.createElement('div');
-        emptyMessage.className = 'no-topic-selected';
-        emptyMessage.style.cssText = 'text-align: center; padding: 20px; color: #6c757d; font-style: italic;';
-        emptyMessage.textContent = message;
-        this.treeView.appendChild(emptyMessage);
-    }
-
-    showWaitingState() {
-        const waitingMessage = document.createElement('div');
-        waitingMessage.className = 'no-topic-selected';
-        waitingMessage.style.cssText = 'text-align: center; padding: 20px; color: #6c757d; font-style: italic;';
-        waitingMessage.innerHTML = `
-            <div style="color: #2ecc71; margin-bottom: 10px;">Connected</div>
-            <div style="font-size: 14px;">Waiting for MQTT messages...</div>
-        `;
-        this.treeView.appendChild(waitingMessage);
-    }
-
-    async renderVisibleNodes(node, container, level) {
-        if (!node) return;
-        
-        for (const [key, value] of Object.entries(node)) {
-            const nodeElement = document.createElement('li');
-            nodeElement.className = 'tree-node';
-            
-            const headerElement = document.createElement('div');
-            headerElement.className = 'tree-node-header';
-            
-            const hasChildren = Object.keys(value.children).length > 0;
-            const hasMessages = value.fullTopic && value.messageCount > 0;
-            
-            if (hasMessages) {
-                headerElement.classList.add('has-messages');
-            }
-            
-            if (this.selectedTopic === value.fullTopic && hasMessages) {
-                headerElement.classList.add('selected');
-            }
-            
-            // Add expand/collapse icon
-            const iconElement = document.createElement('span');
-            iconElement.className = 'tree-expand-icon';
-            if (hasChildren) {
-                iconElement.textContent = value.isExpanded ? '▼' : '▶';
-                iconElement.style.cursor = 'pointer';
-            } else {
-                iconElement.innerHTML = '&nbsp;';
-            }
-            headerElement.appendChild(iconElement);
-            
-            // Add node name
-            const nameElement = document.createElement('span');
-            nameElement.className = 'tree-node-name';
-            nameElement.textContent = key;
-            headerElement.appendChild(nameElement);
-            
-            // Add topic/message counts and current value
-            const infoElement = document.createElement('span');
-            infoElement.className = 'tree-node-value';
-            
-            let infoHTML = '';
-            
-            if (hasChildren) {
-                const parts = [];
-                if (value.topicCount > 0) parts.push(`${value.topicCount} topic${value.topicCount !== 1 ? 's' : ''}`);
-                if (value.messageCount > 0) parts.push(`${value.messageCount} message${value.messageCount !== 1 ? 's' : ''}`);
-                infoHTML = parts.join(', ');
-            }
-            
-            // Add current topic's message info if it has messages
-            if (hasMessages) {
-                const currentInfo = `${value.messageCount} msg${value.messageCount !== 1 ? 's' : ''}`;
-                const messagePayload = value.lastMessage ? 
-                    `<span class="message-payload">${escapeHtml(value.lastMessage)}</span>` : '';
-                
-                if (infoHTML) {
-                    infoHTML += ` | ${currentInfo}${messagePayload ? ': ' + messagePayload : ''}`;
-                } else {
-                    infoHTML = `${currentInfo}${messagePayload ? ': ' + messagePayload : ''}`;
-                }
-            }
-            
-            infoElement.innerHTML = infoHTML;
-            headerElement.appendChild(infoElement);
-            
-            nodeElement.appendChild(headerElement);
-            
-            // Click handlers
-            iconElement.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (hasChildren) {
-                    this.toggleNodeExpansion(value, key);
-                }
-            });
-            
-            nameElement.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (hasMessages) {
-                    this.selectTopic(value.fullTopic);
-                } else if (hasChildren) {
-                    this.toggleNodeExpansion(value, key);
-                }
-            });
-            
-            // Only render children if expanded (lazy rendering)
-            if (value.isExpanded && hasChildren) {
-                const childContainer = document.createElement('ul');
-                childContainer.className = 'tree-children';
-                await this.renderVisibleNodes(value.children, childContainer, level + 1);
-                nodeElement.appendChild(childContainer);
-            }
-            
-            container.appendChild(nodeElement);
+    // Add the missing forceUpdate method
+    forceUpdate() {
+        console.log('TopicTree: Force update requested');
+        if (this.currentActiveConnection) {
+            this.scheduleRender();
         }
     }
 
-    toggleNodeExpansion(node, nodeKey) {
-        node.isExpanded = !node.isExpanded;
-        this.emit('node-toggled', { node, nodeKey });
-        // Re-render only the affected part of the tree
-        this.scheduleRender();
+    renderTreeStructure(treeData, parentElement = null, path = '') {
+        const container = parentElement || document.getElementById('tree-view');
+        if (!container) return;
+
+        if (!parentElement) {
+            container.innerHTML = '';
+        }
+
+        Object.keys(treeData).sort().forEach(key => {
+            const nodeData = treeData[key];
+            const fullPath = path ? `${path}/${key}` : key;
+            const hasChildren = nodeData.children && Object.keys(nodeData.children).length > 0;
+            const messageCount = nodeData.messageCount || 0;
+
+            const li = document.createElement('li');
+            li.className = 'tree-node';
+            
+            const nodeContent = document.createElement('div');
+            nodeContent.className = 'tree-node-content';
+            
+            if (hasChildren) {
+                const toggleBtn = document.createElement('span');
+                toggleBtn.className = 'tree-toggle';
+                toggleBtn.textContent = '▶';
+                toggleBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.toggleNode(li);
+                };
+                nodeContent.appendChild(toggleBtn);
+            } else {
+                const spacer = document.createElement('span');
+                spacer.className = 'tree-spacer';
+                nodeContent.appendChild(spacer);
+            }
+
+            const label = document.createElement('span');
+            label.className = 'tree-label';
+            label.textContent = key;
+            
+            if (!hasChildren) {
+                label.classList.add('selectable');
+                label.onclick = () => this.selectTopic(fullPath);
+                
+                if (this.selectedTopic === fullPath) {
+                    label.classList.add('selected');
+                }
+            }
+            
+            nodeContent.appendChild(label);
+
+            if (messageCount > 0) {
+                const countBadge = document.createElement('span');
+                countBadge.className = 'message-count';
+                countBadge.textContent = messageCount.toString();
+                nodeContent.appendChild(countBadge);
+            }
+
+            li.appendChild(nodeContent);
+
+            if (hasChildren) {
+                const childList = document.createElement('ul');
+                childList.className = 'tree-children';
+                childList.style.display = 'none';
+                this.renderTreeStructure(nodeData.children, childList, fullPath);
+                li.appendChild(childList);
+            }
+
+            container.appendChild(li);
+        });
+    }
+
+    toggleNode(nodeElement) {
+        const toggle = nodeElement.querySelector('.tree-toggle');
+        const children = nodeElement.querySelector('.tree-children');
+        
+        if (!children) return;
+
+        const isExpanded = children.style.display !== 'none';
+        children.style.display = isExpanded ? 'none' : 'block';
+        toggle.textContent = isExpanded ? '▶' : '▼';
+        
+        if (!isExpanded) {
+            nodeElement.classList.add('expanded');
+        } else {
+            nodeElement.classList.remove('expanded');
+        }
     }
 
     selectTopic(topic) {
-        // Only emit if this is actually a different selection
-        if (this.selectedTopic !== topic) {
-            this.selectedTopic = topic;
-            this.scheduleRender();
-            this.emit('topic-selected', topic);
-        } else {
-            // Just update the visual state without emitting
-            this.scheduleRender();
+        // Clear previous selection
+        const prevSelected = document.querySelector('.tree-label.selected');
+        if (prevSelected) {
+            prevSelected.classList.remove('selected');
+        }
+
+        // Set new selection
+        this.selectedTopic = topic;
+        const newSelected = Array.from(document.querySelectorAll('.tree-label.selectable'))
+            .find(label => {
+                const li = label.closest('li');
+                return this.getFullPathForElement(li) === topic;
+            });
+
+        if (newSelected) {
+            newSelected.classList.add('selected');
+        }
+
+        console.log('TopicTree: Topic selected:', topic);
+        this.emit('topic-selected', topic);
+    }
+
+    getFullPathForElement(element) {
+        const parts = [];
+        let current = element;
+        
+        while (current && current.classList.contains('tree-node')) {
+            const label = current.querySelector('.tree-label');
+            if (label) {
+                parts.unshift(label.textContent);
+            }
+            current = current.parentElement?.closest?.('.tree-node');
+        }
+        
+        return parts.join('/');
+    }
+
+    clearTreeView() {
+        const treeView = document.getElementById('tree-view');
+        if (treeView) {
+            treeView.innerHTML = '<li class="no-connection">No active connection</li>';
+        }
+        
+        const treeHeader = document.querySelector('.tree-header');
+        if (treeHeader) {
+            treeHeader.textContent = 'Topic Tree';
         }
     }
 
-    clearSelection() {
-        this.selectedTopic = null;
-        this.scheduleRender();
-        this.emit('selection-cleared');
+    showLoadingState() {
+        const treeView = document.getElementById('tree-view');
+        if (treeView) {
+            treeView.innerHTML = '<li class="loading">Loading topics...</li>';
+        }
+    }
+
+    updateTreeHeader() {
+        const treeHeader = document.querySelector('.tree-header');
+        if (treeHeader && this.currentActiveConnection) {
+            const topicCount = this.knownTopics.size;
+            treeHeader.innerHTML = `Topic Tree (${topicCount} topics)`;
+        }
     }
 
     clear() {
         this.selectedTopic = null;
         this.currentActiveConnection = null;
-        this.treeView.innerHTML = '';
-        this.pendingStructureUpdates.clear();
+        this.treeStructure = {};
+        this.messageCounts = {};
+        this.knownTopics.clear();
         
-        // Clear throttle timers
-        this.updateThrottle.forEach(timer => clearTimeout(timer));
-        this.updateThrottle.clear();
-        
-        // Clear intervals
-        if (this.backgroundUpdateInterval) {
-            clearInterval(this.backgroundUpdateInterval);
-            this.backgroundUpdateInterval = null;
-        }
-        
-        if (this.forceUpdateInterval) {
-            clearInterval(this.forceUpdateInterval);
-            this.forceUpdateInterval = null;
+        // Clear intervals and timers
+        if (this.renderThrottle) {
+            clearTimeout(this.renderThrottle);
+            this.renderThrottle = null;
         }
         
         const treeHeader = document.querySelector('.tree-header');
@@ -547,9 +396,9 @@ class TopicTree extends EventEmitter {
             treeHeader.innerHTML = 'Topic Tree';
         }
         
-        // Restart background updates
-        this.startBackgroundUpdates();
-        this.startForceUpdates();
+        this.clearTreeView();
+        
+        this.emit('selection-cleared');
     }
 
     async getTopicMessages(connectionId, topic, limit = 100, offset = 0) {
@@ -564,10 +413,119 @@ class TopicTree extends EventEmitter {
     }
 
     async clearConnectionData(connectionId) {
-        await this.dbManager.clearConnectionData(connectionId);
+        // Only clear database if it's initialized
+        if (this.isInitialized && this.dbManager) {
+            try {
+                await this.dbManager.clearConnectionData(connectionId);
+            } catch (error) {
+                console.warn('Error clearing connection data from database:', error);
+            }
+        }
+        
         delete this.treeStructure[connectionId];
+        
+        // Clear message counts for this connection
+        Object.keys(this.messageCounts).forEach(key => {
+            if (key.startsWith(`${connectionId}:`)) {
+                delete this.messageCounts[key];
+            }
+        });
+        
+        // Clear known topics for this connection
+        this.knownTopics.forEach(topic => {
+            if (topic.startsWith(`${connectionId}:`)) {
+                this.knownTopics.delete(topic);
+            }
+        });
+        
         if (this.currentActiveConnection && this.currentActiveConnection.id === connectionId) {
             this.scheduleRender();
+        }
+    }
+
+    // Method called by ConnectionManager when messages arrive
+    async onMessageReceived(connectionId, topic, message) {
+        await this.handleNewMessage(connectionId, topic, message);
+    }
+
+    // Add method for compatibility with existing code
+    async forceUpdate() {
+        console.log('TopicTree: Force update requested');
+        if (this.currentActiveConnection) {
+            await this.loadTreeStructure(this.currentActiveConnection.id);
+        }
+    }
+
+    // Add method for getting topic count at specific connection
+    getTopicCount(connectionId) {
+        return Object.keys(this.messageCounts).filter(key => 
+            key.startsWith(`${connectionId}:`)
+        ).length;
+    }
+
+    // Add method to check if topic exists
+    hasTopicData(connectionId, topic) {
+        const key = `${connectionId}:${topic}`;
+        return this.knownTopics.has(key);
+    }
+
+    // Add method to get all topics for a connection
+    getTopicsForConnection(connectionId) {
+        return Array.from(this.knownTopics)
+            .filter(key => key.startsWith(`${connectionId}:`))
+            .map(key => key.substring(connectionId.length + 1));
+    }
+
+    // Add method to reset topic data
+    resetTopicData(connectionId, topic) {
+        const key = `${connectionId}:${topic}`;
+        delete this.messageCounts[key];
+        this.knownTopics.delete(key);
+        
+        // Remove from tree structure
+        if (this.treeStructure[connectionId]) {
+            this.removeTopicFromStructure(connectionId, topic);
+        }
+        
+        this.scheduleRender();
+    }
+
+    // Helper method to remove topic from tree structure
+    removeTopicFromStructure(connectionId, topic) {
+        if (!this.treeStructure[connectionId]) return;
+
+        const parts = topic.split('/');
+        let current = this.treeStructure[connectionId];
+        const pathNodes = [current];
+
+        // Navigate to the topic location
+        for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            if (current[part] && current[part].children) {
+                current = current[part].children;
+                pathNodes.push(current);
+            } else {
+                return; // Path doesn't exist
+            }
+        }
+
+        // Remove the final topic
+        const finalPart = parts[parts.length - 1];
+        delete current[finalPart];
+
+        // Clean up empty parent nodes
+        for (let i = pathNodes.length - 1; i >= 0; i--) {
+            const node = pathNodes[i];
+            const isEmpty = Object.keys(node).length === 0;
+            if (isEmpty && i > 0) {
+                // Remove this empty node from its parent
+                const parentPart = parts[i - 1];
+                if (pathNodes[i - 1][parentPart]) {
+                    delete pathNodes[i - 1][parentPart];
+                }
+            } else {
+                break; // Stop if we find a non-empty node
+            }
         }
     }
 }
