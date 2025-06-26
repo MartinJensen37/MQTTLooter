@@ -28,13 +28,21 @@ class MessagePanel extends EventEmitter {
         this.autoScrollEnabled = false;
         this.headerCreated = false;
         
-        // Simple throttling for display updates
+        // Remove separate rate tracking - use TopicTree's rate data
         this.displayUpdateThrottle = null;
-        this.messageReceiveRate = 0;
-        this.messageTimestamps = [];
-        this.rateCalculationWindow = 5000; // 5 seconds
+        this.rateUpdateInterval = null; // For periodic rate display updates
         
         this.setupEventHandlers();
+        this.startRateDisplayUpdates();
+    }
+
+    startRateDisplayUpdates() {
+        // Update rate display every second
+        this.rateUpdateInterval = setInterval(() => {
+            if (this.currentTopic && this.currentConnection && this.headerCreated && !document.hidden) {
+                this.updateRateDisplay();
+            }
+        }, 1000);
     }
 
     async initializeDbManager() {
@@ -97,6 +105,24 @@ class MessagePanel extends EventEmitter {
         }
         
         return this.topicTree.getTopicMessageCount(this.currentConnection.id, this.currentTopic);
+    }
+
+    // Get message rate from TopicTree (single source of truth)
+    getCurrentMessageRate() {
+        if (!this.currentTopic || !this.currentConnection || !this.topicTree) {
+            return 0;
+        }
+        
+        return this.topicTree.getTopicMessageRate(this.currentConnection.id, this.currentTopic);
+    }
+
+    // Get peak message rate from TopicTree
+    getCurrentPeakRate() {
+        if (!this.currentTopic || !this.currentConnection || !this.topicTree) {
+            return 0;
+        }
+        
+        return this.topicTree.getTopicPeakRate(this.currentConnection.id, this.currentTopic);
     }
 
     formatTopicPath(topic, maxLength = 60) {
@@ -217,22 +243,12 @@ class MessagePanel extends EventEmitter {
         }
     }
 
-    // Simplified update method - just updates display when called
+    // Simplified update method using TopicTree's rate data
     updateIfSelected(topic, message) {
         if (this.currentTopic === topic && this.currentConnection) {
-            // Track message rate
-            this.trackMessageRate();
-            
-            // Throttled display update
+            // Throttled display update based on TopicTree's rate
             this.scheduleDisplayUpdate(message);
         }
-    }
-
-    trackMessageRate() {
-        const now = Date.now();
-        this.messageTimestamps.push(now);
-        this.messageTimestamps = this.messageTimestamps.filter(ts => now - ts < this.rateCalculationWindow);
-        this.messageReceiveRate = this.messageTimestamps.length / (this.rateCalculationWindow / 1000);
     }
 
     scheduleDisplayUpdate(message = null) {
@@ -240,11 +256,15 @@ class MessagePanel extends EventEmitter {
             clearTimeout(this.displayUpdateThrottle);
         }
         
-        // Adaptive delay based on message rate
+        // Get current rate from TopicTree for adaptive delay
+        const currentRate = this.getCurrentMessageRate();
+        
+        // Adaptive delay based on message rate from TopicTree
         let delay = 50;
-        if (this.messageReceiveRate > 50) delay = 200;
-        else if (this.messageReceiveRate > 20) delay = 100;
-        else if (this.messageReceiveRate > 5) delay = 75;
+        if (currentRate > 100) delay = 500;
+        else if (currentRate > 50) delay = 200;
+        else if (currentRate > 20) delay = 100;
+        else if (currentRate > 5) delay = 75;
         
         this.displayUpdateThrottle = setTimeout(() => {
             this.updateDisplay();
@@ -260,21 +280,36 @@ class MessagePanel extends EventEmitter {
         const messageCountArea = this.messageDetails.querySelector('.message-count-area');
         if (messageCountArea) {
             const countText = messageCountArea.querySelector('.count-text');
-            const rateText = messageCountArea.querySelector('.rate-text');
             
             if (countText) {
                 const count = this.getCurrentMessageCount();
                 countText.textContent = `${count} messages`;
+                
+                // Visual feedback for high-rate updates
+                const currentRate = this.getCurrentMessageRate();
+                if (currentRate > 10 && !document.hidden) {
+                    countText.style.transition = 'color 0.2s';
+                    countText.style.color = '#007bff';
+                    setTimeout(() => {
+                        countText.style.color = '#495057';
+                    }, 200);
+                }
             }
             
-            if (rateText) {
-                this.updateRateDisplay(rateText);
-            }
+            // Always update rate display
+            this.updateRateDisplay();
         }
     }
 
-    updateRateDisplay(rateText) {
-        const rate = Math.round(this.messageReceiveRate * 10) / 10;
+    updateRateDisplay() {
+        const messageCountArea = this.messageDetails.querySelector('.message-count-area');
+        if (!messageCountArea) return;
+        
+        const rateText = messageCountArea.querySelector('.rate-text');
+        if (!rateText) return;
+        
+        const rate = this.getCurrentMessageRate();
+        const peakRate = this.getCurrentPeakRate();
         
         let rateDisplay = '';
         let color = '#6c757d';
@@ -297,6 +332,12 @@ class MessagePanel extends EventEmitter {
         } else {
             rateDisplay = '0 msg/sec';
             color = '#6c757d';
+        }
+        
+        // Add peak rate if available and different from current
+        if (peakRate > rate && peakRate > 1) {
+            const peakDisplay = peakRate >= 1000 ? `${(peakRate/1000).toFixed(1)}k` : Math.round(peakRate);
+            rateDisplay += ` (peak: ${peakDisplay})`;
         }
         
         rateText.textContent = rateDisplay;
@@ -500,8 +541,6 @@ class MessagePanel extends EventEmitter {
         this.currentMessages = [];
         this.userScrolledAway = false;
         this.headerCreated = false;
-        this.messageTimestamps = [];
-        this.messageReceiveRate = 0;
 
         if (!connection || !topic) {
             this.showNoSelection();
@@ -694,8 +733,6 @@ class MessagePanel extends EventEmitter {
         this.userScrolledAway = false;
         this.autoScrollEnabled = false;
         this.headerCreated = false;
-        this.messageTimestamps = [];
-        this.messageReceiveRate = 0;
         
         if (this.updateThrottle) {
             clearTimeout(this.updateThrottle);
@@ -707,7 +744,15 @@ class MessagePanel extends EventEmitter {
             this.displayUpdateThrottle = null;
         }
         
+        if (this.rateUpdateInterval) {
+            clearInterval(this.rateUpdateInterval);
+            this.rateUpdateInterval = null;
+        }
+        
         this.showNoSelection();
+        
+        // Restart rate display updates
+        this.startRateDisplayUpdates();
     }
 }
 

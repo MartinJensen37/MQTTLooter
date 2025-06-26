@@ -391,6 +391,18 @@ class DatabaseManager {
         });
     }
 
+    async getAllMessagesForConnection(connectionId) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['messages'], 'readonly');
+            const store = transaction.objectStore('messages');
+            const index = store.index('connectionId');
+            const request = index.getAll(connectionId);
+            
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
     async getAllTopics(connectionId) {
         if (!this.isInitialized) {
             throw new Error('Database not initialized');

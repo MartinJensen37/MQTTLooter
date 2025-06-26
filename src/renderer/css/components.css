@@ -235,6 +235,7 @@
 .tree-node-header {
     padding: 6px 10px;
     cursor: pointer;
+    user-select: none;
     border-radius: 3px;
     display: flex;
     align-items: center;
@@ -244,11 +245,20 @@
 
 .tree-node-header:hover {
     background-color: #e9ecef;
+    cursor: pointer;
 }
 
 .tree-node-header.selected {
-    background-color: #007bff;
-    color: white;
+    background-color: #e9ecef;
+    color: #495057;
+}
+
+.tree-node-header.selected .tree-node-value {
+    color: #6c757d !important; /* Darker gray text for readability */
+}
+
+.tree-node-header.selected .tree-node-value .message-payload {
+    color: #495057 !important; /* Keep payload text dark */
 }
 
 .tree-node-header.has-messages {
@@ -257,7 +267,7 @@
 
 .tree-node-header.node-updated {
     background-color: #e8f5e8 !important;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.2s ease;
 }
 
 .tree-node-header.node-updated .message-payload {
@@ -296,12 +306,12 @@
     color: #495057;
 }
 
-.tree-node-header.selected .tree-node-value {
-    color: #cce7ff;
+.tree-expand-icon {
+    cursor: inherit !important;
 }
 
-.tree-node-header.selected .tree-node-value .message-payload {
-    color: white;
+.tree-node-name {
+    cursor: inherit !important;
 }
 
 .tree-children {
