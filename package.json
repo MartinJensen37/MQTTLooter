@@ -6,7 +6,14 @@
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder",
+    "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "dev:renderer": "cd src/renderer && cross-env BROWSER=none npm start",
+    "dev:electron": "wait-on http://localhost:3000 ; cross-env NODE_ENV=development electron .",
+    "electron": "cross-env NODE_ENV=development electron .",
+    "electron:powershell": "powershell -Command \"$env:NODE_ENV = 'development'; electron .\"",
+    "electron:cmd": "cmd /c \"set NODE_ENV=development && electron .\"",
+    "build:renderer": "cd src/renderer && npm run build",
+    "dist": "npm run build:renderer && electron-builder",
     "pack": "electron-builder --dir",
     "lint": "echo \"No linting configured\""
   },
@@ -18,7 +25,9 @@
       "output": "dist-builder"
     },
     "files": [
-      "src/**/*",
+      "src/main/**/*",
+      "src/preload/**/*",
+      "src/renderer/build/**/*",
       "assets/**/*",
       "package.json"
     ],
@@ -31,22 +40,16 @@
       "allowToChangeInstallationDirectory": true
     }
   },
-  "keywords": [
-    "mqtt",
-    "electron"
-  ],
-  "author": {
-    "name": "martinjensen37",
-    "email": "martinjensen37@gmail.com"
-  },
-  "license": "MIT",
   "dependencies": {
     "mqtt": "^5.13.1",
-    "toastify-js": "^1.12.0"
+    "react-split-pane": "^0.1.92"
   },
   "devDependencies": {
     "@electron/fuses": "^1.8.0",
+    "concurrently": "^7.6.0",
+    "cross-env": "^7.0.3",
     "electron": "36.5.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "wait-on": "^7.2.0"
   }
 }

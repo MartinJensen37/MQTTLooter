@@ -1,0 +1,196 @@
+.app {
+  display: flex;
+  height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+  background: #f8f9fa;
+}
+
+/* Override react-split-pane styles */
+.Resizer {
+  background: #dee2e6 !important;
+  opacity: 0.7 !important;
+  z-index: 1 !important;
+  box-sizing: border-box !important;
+  background-clip: padding-box !important;
+}
+
+.Resizer:hover {
+  transition: all 0.2s ease !important;
+}
+
+.Resizer.vertical {
+  width: 4px !important;
+  margin: 0 -2px !important;
+  border-left: 2px solid rgba(255, 255, 255, 0) !important;
+  border-right: 2px solid rgba(255, 255, 255, 0) !important;
+  cursor: col-resize !important;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: white;
+}
+
+.main-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.header-left h2 {
+  margin: 0 0 4px 0;
+  color: #2c3e50;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.connection-info {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.connection-id {
+  font-size: 12px;
+  color: #6c757d;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  background: #e9ecef;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.multi-connection-indicator {
+  font-size: 12px;
+  color: #28a745;
+  font-weight: 500;
+  background: #d4edda;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.header-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.toggle-tree-btn {
+  padding: 6px 12px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toggle-tree-btn:hover {
+  background: #0056b3;
+}
+
+.topic-tree-panel {
+  background: white;
+  border-right: 1px solid #dee2e6;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 250px;
+  max-width: 600px;
+}
+
+.no-connection-selected {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #6c757d;
+  padding: 40px;
+}
+
+.no-connection-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+
+.no-connection-selected h2 {
+  margin: 0 0 12px 0;
+  color: #495057;
+  font-size: 24px;
+}
+
+.no-connection-selected p {
+  margin: 8px 0;
+  font-size: 16px;
+  line-height: 1.5;
+  max-width: 500px;
+}
+
+.hint {
+  font-size: 14px;
+  color: #6c757d;
+  opacity: 0.8;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .main-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .connection-info {
+    justify-content: center;
+  }
+  
+  .header-controls {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+  
+  .connection-sidebar {
+    width: 100% !important;
+    max-height: 200px;
+    min-width: unset;
+    max-width: unset;
+  }
+  
+  .main-content {
+    height: calc(100vh - 200px);
+  }
+  
+  .no-connection-selected {
+    padding: 20px;
+  }
+  
+  .no-connection-icon {
+    font-size: 48px;
+  }
+  
+  .no-connection-selected h2 {
+    font-size: 20px;
+  }
+  
+  .no-connection-selected p {
+    font-size: 14px;
+  }
+}

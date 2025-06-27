@@ -1,4 +1,4 @@
-const { Menu, shell } = require('electron');
+const { Menu, shell, BrowserWindow } = require('electron');
 
 function setupMenu() {
     const template = [
@@ -9,8 +9,7 @@ function setupMenu() {
                     label: 'New Connection',
                     accelerator: 'CmdOrCtrl+N',
                     click: () => {
-                        // Send IPC to renderer to show new connection modal
-                        const focusedWindow = require('electron').BrowserWindow.getFocusedWindow();
+                        const focusedWindow = BrowserWindow.getFocusedWindow();
                         if (focusedWindow) {
                             focusedWindow.webContents.send('menu-new-connection');
                         }
