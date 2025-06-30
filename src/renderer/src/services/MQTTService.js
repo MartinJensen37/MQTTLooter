@@ -6,7 +6,10 @@ class MQTTService {
   }
 
   setupGlobalEventHandlers() {
-    if (!window.electronAPI) return;
+    if (!window.electronAPI) {
+      console.error('ElectronAPI not available');
+      return;
+    }
 
     const eventTypes = ['connected', 'disconnected', 'message', 'error', 'reconnecting', 'subscribed', 'unsubscribed', 'published'];
     
@@ -26,21 +29,19 @@ class MQTTService {
       
       switch (eventType) {
         case 'connected':
-          connection.status = 'connected';
           connection.isConnected = true;
+          connection.status = 'connected';
           break;
         case 'disconnected':
-          connection.status = 'disconnected';
           connection.isConnected = false;
-          break;
-        case 'reconnecting':
-          connection.status = 'reconnecting';
+          connection.status = 'disconnected';
           break;
         case 'error':
           connection.status = 'error';
-          connection.lastError = data.error;
           break;
       }
+      
+      this.connections.set(connectionId, connection);
     }
 
     // Call registered handlers
@@ -51,7 +52,7 @@ class MQTTService {
       try {
         handler(data);
       } catch (error) {
-        console.error('Event handler error:', error);
+        console.error(`Error in event handler for ${eventType}:`, error);
       }
     });
   }
@@ -93,37 +94,103 @@ class MQTTService {
     this.connections.set(connectionId, connectionData);
 
     try {
+      console.log(`MQTTService: Connecting ${connectionId}`);
       const result = await window.electronAPI.mqtt.connect(connectionId, config);
-      if (!result.success) {
+      
+      if (result.success) {
+        connectionData.status = 'connected';
+        connectionData.isConnected = true;
+        this.connections.set(connectionId, connectionData);
+        console.log(`MQTTService: Successfully connected ${connectionId}`);
+      } else {
         connectionData.status = 'error';
-        connectionData.lastError = result.error;
+        connectionData.isConnected = false;
+        this.connections.set(connectionId, connectionData);
+        console.error(`MQTTService: Failed to connect ${connectionId}:`, result.error);
         throw new Error(result.error);
       }
+      
       return result;
     } catch (error) {
-      connectionData.status = 'error';
-      connectionData.lastError = error.message;
+      console.error(`MQTTService: Connect error for ${connectionId}:`, error);
+      const connectionData = this.connections.get(connectionId);
+      if (connectionData) {
+        connectionData.status = 'error';
+        connectionData.isConnected = false;
+        this.connections.set(connectionId, connectionData);
+      }
       throw error;
     }
   }
 
   async disconnect(connectionId) {
     try {
+      console.log(`MQTTService: Disconnecting ${connectionId}`);
       const result = await window.electronAPI.mqtt.disconnect(connectionId);
+      
       if (result.success) {
-        this.connections.delete(connectionId);
+        // Update connection status but DON'T remove from connections
+        const connection = this.connections.get(connectionId);
+        if (connection) {
+          connection.isConnected = false;
+          connection.status = 'disconnected';
+          this.connections.set(connectionId, connection);
+          console.log(`MQTTService: Successfully disconnected ${connectionId}, keeping connection config`);
+        }
         
-        // Clean up event handlers for this connection
+        // Clean up connection-specific event handlers (but keep the connection)
         const keysToDelete = [];
         this.eventHandlers.forEach((_, key) => {
-          if (key.startsWith(`${connectionId}:`)) {
+          if (key.startsWith(`${connectionId}:`) && !key.startsWith('*:')) {
             keysToDelete.push(key);
           }
         });
-        keysToDelete.forEach(key => this.eventHandlers.delete(key));
+        keysToDelete.forEach(key => {
+          console.log(`Cleaning up connection-specific event handler: ${key}`);
+          this.eventHandlers.delete(key);
+        });
+      } else {
+        console.error(`MQTTService: Failed to disconnect ${connectionId}:`, result.error);
+        throw new Error(result.error);
       }
+      
       return result;
     } catch (error) {
+      console.error(`MQTTService: Disconnect error for ${connectionId}:`, error);
+      throw error;
+    }
+  }
+
+  // New method for completely removing a connection (used by delete function)
+  async deleteConnection(connectionId) {
+    try {
+      console.log(`MQTTService: Deleting connection ${connectionId}`);
+      
+      // First disconnect if connected
+      const connection = this.connections.get(connectionId);
+      if (connection?.isConnected) {
+        await this.disconnect(connectionId);
+      }
+      
+      // Remove from local connections completely
+      this.connections.delete(connectionId);
+      
+      // Clean up ALL event handlers for this connection
+      const keysToDelete = [];
+      this.eventHandlers.forEach((_, key) => {
+        if (key.startsWith(`${connectionId}:`)) {
+          keysToDelete.push(key);
+        }
+      });
+      keysToDelete.forEach(key => {
+        console.log(`Cleaning up event handler for deleted connection: ${key}`);
+        this.eventHandlers.delete(key);
+      });
+      
+      console.log(`MQTTService: Successfully deleted connection ${connectionId}`);
+      return { success: true };
+    } catch (error) {
+      console.error(`MQTTService: Delete connection error for ${connectionId}:`, error);
       throw error;
     }
   }
@@ -151,13 +218,15 @@ class MQTTService {
 
   async refreshConnectionsFromMain() {
     try {
+      console.log('MQTTService: Refreshing connections from main process');
       const result = await window.electronAPI.mqtt.getConnections();
       if (result.success) {
+        console.log('MQTTService: Received connections from main:', result.data);
         return result.data;
       }
       throw new Error(result.error);
     } catch (error) {
-      console.error('Failed to refresh connections:', error);
+      console.error('MQTTService: Failed to refresh connections:', error);
       throw error;
     }
   }
