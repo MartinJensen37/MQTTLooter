@@ -138,15 +138,24 @@ class TopicTree {
   // Expand all nodes up to a certain depth
   expandToDepth(maxDepth) {
     const traverse = (node, depth = 0) => {
-      if (depth < maxDepth) {
-        node.isExpanded = true;
-        for (const child of node.children.values()) {
-          traverse(child, depth + 1);
+      // Always traverse children first to ensure we reach all nodes
+      for (const child of node.children.values()) {
+        traverse(child, depth + 1);
+      }
+      
+      // Then set expansion state based on depth
+      // Skip the root node (it shouldn't have expansion state)
+      if (node !== this.root) {
+        if (maxDepth === 0) {
+          // Collapse all nodes when maxDepth is 0
+          node.isExpanded = false;
+        } else {
+          // Expand nodes that are at depth less than maxDepth
+          node.isExpanded = depth < maxDepth;
         }
-      } else {
-        node.isExpanded = false;
       }
     };
+    
     traverse(this.root);
   }
 
