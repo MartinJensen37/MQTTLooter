@@ -27,59 +27,30 @@ class TopicTreeService {
   setupEventListeners() {
     if (!this.MQTTService) return;
 
-    // Listen to MQTT events and build topic trees
-    this.MQTTService.onAny('connected', (data) => {
-      this.handleConnectionEvent('connected', data);
-    });
-
-    this.MQTTService.onAny('disconnected', (data) => {
-      this.handleConnectionEvent('disconnected', data);
-    });
-
+    // ONLY listen to message events - let App handle connection lifecycle
     this.MQTTService.onAny('message', (data) => {
       this.handleMessage(data);
     });
-
-    this.MQTTService.onAny('error', (data) => {
-      this.handleConnectionEvent('error', data);
-    });
-  }
-
-  handleConnectionEvent(eventType, data) {
-    const { id: connectionId } = data;
-    
-    switch (eventType) {
-      case 'connected':
-        // Create new topic tree for this connection
-        if (!this.topicTrees.has(connectionId)) {
-          this.topicTrees.set(connectionId, new TopicTree(connectionId));
-        }
-        this.emitEvent('treeCreated', { connectionId, tree: this.topicTrees.get(connectionId) });
-        break;
-        
-      case 'disconnected':
-        // Keep the tree but mark as disconnected
-        this.emitEvent('treeDisconnected', { connectionId });
-        break;
-        
-      case 'error':
-        this.emitEvent('treeError', { connectionId, error: data.error });
-        break;
-    }
   }
 
   handleMessage(messageData) {
     const { id: connectionId, topic, message, qos, retain, timestamp } = messageData;
     
-    // Get or create topic tree for this connection
+    // Get or create topic tree for this connection (lazy creation)
     let topicTree = this.topicTrees.get(connectionId);
     if (!topicTree) {
       topicTree = new TopicTree(connectionId);
       this.topicTrees.set(connectionId, topicTree);
+      
+      // Emit tree created event only when first message arrives
+      this.emitEvent('treeCreated', { connectionId, tree: topicTree });
     }
     
     // Add message to topic tree
     const node = topicTree.addMessage(topic, message, qos, retain, timestamp);
+    
+    // Immediately update rate for this specific node for faster response
+    node.calculateMessageRate();
     
     // Emit tree update event
     this.emitEvent('treeUpdated', { 
@@ -91,19 +62,21 @@ class TopicTreeService {
   }
 
   startRateCalculationTimer() {
-    // Update message rates every second
+    // Update message rates every 100ms for very responsive updates
     setInterval(() => {
       this.topicTrees.forEach(tree => {
         tree.topicLookup.forEach(node => {
           node.calculateMessageRate();
         });
       });
-      
-      // Emit rate update event
+    }, 100);
+    
+    // Emit rate updates every 250ms
+    setInterval(() => {
       this.emitEvent('ratesUpdated', {
         trees: this.getAllTreeStatistics()
       });
-    }, 1000);
+    }, 250);
   }
 
   // Event system for the service
@@ -144,7 +117,11 @@ class TopicTreeService {
 
   getTopicTreeNodes(connectionId, includeCollapsed = false) {
     const tree = this.topicTrees.get(connectionId);
-    return tree ? tree.getFlattenedNodes(includeCollapsed) : [];
+    if (!tree) {
+      // Return empty array if no tree exists yet (no messages received)
+      return [];
+    }
+    return tree.getFlattenedNodes(includeCollapsed);
   }
 
   toggleTopicNode(connectionId, topicPath) {

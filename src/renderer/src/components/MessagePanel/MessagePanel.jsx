@@ -11,50 +11,37 @@ function MessagePanel({
   const [sortBy, setSortBy] = useState('timestamp');
   const [sortOrder, setSortOrder] = useState('desc');
   const [showRetainedOnly, setShowRetainedOnly] = useState(false);
+  const [showTopicExportMenu, setShowTopicExportMenu] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState('');
 
-  // Filter and sort messages
-  const processedMessages = React.useMemo(() => {
-    let filtered = messages;
+  // Filter
+const processedMessages = React.useMemo(() => {
+  // Messages are already filtered by connection and topic in App.jsx
+  return messages;
+}, [messages, showRetainedOnly, sortBy, sortOrder]);
 
-    // Filter by selected topic
-    if (selectedTopic) {
-      filtered = filtered.filter(msg => msg.topic === selectedTopic.topicPath);
-    }
+  // Get the most recent message for the selected topic (for topic details)
+  const topicDetails = React.useMemo(() => {
+    if (!selectedTopic || processedMessages.length === 0) return null;
+    
+    return processedMessages[processedMessages.length - 1]; // Most recent message
+  }, [selectedTopic, processedMessages]);
 
-    // Filter by retained messages if toggled
-    if (showRetainedOnly) {
-      filtered = filtered.filter(msg => msg.retain);
-    }
+  const showCopyFeedback = (message) => {
+    setCopyFeedback(message);
+    setTimeout(() => setCopyFeedback(''), 2000); // Clear feedback after 2 seconds
+  };
 
-    // Sort messages
-    filtered.sort((a, b) => {
-      let aValue = a[sortBy];
-      let bValue = b[sortBy];
-
-      if (sortBy === 'timestamp') {
-        aValue = new Date(a.timestamp).getTime();
-        bValue = new Date(b.timestamp).getTime();
-      }
-
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
-
-    return filtered;
-  }, [messages, selectedTopic, showRetainedOnly, sortBy, sortOrder]);
-
-  const exportAsJSON = () => {
+  const exportTopicAsJSON = () => {
+    if (!selectedTopic || processedMessages.length === 0) return;
+    
     const exportData = {
       exportDate: new Date().toISOString(),
       connectionName: connectionName || 'Unknown',
-      selectedTopic: selectedTopic?.topicPath || 'All Topics',
+      topic: selectedTopic.topicPath,
       messageCount: processedMessages.length,
       messages: processedMessages.map(msg => ({
         timestamp: msg.timestamp,
-        topic: msg.topic,
         payload: msg.message,
         qos: msg.qos,
         retain: msg.retain,
@@ -69,20 +56,22 @@ function MessagePanel({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `mqtt-messages-${new Date().toISOString().slice(0, 19)}.json`;
+    a.download = `mqtt-topic-${selectedTopic.topicPath.replace(/[\/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 19)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    setShowTopicExportMenu(false);
   };
 
-  const exportAsCSV = () => {
-    const headers = ['Timestamp', 'Topic', 'Payload', 'QoS', 'Retain', 'Connection'];
+  const exportTopicAsCSV = () => {
+    if (!selectedTopic || processedMessages.length === 0) return;
+    
+    const headers = ['Timestamp', 'Payload', 'QoS', 'Retain', 'Connection'];
     const csvData = [
       headers.join(','),
       ...processedMessages.map(msg => [
         `"${msg.timestamp}"`,
-        `"${msg.topic}"`,
         `"${msg.message.replace(/"/g, '""')}"`, // Escape quotes
         msg.qos,
         msg.retain,
@@ -94,11 +83,28 @@ function MessagePanel({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `mqtt-messages-${new Date().toISOString().slice(0, 19)}.csv`;
+    a.download = `mqtt-topic-${selectedTopic.topicPath.replace(/[\/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 19)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    setShowTopicExportMenu(false);
+  };
+
+  const copyTopicPath = () => {
+    if (selectedTopic) {
+      navigator.clipboard.writeText(selectedTopic.topicPath);
+      showCopyFeedback('Topic path copied!');
+    }
+  };
+
+  const copyPayload = (payload, event) => {
+    // Stop event propagation to prevent conflicts
+    if (event) {
+      event.stopPropagation();
+    }
+    navigator.clipboard.writeText(payload);
+    showCopyFeedback('Payload copied!');
   };
 
   const formatTimestamp = (timestamp) => {
@@ -121,6 +127,13 @@ function MessagePanel({
 
   return (
     <div className="message-panel">
+      {/* Copy Feedback Toast */}
+      {copyFeedback && (
+        <div className="copy-feedback">
+          <i className="fas fa-check-circle"></i> {copyFeedback}
+        </div>
+      )}
+
       <div className="message-panel-header">
         <div className="header-left">
           <h2>
@@ -132,109 +145,154 @@ function MessagePanel({
             )}
           </h2>
         </div>
-        
-        <div className="header-controls">
-          <div className="filter-controls">
-            <label className="checkbox-control">
-              <input
-                type="checkbox"
-                checked={showRetainedOnly}
-                onChange={(e) => setShowRetainedOnly(e.target.checked)}
-              />
-              Retained only
-            </label>
-            
-            <select 
-              value={sortBy} 
-              onChange={(e) => setSortBy(e.target.value)}
-              className="sort-select"
-            >
-              <option value="timestamp">Sort by Time</option>
-              <option value="topic">Sort by Topic</option>
-              <option value="qos">Sort by QoS</option>
-            </select>
-            
-            <button 
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="sort-order-btn"
-              title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
-            >
-              {sortOrder === 'asc' ? '↓' : '↑'}
-            </button>
+      </div>
+
+      {/* Topic Details Box */}
+      {selectedTopic && topicDetails && (
+        <div className="topic-details-box">
+          <div className="topic-details-header">
+            <h3>Topic Details</h3>
           </div>
           
-          <div className="action-buttons">
-            <button onClick={exportAsJSON} className="export-btn json-btn">
-              Export JSON
-            </button>
-            <button onClick={exportAsCSV} className="export-btn csv-btn">
-              Export CSV
-            </button>
+          <div className="topic-details-content">
+            <div className="topic-info-grid">
+              <div className="topic-info-item">
+                <label>Full Topic Path:</label>
+                <div className="topic-path-with-copy">
+                  <span className="topic-path">{selectedTopic.topicPath}</span>
+                  <button 
+                    className="copy-topic-inline-btn"
+                    onClick={copyTopicPath}
+                    title="Copy topic path"
+                  >
+                    <i className="fas fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="topic-info-item">
+                <label>Last Message:</label>
+                <span className="timestamp">{formatTimestamp(topicDetails.timestamp)}</span>
+              </div>
+              
+              <div className="topic-info-item">
+                <label>QoS:</label>
+                <span className={`qos-badge ${getQoSBadgeClass(topicDetails.qos)}`}>
+                  {topicDetails.qos}
+                </span>
+              </div>
+              
+              <div className="topic-info-item">
+                <label>Retained:</label>
+                <span className={`retain-status ${topicDetails.retain ? 'retained' : 'not-retained'}`}>
+                  {topicDetails.retain ? 'Yes' : 'No'}
+                </span>
+              </div>
+            </div>
             
-            {selectedTopic && (
-              <button onClick={onClearFilter} className="clear-filter-btn">
-                Clear Filter
-              </button>
-            )}
-            
-            <button onClick={onClearMessages} className="clear-messages-btn">
-              Clear Messages
-            </button>
+            {/* Export button moved to bottom right */}
+            <div className="topic-export-section">
+              <div className="topic-export-dropdown">
+                <button 
+                  onClick={() => setShowTopicExportMenu(!showTopicExportMenu)} 
+                  className="export-topic-btn"
+                  title="Export topic data"
+                >
+                  <i className="fas fa-download"></i> Export <i className="fas fa-chevron-down"></i>
+                </button>
+                {showTopicExportMenu && (
+                  <div className="export-menu">
+                    <button onClick={exportTopicAsJSON} className="export-menu-item">
+                      <i className="fas fa-file-code"></i> Export as JSON
+                    </button>
+                    <button onClick={exportTopicAsCSV} className="export-menu-item">
+                      <i className="fas fa-file-csv"></i> Export as CSV
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
       
       <div className="message-list">
         {processedMessages.length === 0 ? (
           <div className="no-messages">
-            <div className="no-messages-icon">📭</div>
+            <div className="no-messages-icon">
+              <i className="fas fa-inbox"></i>
+            </div>
             <h3>No messages yet</h3>
             <p>
-              {selectedTopic 
-                ? `No messages received for topic "${selectedTopic.topicPath}"`
-                : "Connect to an MQTT broker and start receiving messages!"
+              {!selectedTopic 
+                ? "Select a topic from the topic tree to view its messages"
+                : `No messages received for topic "${selectedTopic.topicPath}"`
               }
             </p>
           </div>
         ) : (
-          processedMessages.map(msg => (
-            <div key={msg.id} className="message-item">
-              <div className="message-header">
-                <div className="message-meta">
-                  <span className="timestamp" title={formatTimestamp(msg.timestamp)}>
-                    {new Date(msg.timestamp).toLocaleTimeString()}
-                  </span>
-                  <span className="topic" title={msg.topic}>
-                    {msg.topic}
-                  </span>
-                  <span className={`qos-badge ${getQoSBadgeClass(msg.qos)}`}>
-                    QoS {msg.qos}
-                  </span>
-                  {msg.retain && (
-                    <span className="retain-badge">
-                      RETAIN
-                    </span>
-                  )}
-                  <span className="connection-id" title={`Connection: ${msg.connectionId}`}>
-                    {msg.connectionId}
-                  </span>
-                </div>
+          <>
+            {selectedTopic && processedMessages.length >= 300 && (
+              <div className="message-limit-notice">
+                <i className="fas fa-info-circle"></i> Showing up to 300 most recent messages for this topic.
               </div>
-              
-              <div className="message-content">
-                <div className="payload-preview">
-                  {getPayloadPreview(msg.message)}
+            )}
+            
+            {processedMessages.map(msg => (
+              <div 
+                key={msg.id} 
+                className="message-item"
+                onDoubleClick={(e) => copyPayload(msg.message, e)}
+                title="Double-click to copy payload"
+              >
+                <div className="message-header">
+                  <div className="message-meta">
+                    <span className="timestamp" title={formatTimestamp(msg.timestamp)}>
+                      <i className="fas fa-clock"></i> {new Date(msg.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span className="topic" title={msg.topic}>
+                      <i className="fas fa-tag"></i> {msg.topic}
+                    </span>
+                    <span className={`qos-badge ${getQoSBadgeClass(msg.qos)}`}>
+                      QoS {msg.qos}
+                    </span>
+                    {msg.retain && (
+                      <span className="retain-badge">
+                        <i className="fas fa-save"></i> RETAIN
+                      </span>
+                    )}
+                    <span className="connection-id" title={`Connection: ${msg.connectionId}`}>
+                      <i className="fas fa-plug"></i> {msg.connectionId}
+                    </span>
+                  </div>
+                  <div className="message-actions">
+                    <button 
+                      className="copy-payload-btn"
+                      onClick={(e) => copyPayload(msg.message, e)}
+                      title="Copy payload"
+                    >
+                      <i className="fas fa-copy"></i>
+                    </button>
+                  </div>
                 </div>
                 
-                {msg.message.length > 100 && (
-                  <details className="payload-full">
-                    <summary>Show full payload ({msg.message.length} chars)</summary>
-                    <pre className="payload-code">{msg.message}</pre>
-                  </details>
-                )}
+                <div className="message-content">
+                  <div className="payload-preview">
+                    {getPayloadPreview(msg.message)}
+                  </div>
+                  
+                  {msg.message.length > 100 && (
+                    <details className="payload-full">
+                      <summary>
+                        <i className="fas fa-expand-alt"></i> Show full payload ({msg.message.length} chars)
+                      </summary>
+                      <pre className="payload-code">{msg.message}</pre>
+                    </details>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+          </>
         )}
       </div>
     </div>

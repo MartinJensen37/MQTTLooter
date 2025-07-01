@@ -38,10 +38,11 @@ function TopicTreeNode({ node, onClick, isSelected }) {
 
   const hasStats = node.messageCount > 0 || node.messageRate > 0;
   const hasPayload = node.lastMessage;
+  const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
 
   return (
     <div
-      className={`topic-tree-node ${node.hasChildren ? 'has-children' : 'is-leaf'} ${node.isLeaf ? 'has-messages' : ''} ${isSelected ? 'selected' : ''}`}
+      className={`topic-tree-node ${node.hasChildren ? 'has-children' : 'is-leaf'} ${hasDirectMessages ? 'has-messages' : ''} ${isSelected ? 'selected' : ''}`}
       style={indentStyle}
       onClick={onClick}
     >
@@ -78,8 +79,8 @@ function TopicTreeNode({ node, onClick, isSelected }) {
                 <span className="stats-separator">|</span>
               )}
               
-              {/* Payload */}
-              {hasPayload && (
+              {/* Payload preview for direct messages only */}
+              {hasPayload && hasDirectMessages && (
                 <div className="node-payload">
                   {formatMessage(node.lastMessage)}
                 </div>
@@ -88,22 +89,6 @@ function TopicTreeNode({ node, onClick, isSelected }) {
           )}
         </div>
       </div>
-      
-      {/* Additional details for leaf nodes when selected */}
-      {isSelected && node.isLeaf && node.lastMessage && (
-        <div className="node-details" style={{ paddingLeft: `${(node.depth + 1) * 20 + 10}px` }}>
-          <div className="node-topic-path">
-            <strong>Topic:</strong> {node.fullPath}
-          </div>
-          <div className="node-message-info">
-            <span className="qos-info">QoS: {node.lastMessage.qos}</span>
-            {node.lastMessage.retain && <span className="retain-info">Retained</span>}
-            <span className="timestamp-info">
-              {new Date(node.lastMessageTime).toLocaleString()}
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
