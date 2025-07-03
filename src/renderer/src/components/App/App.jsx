@@ -625,15 +625,22 @@ function App() {
         return;
       }
 
+      // Check if the selected connection is actually connected
+      const connection = connections.find(c => c.id === selectedConnection);
+      if (!connection?.isConnected) {
+        toast.error('Selected connection is not active');
+        return;
+      }
+
       // Use MQTTService to publish the message
       await MQTTService.publish(selectedConnection, {
         topic: messageData.topic,
-        message: messageData.payload,
+        message: messageData.payload,  // Map payload to message
         qos: messageData.qos,
         retain: messageData.retain
       });
 
-      toast.success('Message published successfully');
+      
     } catch (error) {
       console.error('Failed to publish message:', error);
       toast.error(`Failed to publish message: ${error.message}`);
@@ -679,6 +686,7 @@ function App() {
           <PublishingPanel
             connectionId={selectedConnection}
             onPublishMessage={handlePublishMessage}
+            isConnected={connections.find(c => c.id === selectedConnection)?.isConnected || false}
           />
         );
       case 'recording':
@@ -838,7 +846,7 @@ function App() {
         </div>
       </SplitPane>
 
-      <ToastContainer position="top-right" autoClose={3000} />
+      <ToastContainer position="top-right" autoClose={2500} />
     </div>
   );
 }

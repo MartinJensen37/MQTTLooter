@@ -416,3 +416,64 @@
     padding: 3px 8px;
   }
 }
+.node-bubbles {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 8px;
+  align-items: center;
+}
+
+.retained-bubble,
+.subtopic-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.retained-bubble {
+  background-color: rgba(255, 193, 7, 0.2);
+  color: #856404;
+  border: 1px solid rgba(255, 193, 7, 0.4);
+}
+
+.retained-bubble i {
+  font-size: 8px;
+}
+
+.subtopic-bubble {
+  background-color: rgba(40, 167, 69, 0.15);
+  color: #155724;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.subtopic-bubble i {
+  font-size: 8px;
+}
+
+/* Hover effects for bubbles */
+.topic-tree-node:hover .retained-bubble {
+  background-color: rgba(255, 193, 7, 0.3);
+  border-color: rgba(255, 193, 7, 0.6);
+}
+
+.topic-tree-node:hover .subtopic-bubble {
+  background-color: rgba(40, 167, 69, 0.25);
+  border-color: rgba(40, 167, 69, 0.5);
+}
+
+/* Ensure bubbles don't interfere with selection styling */
+.topic-tree-node.selected .retained-bubble {
+  background-color: rgba(255, 193, 7, 0.4);
+  color: #664d03;
+}
+
+.topic-tree-node.selected .subtopic-bubble {
+  background-color: rgba(40, 167, 69, 0.3);
+  color: #0f5132;
+}

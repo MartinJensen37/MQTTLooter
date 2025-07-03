@@ -39,6 +39,10 @@ function TopicTreeNode({ node, onClick, isSelected }) {
   const hasStats = node.messageCount > 0 || node.messageRate > 0;
   const hasPayload = node.lastMessage;
   const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
+  const hasRetainedMessage = node.lastMessage && node.lastMessage.retain;
+
+  // Calculate subtopic count (direct children count)
+  const subtopicCount = node.hasChildren ? (node.childCount || 0) : 0;
 
   return (
     <div
@@ -52,6 +56,19 @@ function TopicTreeNode({ node, onClick, isSelected }) {
             {getExpandIcon()}
           </span>
           <span className="node-name">{node.name}</span>
+          
+          <div className="node-bubbles">
+            {hasRetainedMessage && (
+              <span className="retained-bubble" title="Has retained message">
+                <i className="fas fa-save"></i> Retained
+              </span>
+            )}
+            {subtopicCount > 0 && (
+              <span className="subtopic-bubble" title={`${subtopicCount} subtopic${subtopicCount > 1 ? 's' : ''}`}>
+                <i className="fas fa-sitemap"></i> {subtopicCount} Subtopic{subtopicCount > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
         </div>
         
         <div className="node-right">

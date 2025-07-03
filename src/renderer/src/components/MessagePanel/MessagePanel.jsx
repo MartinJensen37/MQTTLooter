@@ -14,22 +14,42 @@ function MessagePanel({
   const [showTopicExportMenu, setShowTopicExportMenu] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState('');
 
-  // Filter
-const processedMessages = React.useMemo(() => {
-  // Messages are already filtered by connection and topic in App.jsx
-  return messages;
-}, [messages, showRetainedOnly, sortBy, sortOrder]);
+  // Filter and sort messages - FIXED: Include messages in dependencies
+  const processedMessages = React.useMemo(() => {
+    // Messages are already filtered by connection and topic in App.jsx
+    let filtered = messages;
+    
+    // Apply retained filter if enabled
+    if (showRetainedOnly) {
+      filtered = filtered.filter(msg => msg.retain);
+    }
+    
+    // Sort messages
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortBy === 'timestamp') {
+        return sortOrder === 'desc' ? b.timestamp - a.timestamp : a.timestamp - b.timestamp;
+      }
+      return 0;
+    });
+    
+    return sorted;
+  }, [messages, showRetainedOnly, sortBy, sortOrder]); // FIXED: Added messages dependency
 
-  // Get the most recent message for the selected topic (for topic details)
+  // Get the most recent message for the selected topic (for topic details) - FIXED
   const topicDetails = React.useMemo(() => {
     if (!selectedTopic || processedMessages.length === 0) return null;
     
-    return processedMessages[processedMessages.length - 1]; // Most recent message
-  }, [selectedTopic, processedMessages]);
+    // Find the message with the highest timestamp (most recent)
+    const mostRecentMessage = processedMessages.reduce((latest, current) => {
+      return current.timestamp > latest.timestamp ? current : latest;
+    }, processedMessages[0]);
+    
+    return mostRecentMessage;
+  }, [selectedTopic, processedMessages]); // This will now update when messages change
 
   const showCopyFeedback = (message) => {
     setCopyFeedback(message);
-    setTimeout(() => setCopyFeedback(''), 2000); // Clear feedback after 2 seconds
+    setTimeout(() => setCopyFeedback(''), 2000);
   };
 
   const exportTopicAsJSON = () => {
@@ -72,7 +92,7 @@ const processedMessages = React.useMemo(() => {
       headers.join(','),
       ...processedMessages.map(msg => [
         `"${msg.timestamp}"`,
-        `"${msg.message.replace(/"/g, '""')}"`, // Escape quotes
+        `"${msg.message.replace(/"/g, '""')}"`,
         msg.qos,
         msg.retain,
         `"${msg.connectionId}"`
@@ -99,7 +119,6 @@ const processedMessages = React.useMemo(() => {
   };
 
   const copyPayload = (payload, event) => {
-    // Stop event propagation to prevent conflicts
     if (event) {
       event.stopPropagation();
     }
@@ -137,21 +156,21 @@ const processedMessages = React.useMemo(() => {
       <div className="message-panel-header">
         <div className="header-left">
           <h2>
-            Messages ({processedMessages.length})
+            Message Details ({processedMessages.length})
             {selectedTopic && (
               <span className="filter-indicator">
-                - {selectedTopic.topicPath}
+               | {selectedTopic.topicPath}
               </span>
             )}
           </h2>
         </div>
       </div>
 
-      {/* Topic Details Box */}
+      {/* Topic Details Box - This will now update with each new message */}
       {selectedTopic && topicDetails && (
         <div className="topic-details-box">
           <div className="topic-details-header">
-            <h3>Topic Details</h3>
+            <h3>Current Message Details</h3>
           </div>
           
           <div className="topic-details-content">
@@ -190,7 +209,6 @@ const processedMessages = React.useMemo(() => {
               </div>
             </div>
             
-            {/* Export button moved to bottom right */}
             <div className="topic-export-section">
               <div className="topic-export-dropdown">
                 <button 

@@ -1,6 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Create a generic event handler system
 const createEventHandler = (eventPrefix) => {
   const handlers = new Map();
   
@@ -46,7 +45,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     disconnect: (connectionId) => ipcRenderer.invoke('mqtt-disconnect', connectionId),
     subscribe: (connectionId, topic, qos = 0) => ipcRenderer.invoke('mqtt-subscribe', connectionId, topic, qos),
     unsubscribe: (connectionId, topic) => ipcRenderer.invoke('mqtt-unsubscribe', connectionId, topic),
-    publish: (connectionId, topic, message, options = {}) => ipcRenderer.invoke('mqtt-publish', connectionId, topic, message, options),
+    // Updated to match index.js signature: (connectionId, topic, message, options)
+    publish: (connectionId, topic, message, options) => ipcRenderer.invoke('mqtt-publish', connectionId, topic, message, options),
     getConnections: () => ipcRenderer.invoke('mqtt-get-connections'),
     
     // Event handling

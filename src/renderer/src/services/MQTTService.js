@@ -203,8 +203,28 @@ class MQTTService {
     return await window.electronAPI.mqtt.unsubscribe(connectionId, topic);
   }
 
-  async publish(connectionId, topic, message, options = {}) {
-    return await window.electronAPI.mqtt.publish(connectionId, topic, message, options);
+  async publish(connectionId, data) {
+    try {
+      console.log(`MQTTService: Publishing message to ${connectionId}:`, data);
+      
+      // Extract data and call with separate parameters to match index.js
+      const { topic, message, qos, retain } = data;
+      const options = { qos: qos || 0, retain: retain || false };
+      
+      const result = await window.electronAPI.mqtt.publish(connectionId, topic, message, options);
+      
+      if (result.success) {
+        console.log(`MQTTService: Successfully published message to ${connectionId}`);
+      } else {
+        console.error(`MQTTService: Failed to publish message to ${connectionId}:`, result.error);
+        throw new Error(result.error);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error(`MQTTService: Publish error for ${connectionId}:`, error);
+      throw error;
+    }
   }
 
   // Connection info

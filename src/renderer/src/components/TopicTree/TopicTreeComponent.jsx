@@ -93,15 +93,25 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
   }, [connectionId, topicTreeService]);
 
   const handleNodeClick = (node) => {
+    // Check if node has direct messages (either leaf or parent with messages)
+    const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
+    const hasMessages = node.messageCount > 0;
+    
+    // ALWAYS toggle expansion if it has children
     if (node.hasChildren) {
-      // Toggle expansion
       topicTreeService.toggleTopicNode(connectionId, node.fullPath);
     }
     
-    // Allow selection of any node that has direct messages (leaf nodes or parent nodes with messages)
-    const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
-    if (hasDirectMessages && node.messageCount > 0) {
-      // Select topic for message viewing
+    // Select topic for message viewing if it has messages
+    if (hasDirectMessages && hasMessages) {
+      setSelectedNode(node.fullPath);
+      if (onTopicSelect) {
+        onTopicSelect(node.fullPath, node);
+      }
+    }
+    // For nodes without direct messages but with children, still allow selection 
+    // if they somehow have messages (edge case)
+    else if (hasMessages) {
       setSelectedNode(node.fullPath);
       if (onTopicSelect) {
         onTopicSelect(node.fullPath, node);
