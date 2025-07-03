@@ -687,6 +687,7 @@ function App() {
             connectionId={selectedConnection}
             onPublishMessage={handlePublishMessage}
             isConnected={connections.find(c => c.id === selectedConnection)?.isConnected || false}
+            selectedTopic={selectedTopic}
           />
         );
       case 'recording':

@@ -329,6 +329,7 @@
 .clear-btn:hover:not(:disabled) {
   background: rgba(108, 117, 125, 0.2);
   border-color: rgba(108, 117, 125, 0.5);
+  transform: translateY(-2px);
   color: #495057;
 }
 
@@ -751,4 +752,37 @@
   font-weight: 500;
   color: #495057;
   height: 100%;
+}
+
+.load-topic-btn {
+  padding: 12px 20px;
+  background: rgba(21, 147, 51);
+  color: #ffffff;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.load-topic-btn:hover:not(:disabled) {
+  background: rgb(15, 107, 37);
+  border-color: rgba(40, 167, 69, 0.5);
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+}
+
+.load-topic-btn:disabled {
+  background: rgba(108, 117, 125, 0.1);
+  color: #6c757d;
+  border-color: rgba(108, 117, 125, 0.3);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }

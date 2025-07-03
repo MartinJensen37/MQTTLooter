@@ -4,7 +4,8 @@ import './PublishingPanel.css';
 function PublishingPanel({ 
   connectionId,
   onPublishMessage,
-  isConnected = false  // Add this prop to track connection status
+  isConnected = false,
+  selectedTopic = null
 }) {
   const [topic, setTopic] = useState('');
   const [payload, setPayload] = useState('');
@@ -123,6 +124,33 @@ function PublishingPanel({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showQosDropdown]);
+
+
+  const loadFromSelectedTopic = () => {
+    if (!selectedTopic) {
+      showCopyFeedback('No topic selected', 'error');
+      return;
+    }
+
+    // Set the topic path
+    setTopic(selectedTopic.topicPath || selectedTopic.topic || '');
+    
+    // Get message data from the known structure
+    const messageData = selectedTopic.node?.lastMessage;
+
+    if (messageData) {
+      setPayload(messageData.payload || '');
+      setQos(messageData.qos || 0);
+      setRetain(messageData.retain || false);
+      showCopyFeedback('Form filled with selected topic data', 'success');
+    } else {
+      // Just set the topic, clear other fields
+      setPayload('');
+      setQos(0);
+      setRetain(false);
+      showCopyFeedback('Topic loaded, ready for new message', 'success');
+    }
+  };
 
   const loadFromHistory = (historyItem) => {
     setTopic(historyItem.topic);
@@ -392,7 +420,19 @@ function PublishingPanel({
                 </>
               )}
             </button>
+
+            <button 
+              type="button"
+              onClick={loadFromSelectedTopic}
+              className="load-topic-btn"
+              disabled={isPublishing || !selectedTopic}
+              title={selectedTopic ? `Load topic: ${selectedTopic.topicPath}` : 'No topic selected'}
+            >
+              <i className="fas fa-download"></i> Use Selected Topic
+            </button>
             
+
+
             <button 
               type="button"
               onClick={clearForm}
