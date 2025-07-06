@@ -94,10 +94,48 @@ function PublishingPanel({
         await onPublishMessage(messageData);
       }
 
-      // Add to history on successful publish
+      // Add to history only if it's unique (excluding timestamp)
       setPublishHistory(prev => {
-        const newHistory = [messageData, ...prev.slice(0, 9)]; // Keep last 10
-        return newHistory;
+        // Check if a message with same topic, payload, qos, and retain already exists
+        const isDuplicate = prev.some(item => 
+          item.topic === messageData.topic &&
+          item.payload === messageData.payload &&
+          item.qos === messageData.qos &&
+          item.retain === messageData.retain
+        );
+
+        if (!isDuplicate) {
+          const newHistory = [messageData, ...prev.slice(0, 9)]; // Keep last 10
+          return newHistory;
+        }
+        
+        // If duplicate, don't add to history but move existing to top
+        const existingIndex = prev.findIndex(item => 
+          item.topic === messageData.topic &&
+          item.payload === messageData.payload &&
+          item.qos === messageData.qos &&
+          item.retain === messageData.retain
+        );
+
+        if (existingIndex > 0) {
+          // Move existing item to top with updated timestamp
+          const updatedItem = { ...prev[existingIndex], timestamp: messageData.timestamp };
+          const newHistory = [
+            updatedItem,
+            ...prev.slice(0, existingIndex),
+            ...prev.slice(existingIndex + 1)
+          ];
+          return newHistory;
+        }
+
+        // If it's already at the top, just update timestamp
+        if (existingIndex === 0) {
+          const newHistory = [...prev];
+          newHistory[0] = { ...newHistory[0], timestamp: messageData.timestamp };
+          return newHistory;
+        }
+
+        return prev;
       });
 
       // Show success feedback
@@ -439,7 +477,7 @@ function PublishingPanel({
               className="clear-btn"
               disabled={isPublishing}
             >
-              <i className="fas fa-eraser"></i> Clear Form
+              <i className="fas fa-eraser"></i> Clear Message
             </button>
           </div>
 

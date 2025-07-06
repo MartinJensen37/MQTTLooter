@@ -400,7 +400,9 @@ function ConnectionModal({ connection, onSave, onCancel }) {
               {formData.subscriptions.map((subscription, index) => (
                 <div key={index} className="subscription-row">
                   <div className="form-group flex-grow">
+                    <label htmlFor={`topic-${index}`}>Topic</label>
                     <input
+                      id={`topic-${index}`}
                       type="text"
                       value={subscription.topic}
                       onChange={(e) => handleSubscriptionChange(index, 'topic', e.target.value)}
@@ -414,7 +416,9 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                   </div>
                   
                   <div className="form-group qos-group">
+                    <label htmlFor={`qos-${index}`}>QoS</label>
                     <select
+                      id={`qos-${index}`}
                       value={subscription.qos}
                       onChange={(e) => handleSubscriptionChange(index, 'qos', e.target.value)}
                     >
@@ -425,14 +429,17 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                   </div>
                   
                   {formData.subscriptions.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeSubscription(index)}
-                      className="remove-subscription-btn"
-                      title="Remove subscription"
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
+                    <div className="form-group remove-btn-group">
+                      <label>&nbsp;</label>
+                      <button
+                        type="button"
+                        onClick={() => removeSubscription(index)}
+                        className="remove-subscription-btn"
+                        title="Remove subscription"
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}

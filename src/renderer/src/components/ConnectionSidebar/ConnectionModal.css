@@ -55,7 +55,7 @@
 
 .protocol-group {
   flex-shrink: 0;
-  width: 90px; /* Fixed width for protocol dropdown */
+  width: 110px; /* Increased from 100px */
 }
 
 .protocol-group select {
@@ -115,7 +115,7 @@
 
 .port-group {
   flex-shrink: 0;
-  width: 70px; /* Smaller fixed width for port */
+  width: 85px; /* Increased from 77px */
 }
 
 .port-group input {
@@ -139,8 +139,8 @@
 .subscription-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .subscription-row .flex-grow {
@@ -172,7 +172,8 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  margin-top: 0;
+  margin-bottom: 0;
+  margin-top: 25px; /* Add top margin to align with input fields */
 }
 
 .remove-subscription-btn:hover {
@@ -243,9 +244,16 @@
   .subscription-row {
     flex-direction: column;
     gap: 8px;
+    align-items: stretch; /* Reset alignment on mobile */
   }
   
   .subscription-row .qos-group {
     width: 100%;
+  }
+  
+  .remove-subscription-btn {
+    align-self: center; /* Center on mobile */
+    width: 100%;
+    margin-top: 8px;
   }
 }

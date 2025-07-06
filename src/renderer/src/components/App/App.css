@@ -18,24 +18,30 @@
 }
 
 .main-header {
-  height: 60px;
-  background: white;
-  border-bottom: 1px solid #dee2e6;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  flex-shrink: 0;
-  z-index: 10;
-  box-shadow: 0 2px 2px rgba(0,0,0,0.1); /* Add subtle shadow */
-} 
+  align-items: flex-end;
+  padding: 20px 25px 0 25px;
+  background: #f8f9fa;
+
+}
+
+
 .main-panels {
   flex: 1;
   display: flex;
   flex-direction: column;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-top: 1px solid #007bff; /* Blue top border when tabs are active */
+  border-radius: 0 0 8px 8px;
+  min-height: 600px;
+  position: relative;
+  margin-top: 0; /* No margin to connect with tabs */
   overflow: hidden;
-  min-height: 0;
 }
+
+
 
 .header-left {
   display: flex;
@@ -88,7 +94,7 @@
 .header-controls {
   display: flex;
   gap: 8px;
-  align-items: center;
+  align-items: flex-end;
   flex-shrink: 0;
 }
 
@@ -257,42 +263,55 @@
 
 .main-tabs {
   display: flex;
-  gap: 4px;
-  margin-right: 16px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 4px;
+  align-items: flex-end;
+  gap: 0; /* No gap between tabs */
+  margin: 0;
+  padding: 0;
 }
 
 .tab-btn {
-  padding: 8px 16px;
-  background: transparent;
-  color: #6c757d;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+  padding: 12px 20px 15px 20px; /* More padding at bottom for connection */
+  background: #e9ecef;
+  border: 1px solid #dee2e6;
+  border-bottom: none; /* No bottom border to connect with panel */
+  border-radius: 8px 8px 0 0; /* Rounded top corners only */
   font-size: 14px;
   font-weight: 500;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
+  color: #6c757d;
   transition: all 0.2s ease;
-  white-space: nowrap;
+  position: relative;
+  margin-bottom: 0;
+  min-width: 120px;
+  justify-content: center;
+  
+  /* Create overlap effect */
+  margin-right: -1px;
 }
 
 .tab-btn:hover {
-  background: #e9ecef;
+  background: #f8f9fa;
   color: #495057;
+  transform: translateY(-2px);
+  border-color: #adb5bd;
+  z-index: 2;
 }
 
 .tab-btn.active {
-  background: #007bff;
-  color: white;
-  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.2);
+  background: white;
+  color: #007bff;
+  border-color: #007bff;
+  border-bottom: 1px solid white; /* White bottom border to cover panel border */
+  z-index: 3;
+  transform: translateY(1px); /* Slight overlap with panel */
+  box-shadow: 0 -2px 8px rgba(0, 123, 255, 0.1);
 }
 
-.tab-btn i {
-  font-size: 12px;
+.tab-btn.active i {
+  color: #007bff;
 }
 
 /* Responsive tabs */
@@ -309,4 +328,26 @@
   .tab-btn span {
     display: none; /* Hide text on mobile, show only icons */
   }
+}
+
+.tab-content-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.tab-content-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.tab-content-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tab-content-exit-active {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
