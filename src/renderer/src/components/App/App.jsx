@@ -32,6 +32,41 @@ function App() {
       .map(conn => conn.id);
   }, [connections]);
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Only handle F keys when a connection is selected
+      if (!selectedConnection) return;
+      
+      switch (event.key) {
+        case 'F1':
+          event.preventDefault();
+          setActiveTab('logging');
+          break;
+        case 'F2':
+          event.preventDefault();
+          setActiveTab('publishing');
+          break;
+        case 'F3':
+          event.preventDefault();
+          setActiveTab('recording');
+          break;
+        case 'F4':
+          //event.preventDefault();
+          //setActiveTab('recording');
+          break;
+        default:
+          break;
+    }
+  };
+
+  // Add event listener
+  window.addEventListener('keydown', handleKeyDown);
+
+  // Cleanup
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+  };
+  }, [selectedConnection]);
   // Use ref to store handlers so they can be properly removed
   const handlersRef = useRef(null);
   const topicTreeHandlersRef = useRef(null);
@@ -142,7 +177,7 @@ function App() {
         return current;
       });
     };
-
+  
     const handleMessage = (data) => {
       const newMessage = {
         id: Date.now() + Math.random(),
@@ -670,6 +705,20 @@ function App() {
     return filtered.filter(msg => msg.topic === selectedTopic.topicPath);
   }, [messages, selectedConnection, selectedTopic, connections]);
 
+  const allConnectionMessages = useMemo(() => {
+    if (!selectedConnection) return [];
+    
+    // Check if the selected connection is actually connected
+    const selectedConn = connections.find(c => c.id === selectedConnection);
+    const isConnected = selectedConn?.isConnected || selectedConn?.status === 'connected';
+    
+    // If connection is disconnected, return empty array
+    if (!isConnected) return [];
+    
+    // Return ALL messages for this connection (no topic filter)
+    return messages.filter(msg => msg.connectionId === selectedConnection);
+  }, [messages, selectedConnection, connections]);
+
   // New function to render tab content
   const renderTabContent = () => {
     switch (activeTab) {
@@ -693,9 +742,10 @@ function App() {
       case 'recording':
         return (
           <RecordingPanel
-            messages={connectionMessages}
+            messages={allConnectionMessages}
             connectionName={getSelectedConnectionName()}
             selectedTopic={selectedTopic}
+            onPublishMessage={handlePublishMessage}
           />
         );
       default:
@@ -815,30 +865,33 @@ function App() {
               )}
             </div>
             
-            {selectedConnection && (
-              <div className="header-controls">
-                <div className="main-tabs">
-                  <button 
-                    onClick={() => setActiveTab('logging')} 
-                    className={`tab-btn ${activeTab === 'logging' ? 'active' : ''}`}
-                  >
-                    <i className="fas fa-list"></i> Logging
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('publishing')} 
-                    className={`tab-btn ${activeTab === 'publishing' ? 'active' : ''}`}
-                  >
-                    <i className="fas fa-paper-plane"></i> Publishing
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('recording')} 
-                    className={`tab-btn ${activeTab === 'recording' ? 'active' : ''}`}
-                  >
-                    <i className="fas fa-video"></i> Recording
-                  </button>
+              {selectedConnection && (
+                <div className="header-controls">
+                  <div className="main-tabs">
+                    <button 
+                      onClick={() => setActiveTab('logging')} 
+                      className={`tab-btn ${activeTab === 'logging' ? 'active' : ''}`}
+                      title="F1 - Logging Panel"
+                    >
+                      <i className="fas fa-list"></i> Logging <span className="shortcut-hint">F1</span>
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('publishing')} 
+                      className={`tab-btn ${activeTab === 'publishing' ? 'active' : ''}`}
+                      title="F2 - Publishing Panel"
+                    >
+                      <i className="fas fa-paper-plane"></i> Publishing <span className="shortcut-hint">F2</span>
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('recording')} 
+                      className={`tab-btn ${activeTab === 'recording' ? 'active' : ''}`}
+                      title="F3 - Recording Panel"
+                    >
+                      <i className="fas fa-video"></i> Recording <span className="shortcut-hint">F3</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
           </div>
           
           <div className="main-panels">
