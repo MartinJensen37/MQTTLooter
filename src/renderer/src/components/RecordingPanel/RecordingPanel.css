@@ -37,11 +37,34 @@
   gap: 8px;
 }
 
-.load-recording-btn,
+.load-recording-btn {
+  padding: 8px 16px;
+  width: 140px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  background: #007bff;
+  color: white;
+}
+
+.header-left h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+
 .save-recording-btn {
   padding: 8px 16px;
   border: none;
-  border-radius: 4px;
+  border-radius: 16px;
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;

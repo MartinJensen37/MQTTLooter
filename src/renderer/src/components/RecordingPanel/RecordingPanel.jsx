@@ -11,25 +11,28 @@ function RecordingPanel({
   const [recordingStart, setRecordingStart] = useState(null);
   const [recordedMessages, setRecordedMessages] = useState([]);
   const [recordings, setRecordings] = useState([]);
-  const [hasUnsavedRecording, setHasUnsavedRecording] = useState(false);
-  
+
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentPlayback, setCurrentPlayback] = useState(null);
-  const [playbackProgress, setPlaybackProgress] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [stepSize, setStepSize] = useState(1);
-  
+
   // UI state
   const [expandedRecording, setExpandedRecording] = useState(null);
   const [selectedTopicsFilter, setSelectedTopicsFilter] = useState([]);
   const [showTopicFilter, setShowTopicFilter] = useState(false);
-  const [showSavePrompt, setShowSavePrompt] = useState(false);
-  
-  const playbackIntervalRef = useRef(null);
-  const playbackStartTimeRef = useRef(null);
-  const pausedAtIndexRef = useRef(0);
+
+  // For timeout-based playback
+  const playbackTimeoutsRef = useRef([]);
+  const isPlayingRef = useRef(isPlaying);
+
+  // Keep isPlayingRef in sync
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   // Load recordings from localStorage on mount
   useEffect(() => {
@@ -37,7 +40,6 @@ function RecordingPanel({
     if (savedRecordings) {
       try {
         const parsedRecordings = JSON.parse(savedRecordings);
-        // Convert string dates back to Date objects
         const recordingsWithDates = parsedRecordings.map(recording => ({
           ...recording,
           startTime: new Date(recording.startTime),
@@ -56,43 +58,23 @@ function RecordingPanel({
 
   // Save recordings to localStorage whenever recordings change
   useEffect(() => {
-    if (recordings.length > 0) {
-      localStorage.setItem('mqtt-recordings', JSON.stringify(recordings));
-    }
+    localStorage.setItem('mqtt-recordings', JSON.stringify(recordings));
   }, [recordings]);
 
-  // Handle beforeunload to prompt for unsaved recordings
-  useEffect(() => {
-    const handleBeforeUnload = (event) => {
-      if (hasUnsavedRecording) {
-        event.preventDefault();
-        event.returnValue = 'You have an unsaved recording. Do you want to save it before closing?';
-        return event.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [hasUnsavedRecording]);
-
+  // Update recorded messages while recording
   useEffect(() => {
     if (isRecording && recordingStart) {
       const newMessages = messages.filter(msg => 
         new Date(msg.timestamp) >= recordingStart
       );
       setRecordedMessages(newMessages);
-      setHasUnsavedRecording(newMessages.length > 0);
     }
   }, [messages, isRecording, recordingStart]);
 
   // Cleanup playback on unmount
   useEffect(() => {
     return () => {
-      if (playbackIntervalRef.current) {
-        clearInterval(playbackIntervalRef.current);
-      }
+      clearAllPlaybackTimeouts();
     };
   }, []);
 
@@ -104,36 +86,22 @@ function RecordingPanel({
         ...prev,
         messages: filteredMessages
       }));
-      
-      // Reset progress when filter changes
-      if (!isPlaying) {
-        setPlaybackProgress(0);
-        pausedAtIndexRef.current = 0;
-      }
+      setCurrentIndex(0);
     }
   }, [selectedTopicsFilter]);
 
+  // --- Recording logic ---
+
   const startRecording = () => {
-    if (hasUnsavedRecording) {
-      setShowSavePrompt(true);
-      return;
-    }
-    
     setIsRecording(true);
     setRecordingStart(new Date());
     setRecordedMessages([]);
-    setHasUnsavedRecording(false);
   };
 
   const stopRecording = () => {
     setIsRecording(false);
-    setHasUnsavedRecording(recordedMessages.length > 0);
-  };
-
-  const saveRecording = () => {
     if (recordedMessages.length > 0) {
       const uniqueTopics = [...new Set(recordedMessages.map(msg => msg.topic))];
-      
       const recording = {
         id: Date.now(),
         name: `Recording ${new Date().toLocaleString()}`,
@@ -144,28 +112,13 @@ function RecordingPanel({
         topic: uniqueTopics.length === 1 ? uniqueTopics[0] : `${uniqueTopics.length} Topics`,
         connectionName: connectionName || 'Unknown'
       };
-      
       setRecordings(prev => [...prev, recording]);
-      setHasUnsavedRecording(false);
       setRecordedMessages([]);
       setRecordingStart(null);
-      setShowSavePrompt(false);
     }
   };
 
-  const discardRecording = () => {
-    setHasUnsavedRecording(false);
-    setRecordedMessages([]);
-    setRecordingStart(null);
-    setShowSavePrompt(false);
-    
-    // If we were trying to start a new recording, start it now
-    if (!isRecording) {
-      setIsRecording(true);
-      setRecordingStart(new Date());
-      setRecordedMessages([]);
-    }
-  };
+  // --- Playback logic ---
 
   const getUniqueTopics = (messages) => {
     const topics = new Set(messages.map(msg => msg.topic));
@@ -180,151 +133,115 @@ function RecordingPanel({
   };
 
   const selectRecording = (recording) => {
-    // Stop any existing playback
-    if (playbackIntervalRef.current) {
-      clearInterval(playbackIntervalRef.current);
-    }
-
-    // Toggle expanded state
+    clearAllPlaybackTimeouts();
     if (expandedRecording === recording.id) {
       setExpandedRecording(null);
       setCurrentPlayback(null);
     } else {
+      // Always sort messages by timestamp for playback
+      const sortedMessages = [...recording.messages].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
       setExpandedRecording(recording.id);
       setCurrentPlayback({
         ...recording,
-        messages: recording.messages,
-        originalMessages: recording.messages
+        messages: sortedMessages,
+        originalMessages: sortedMessages
       });
+      setCurrentIndex(0);
+      setIsPlaying(false);
+      setIsPaused(false);
+      setSelectedTopicsFilter([]);
+      setShowTopicFilter(false);
     }
-    
-    // Reset states
-    setPlaybackProgress(0);
-    setIsPlaying(false);
-    setIsPaused(false);
-    pausedAtIndexRef.current = 0;
-    setSelectedTopicsFilter([]);
-    setShowTopicFilter(false);
   };
 
   const resetPlayback = () => {
-    if (playbackIntervalRef.current) {
-      clearInterval(playbackIntervalRef.current);
-    }
-    setPlaybackProgress(0);
+    clearAllPlaybackTimeouts();
+    setCurrentIndex(0);
     setIsPlaying(false);
     setIsPaused(false);
-    pausedAtIndexRef.current = 0;
   };
+
+  function clearAllPlaybackTimeouts() {
+    playbackTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+    playbackTimeoutsRef.current = [];
+  }
 
   const startRealtimePlayback = () => {
     if (!currentPlayback) return;
-    
     const filteredMessages = currentPlayback.messages;
     if (filteredMessages.length === 0) {
       alert('No messages match the selected topic filter.');
       return;
     }
-
-    const sortedMessages = [...filteredMessages].sort((a, b) => a.timestamp - b.timestamp);
-    const startTimestamp = sortedMessages[0].timestamp;
-    
     setIsPlaying(true);
     setIsPaused(false);
-    playbackStartTimeRef.current = Date.now();
-    let messageIndex = pausedAtIndexRef.current;
 
-    playbackIntervalRef.current = setInterval(() => {
-      const currentTime = Date.now();
-      const elapsedTime = (currentTime - playbackStartTimeRef.current) * playbackSpeed;
-      const targetTimestamp = startTimestamp + elapsedTime;
+    clearAllPlaybackTimeouts();
 
-      // Publish all messages that should have been sent by now
-      while (messageIndex < sortedMessages.length && 
-             sortedMessages[messageIndex].timestamp <= targetTimestamp) {
-        
-        const message = sortedMessages[messageIndex];
-        
-        if (onPublishMessage) {
-          onPublishMessage({
-            topic: message.topic,
-            payload: message.message,
-            qos: message.qos,
-            retain: message.retain
-          });
-        }
+    const startTime = filteredMessages[currentIndex]?.timestamp || filteredMessages[0].timestamp;
+    for (let i = currentIndex; i < filteredMessages.length; i++) {
+      const msg = filteredMessages[i];
+      const delay = ((msg.timestamp - startTime) / playbackSpeed);
 
-        messageIndex++;
-        setPlaybackProgress((messageIndex / sortedMessages.length) * 100);
-        pausedAtIndexRef.current = messageIndex;
-      }
+      const timeout = setTimeout(() => {
+        if (!isPlayingRef.current) return;
+        setCurrentIndex(idx => {
+          if (onPublishMessage) {
+            onPublishMessage({
+              topic: msg.topic,
+              payload: msg.message,
+              qos: msg.qos,
+              retain: msg.retain
+            });
+          }
+          // If last message, stop playback
+          if (i === filteredMessages.length - 1) {
+            setIsPlaying(false);
+            setIsPaused(false);
+          }
+          return i + 1;
+        });
+      }, delay);
 
-      // Check if playback is complete
-      if (messageIndex >= sortedMessages.length) {
-        pausePlayback();
-      }
-    }, 100);
+      playbackTimeoutsRef.current.push(timeout);
+    }
   };
 
   const pausePlayback = () => {
-    if (playbackIntervalRef.current) {
-      clearInterval(playbackIntervalRef.current);
-      playbackIntervalRef.current = null;
-    }
+    clearAllPlaybackTimeouts();
     setIsPlaying(false);
     setIsPaused(true);
   };
 
   const resumePlayback = () => {
-    if (currentPlayback) {
-      setIsPlaying(true);
-      setIsPaused(false);
-      
-      // Adjust start time to account for the pause
-      const sortedMessages = [...currentPlayback.messages].sort((a, b) => a.timestamp - b.timestamp);
-      const currentMessageTime = sortedMessages[pausedAtIndexRef.current]?.timestamp || sortedMessages[0].timestamp;
-      const elapsedOriginalTime = currentMessageTime - sortedMessages[0].timestamp;
-      
-      playbackStartTimeRef.current = Date.now() - (elapsedOriginalTime / playbackSpeed);
-      startRealtimePlayback();
-    }
+    setIsPlaying(true);
+    setIsPaused(false);
+    startRealtimePlayback();
   };
 
-  const stepForward = () => {
+  const stepForward = (e) => {
+    if (e) e.preventDefault();
     if (!currentPlayback) return;
-
     const filteredMessages = currentPlayback.messages;
-    const currentIndex = Math.floor((playbackProgress / 100) * filteredMessages.length);
-    
-    // Step forward by stepSize messages
-    const nextIndex = Math.min(currentIndex + stepSize, filteredMessages.length);
-    
-    // Publish all messages in the step
+    let nextIndex = Math.min(currentIndex + stepSize, filteredMessages.length);
     for (let i = currentIndex; i < nextIndex; i++) {
-      const message = filteredMessages[i];
-      
       if (onPublishMessage) {
         onPublishMessage({
-          topic: message.topic,
-          payload: message.message,
-          qos: message.qos,
-          retain: message.retain
+          topic: filteredMessages[i].topic,
+          payload: filteredMessages[i].message,
+          qos: filteredMessages[i].qos,
+          retain: filteredMessages[i].retain
         });
       }
     }
-
-    setPlaybackProgress((nextIndex / filteredMessages.length) * 100);
+    setCurrentIndex(nextIndex);
   };
 
-  const stepBackward = () => {
+  const stepBackward = (e) => {
+    if (e) e.preventDefault();
     if (!currentPlayback) return;
-
-    const filteredMessages = currentPlayback.messages;
-    const currentIndex = Math.floor((playbackProgress / 100) * filteredMessages.length);
-    
-    // Step backward by stepSize messages
-    const prevIndex = Math.max(currentIndex - stepSize, 0);
-    setPlaybackProgress((prevIndex / filteredMessages.length) * 100);
+    let prevIndex = Math.max(currentIndex - stepSize, 0);
+    setCurrentIndex(prevIndex);
   };
 
   const toggleTopicFilter = (topic) => {
@@ -389,8 +306,6 @@ function RecordingPanel({
         reader.onload = (e) => {
           try {
             const data = JSON.parse(e.target.result);
-            
-            // Validate the file structure
             if (data.recordingInfo && data.messages) {
               const recording = {
                 id: Date.now(),
@@ -406,7 +321,6 @@ function RecordingPanel({
                   message: msg.payload
                 }))
               };
-              
               setRecordings(prev => [...prev, recording]);
               alert('Recording loaded successfully!');
             } else {
@@ -425,13 +339,11 @@ function RecordingPanel({
   const deleteRecording = (recordingId) => {
     setRecordings(prev => {
       const newRecordings = prev.filter(r => r.id !== recordingId);
-      // Update localStorage immediately
       if (newRecordings.length === 0) {
         localStorage.removeItem('mqtt-recordings');
       }
       return newRecordings;
     });
-    
     if (expandedRecording === recordingId) {
       setExpandedRecording(null);
       setCurrentPlayback(null);
@@ -440,69 +352,37 @@ function RecordingPanel({
 
   const getCurrentMessage = () => {
     if (!currentPlayback) return null;
-    
     const filteredMessages = currentPlayback.messages;
-    const currentIndex = Math.floor((playbackProgress / 100) * filteredMessages.length);
-    
     return filteredMessages[currentIndex] || null;
   };
 
   const formatPayload = (payload) => {
     try {
-      // Try to parse as JSON for better formatting
       const parsed = JSON.parse(payload);
       return JSON.stringify(parsed, null, 2);
     } catch {
-      // If not JSON, return as is
       return payload;
     }
   };
-  
+
+  // --- UI ---
   return (
     <div className="recording-panel">
-      <div className="recording-panel-header">
-        <h2>Message Recording & Playback</h2>
-        <div className="recording-panel-actions">
-          <button 
-            onClick={loadRecordingFromFile}
-            className="load-recording-btn"
-            title="Load recording from file"
-          >
-            <i className="fas fa-upload"></i> Load Recording
-          </button>
-        </div>
+    <div className="message-panel-header">
+      <div className="header-left">
+        <h2>
+          Recording & Playback
+        </h2>
       </div>
-
+    </div>
+      
       <div className="recording-content">
-        {/* Save Prompt Modal */}
-        {showSavePrompt && (
-          <div className="save-prompt-overlay">
-            <div className="save-prompt-modal">
-              <h3>Unsaved Recording</h3>
-              <p>You have an unsaved recording with {recordedMessages.length} messages. What would you like to do?</p>
-              <div className="save-prompt-actions">
-                <button onClick={saveRecording} className="save-btn">
-                  <i className="fas fa-save"></i> Save Recording
-                </button>
-                <button onClick={discardRecording} className="discard-btn">
-                  <i className="fas fa-trash"></i> Discard
-                </button>
-                <button onClick={() => setShowSavePrompt(false)} className="cancel-btn">
-                  <i className="fas fa-times"></i> Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Recording Controls - Compact Version */}
         <div className="recording-controls">
           <div className="recording-status">
             <div className={`status-indicator ${isRecording ? 'recording' : 'stopped'}`}>
               <i className={`fas fa-${isRecording ? 'circle' : 'stop-circle'}`}></i>
               {isRecording ? 'Recording...' : 'Ready to Record'}
             </div>
-            
             {isRecording && (
               <div className="recording-info">
                 <span>Started: {recordingStart?.toLocaleTimeString()}</span>
@@ -511,49 +391,40 @@ function RecordingPanel({
               </div>
             )}
           </div>
-
           <div className="recording-buttons">
             {!isRecording ? (
-              <div className="recording-button-group">
-                <button onClick={startRecording} className="start-recording-btn">
-                  <i className="fas fa-record-vinyl"></i> Record
-                </button>
-                {hasUnsavedRecording && (
-                  <div className="unsaved-recording-actions">
-                    <button onClick={saveRecording} className="save-unsaved-btn">
-                      <i className="fas fa-save"></i> Save
-                    </button>
-                    <button onClick={discardRecording} className="discard-unsaved-btn">
-                      <i className="fas fa-trash"></i> Discard
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button onClick={startRecording} className="start-recording-btn">
+                <i className="fas fa-record-vinyl"></i> Record
+              </button>
             ) : (
               <button onClick={stopRecording} className="stop-recording-btn">
                 <i className="fas fa-stop"></i> Stop
               </button>
             )}
           </div>
-
-          {hasUnsavedRecording && !isRecording && (
-            <div className="unsaved-recording-warning">
-              <p><i className="fas fa-exclamation-triangle"></i> You have an unsaved recording with {recordedMessages.length} messages.</p>
-            </div>
-          )}
         </div>
 
         {/* Recordings List */}
         <div className="recordings-list">
           <h3>Saved Recordings ({recordings.length})</h3>
-          
           {recordings.length === 0 ? (
             <div className="no-recordings">
               <i className="fas fa-video"></i>
               <p>No recordings yet. Start recording to capture MQTT messages or load an existing recording.</p>
             </div>
+            
           ) : (
+
+
             <div className="recordings">
+              <button 
+                onClick={loadRecordingFromFile}
+                className="load-recording-btn"
+                title="Load recording from file"
+              >
+                <i className="fas fa-upload"></i> Load Recording
+              </button>
+
               {recordings.map(recording => (
                 <div 
                   key={recording.id} 
@@ -587,7 +458,7 @@ function RecordingPanel({
                     </div>
                   </div>
                   
-                  {/* Recording Details (always visible) */}
+                  {/* Recording Details */}
                   <div className="recording-summary">
                     <div className="recording-stats">
                       <span><i className="fas fa-envelope"></i> {recording.messageCount} messages</span>
@@ -603,7 +474,6 @@ function RecordingPanel({
                   {/* Expanded Content */}
                   {expandedRecording === recording.id && currentPlayback && (
                     <div className="recording-expanded-content">
-                      
                       {/* Topic Filter */}
                       <div className="topic-filter-section">
                         <button 
@@ -613,7 +483,6 @@ function RecordingPanel({
                           <i className="fas fa-filter"></i> 
                           Topic Filter ({selectedTopicsFilter.length} of {getUniqueTopics(currentPlayback.originalMessages).length} selected)
                         </button>
-                        
                         {showTopicFilter && (
                           <div className="topic-filter-panel">
                             <div className="filter-actions">
@@ -650,10 +519,10 @@ function RecordingPanel({
                           <div className="progress-bar">
                             <div 
                               className="progress-fill" 
-                              style={{ width: `${playbackProgress}%` }}
+                              style={{ width: `${currentPlayback.messages.length === 0 ? 0 : (currentIndex / currentPlayback.messages.length) * 100}%` }}
                             ></div>
                           </div>
-                          <span>{Math.round(playbackProgress)}%</span>
+                          <span>{currentPlayback.messages.length === 0 ? 0 : Math.round((currentIndex / currentPlayback.messages.length) * 100)}%</span>
                         </div>
 
                         {/* Main Controls */}
@@ -661,7 +530,7 @@ function RecordingPanel({
                           <button 
                             onClick={stepBackward} 
                             className="step-btn"
-                            disabled={playbackProgress === 0}
+                            disabled={currentIndex === 0}
                           >
                             <i className="fas fa-step-backward"></i>
                           </button>
@@ -693,7 +562,7 @@ function RecordingPanel({
                           <button 
                             onClick={stepForward} 
                             className="step-btn"
-                            disabled={playbackProgress >= 100}
+                            disabled={currentIndex >= (currentPlayback.messages.length)}
                           >
                             <i className="fas fa-step-forward"></i>
                           </button>
@@ -735,7 +604,7 @@ function RecordingPanel({
                           <div className="current-message-info">
                             <div className="message-position">
                               <strong>Position:</strong>
-                              <span>Message {Math.floor((playbackProgress / 100) * currentPlayback.messages.length) + 1} of {currentPlayback.messages.length}</span>
+                              <span>Message {currentIndex + 1} of {currentPlayback.messages.length}</span>
                             </div>
                             <div className="message-details">
                               <div>

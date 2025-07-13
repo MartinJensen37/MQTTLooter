@@ -434,7 +434,7 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                       <button
                         type="button"
                         onClick={() => removeSubscription(index)}
-                        className="remove-subscription-btn"
+                        className="remove-subscription-btn1"
                         title="Remove subscription"
                       >
                         <i className="fas fa-trash"></i>
