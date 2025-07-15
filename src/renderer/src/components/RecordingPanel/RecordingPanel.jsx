@@ -5,7 +5,9 @@ function RecordingPanel({
   messages,
   connectionName,
   selectedTopic,
-  onPublishMessage
+  onPublishMessage,
+  isConnected = false,
+  activeConnectionId = null
 }) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStart, setRecordingStart] = useState(null);
@@ -24,15 +26,28 @@ function RecordingPanel({
   const [expandedRecording, setExpandedRecording] = useState(null);
   const [selectedTopicsFilter, setSelectedTopicsFilter] = useState([]);
   const [showTopicFilter, setShowTopicFilter] = useState(false);
+  const [editingRecording, setEditingRecording] = useState(null);
+  const [editingName, setEditingName] = useState('');
 
   // For timeout-based playback
   const playbackTimeoutsRef = useRef([]);
   const isPlayingRef = useRef(isPlaying);
 
+  // Check if recording should be disabled
+  const isRecordingDisabled = !isConnected || !activeConnectionId;
+
   // Keep isPlayingRef in sync
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+
+  // Disable recording if connection is lost while recording
+  useEffect(() => {
+    if (isRecording && isRecordingDisabled) {
+      // Auto-stop recording if connection is lost
+      stopRecording();
+    }
+  }, [isRecordingDisabled, isRecording]);
 
   // Load recordings from localStorage on mount
   useEffect(() => {
@@ -93,6 +108,10 @@ function RecordingPanel({
   // --- Recording logic ---
 
   const startRecording = () => {
+    if (isRecordingDisabled) {
+      alert('Please connect to an MQTT broker before starting a recording.');
+      return;
+    }
     setIsRecording(true);
     setRecordingStart(new Date());
     setRecordedMessages([]);
@@ -186,7 +205,7 @@ function RecordingPanel({
       const timeout = setTimeout(() => {
         if (!isPlayingRef.current) return;
         setCurrentIndex(idx => {
-          if (onPublishMessage) {
+          if (onPublishMessage && isConnected) {
             onPublishMessage({
               topic: msg.topic,
               payload: msg.message,
@@ -225,7 +244,7 @@ function RecordingPanel({
     const filteredMessages = currentPlayback.messages;
     let nextIndex = Math.min(currentIndex + stepSize, filteredMessages.length);
     for (let i = currentIndex; i < nextIndex; i++) {
-      if (onPublishMessage) {
+      if (onPublishMessage && isConnected) {
         onPublishMessage({
           topic: filteredMessages[i].topic,
           payload: filteredMessages[i].message,
@@ -256,6 +275,38 @@ function RecordingPanel({
 
   const clearTopicFilter = () => {
     setSelectedTopicsFilter([]);
+  };
+
+  // Rename recording functionality
+  const startEditingRecording = (recording, e) => {
+    e.stopPropagation();
+    setEditingRecording(recording.id);
+    setEditingName(recording.name);
+  };
+
+  const saveRecordingName = (recordingId) => {
+    if (editingName.trim()) {
+      setRecordings(prev => prev.map(recording => 
+        recording.id === recordingId 
+          ? { ...recording, name: editingName.trim() }
+          : recording
+      ));
+    }
+    setEditingRecording(null);
+    setEditingName('');
+  };
+
+  const cancelEditingRecording = () => {
+    setEditingRecording(null);
+    setEditingName('');
+  };
+
+  const handleNameKeyPress = (e, recordingId) => {
+    if (e.key === 'Enter') {
+      saveRecordingName(recordingId);
+    } else if (e.key === 'Escape') {
+      cancelEditingRecording();
+    }
   };
 
   // Save recording to file system
@@ -367,90 +418,141 @@ function RecordingPanel({
 
   // --- UI ---
   return (
-    <div className="recording-panel">
-    <div className="message-panel-header">
-      <div className="header-left">
-        <h2>
-          Recording & Playback
-        </h2>
+    <div className={`recording-main-panel ${isRecordingDisabled ? 'recording-disabled' : ''}`}>
+      <div className="recording-main-header">
+        <div className="recording-header-left">
+          <h2>
+            Recording & Playback
+            {isRecordingDisabled && (
+              <span className="recording-connection-status">
+                <i className="fas fa-exclamation-triangle"></i>
+                No Active Connection
+              </span>
+            )}
+          </h2>
+        </div>
       </div>
-    </div>
       
-      <div className="recording-content">
-        <div className="recording-controls">
-          <div className="recording-status">
-            <div className={`status-indicator ${isRecording ? 'recording' : 'stopped'}`}>
+      {/* Fixed Controls Section */}
+      <div className="recording-fixed-controls">
+        {isRecordingDisabled && (
+          <div className="recording-connection-warning">
+            <div className="recording-warning-content">
+              <i className="fas fa-plug"></i>
+              <h3>No Active Connection</h3>
+              <p>Please connect to an MQTT broker to start recording messages.</p>
+              <p>You can still view and playback existing recordings below.</p>
+            </div>
+          </div>
+        )}
+
+        <div className={`recording-controls-section ${isRecordingDisabled ? 'recording-controls-disabled' : ''}`}>
+          <div className="recording-status-area">
+            <div className={`recording-status-indicator ${isRecording ? 'recording-active' : 'recording-stopped'} ${isRecordingDisabled ? 'recording-indicator-disabled' : ''}`}>
               <i className={`fas fa-${isRecording ? 'circle' : 'stop-circle'}`}></i>
-              {isRecording ? 'Recording...' : 'Ready to Record'}
+              {isRecording ? 'Recording...' : isRecordingDisabled ? 'Connection Required' : 'Ready to Record'}
             </div>
             {isRecording && (
-              <div className="recording-info">
+              <div className="recording-live-info">
                 <span>Started: {recordingStart?.toLocaleTimeString()}</span>
                 <span>Messages: {recordedMessages.length}</span>
                 <span>Topics: {[...new Set(recordedMessages.map(msg => msg.topic))].length}</span>
               </div>
             )}
           </div>
-          <div className="recording-buttons">
+          <div className="recording-action-buttons">
             {!isRecording ? (
-              <button onClick={startRecording} className="start-recording-btn">
+              <button 
+                onClick={startRecording} 
+                className="recording-start-btn"
+                disabled={isRecordingDisabled}
+                title={isRecordingDisabled ? 'Connect to an MQTT broker to start recording' : 'Start recording messages'}
+              >
                 <i className="fas fa-record-vinyl"></i> Record
               </button>
             ) : (
-              <button onClick={stopRecording} className="stop-recording-btn">
+              <button onClick={stopRecording} className="recording-stop-btn">
                 <i className="fas fa-stop"></i> Stop
               </button>
             )}
           </div>
         </div>
+      </div>
 
+      {/* Scrollable Content Area */}
+      <div className="recording-scrollable-content">
         {/* Recordings List */}
-        <div className="recordings-list">
-          <h3>Saved Recordings ({recordings.length})</h3>
+        <div className="recording-saved-list">
+          <div className="recording-saved-list-header">
+            <h3>Saved Recordings ({recordings.length})</h3>
+            <button 
+              onClick={loadRecordingFromFile}
+              className="recording-load-btn"
+              title="Load recording from file"
+            >
+              <i className="fas fa-upload"></i> Load Recording
+            </button>
+          </div>
+
           {recordings.length === 0 ? (
-            <div className="no-recordings">
+            <div className="recording-no-recordings">
               <i className="fas fa-video"></i>
-              <p>No recordings yet. Start recording to capture MQTT messages or load an existing recording.</p>
+              <p>No recordings yet. {isRecordingDisabled ? 'Connect to an MQTT broker and start' : 'Start'} recording to capture MQTT messages or load an existing recording.</p>
             </div>
-            
           ) : (
-
-
-            <div className="recordings">
-              <button 
-                onClick={loadRecordingFromFile}
-                className="load-recording-btn"
-                title="Load recording from file"
-              >
-                <i className="fas fa-upload"></i> Load Recording
-              </button>
-
+            <div className="recording-saved-items">
               {recordings.map(recording => (
                 <div 
                   key={recording.id} 
-                  className={`recording-item ${expandedRecording === recording.id ? 'expanded' : ''}`}
+                  className={`recording-saved-item ${expandedRecording === recording.id ? 'recording-item-expanded' : ''}`}
                 >
                   {/* Recording Header */}
                   <div 
-                    className="recording-header"
+                    className="recording-item-header"
                     onClick={() => selectRecording(recording)}
                   >
-                    <div className="recording-title">
+                    <div className="recording-item-title">
                       <i className={`fas fa-${expandedRecording === recording.id ? 'chevron-down' : 'chevron-right'}`}></i>
                       <i className="fas fa-video"></i>
-                      {recording.name}
+                      {editingRecording === recording.id ? (
+                        <input
+                          type="text"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onBlur={() => saveRecordingName(recording.id)}
+                          onKeyDown={(e) => handleNameKeyPress(e, recording.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="recording-name-input"
+                          autoFocus
+                        />
+                      ) : (
+                        <span 
+                          onDoubleClick={(e) => startEditingRecording(recording, e)}
+                          className="recording-name-text"
+                          title="Double-click to rename"
+                        >
+                          {recording.name}
+                        </span>
+                      )}
                     </div>
-                    <div className="recording-actions" onClick={(e) => e.stopPropagation()}>
+                    <div className="recording-item-actions" onClick={(e) => e.stopPropagation()}>
+                      <button 
+                        onClick={(e) => startEditingRecording(recording, e)}
+                        className="recording-edit-btn"
+                        title="Rename recording"
+                      >
+                        <i className="fas fa-edit"></i>
+                      </button>
                       <button 
                         onClick={() => saveRecordingToFile(recording)}
-                        className="save-recording-btn"
+                        className="recording-save-btn"
                         title="Save recording to file"
                       >
                         <i className="fas fa-save"></i>
                       </button>
                       <button 
                         onClick={() => deleteRecording(recording.id)}
-                        className="delete-recording-btn"
+                        className="recording-delete-btn"
                         title="Delete recording"
                       >
                         <i className="fas fa-trash"></i>
@@ -459,43 +561,50 @@ function RecordingPanel({
                   </div>
                   
                   {/* Recording Details */}
-                  <div className="recording-summary">
-                    <div className="recording-stats">
+                  <div className="recording-item-summary">
+                    <div className="recording-item-stats">
                       <span><i className="fas fa-envelope"></i> {recording.messageCount} messages</span>
                       <span><i className="fas fa-clock"></i> {Math.round((recording.endTime - recording.startTime) / 1000)}s</span>
                       <span><i className="fas fa-tag"></i> {recording.topic}</span>
                       <span><i className="fas fa-list"></i> {getUniqueTopics(recording.messages).length} topics</span>
                     </div>
-                    <div className="recording-time">
+                    <div className="recording-item-time">
                       {recording.startTime.toLocaleString()} - {recording.endTime.toLocaleString()}
                     </div>
                   </div>
 
-                  {/* Expanded Content */}
+                  {/* Expanded Content - Show warning if trying to playback without connection */}
                   {expandedRecording === recording.id && currentPlayback && (
-                    <div className="recording-expanded-content">
+                    <div className="recording-expanded-area">
+                      {isRecordingDisabled && (
+                        <div className="recording-playback-warning">
+                          <i className="fas fa-exclamation-triangle"></i>
+                          <strong>Note:</strong> Connect to an MQTT broker to publish messages during playback.
+                        </div>
+                      )}
+
                       {/* Topic Filter */}
-                      <div className="topic-filter-section">
+                      <div className="recording-topic-filter-section">
                         <button 
                           onClick={() => setShowTopicFilter(!showTopicFilter)}
-                          className="filter-toggle-btn"
+                          className="recording-filter-toggle-btn"
                         >
                           <i className="fas fa-filter"></i> 
                           Topic Filter ({selectedTopicsFilter.length} of {getUniqueTopics(currentPlayback.originalMessages).length} selected)
                         </button>
                         {showTopicFilter && (
-                          <div className="topic-filter-panel">
-                            <div className="filter-actions">
-                              <button onClick={() => setSelectedTopicsFilter(getUniqueTopics(currentPlayback.originalMessages))} className="select-all-btn">
+                          <div className="recording-topic-filter-panel">
+                            <div className="recording-filter-actions">
+                              <button onClick={() => setSelectedTopicsFilter(getUniqueTopics(currentPlayback.originalMessages))} className="recording-select-all-btn">
                                 Select All
                               </button>
-                              <button onClick={clearTopicFilter} className="clear-filter-btn">
+                              <button onClick={clearTopicFilter} className="recording-clear-filter-btn">
                                 Clear All
                               </button>
                             </div>
-                            <div className="topic-list">
+                            <div className="recording-topic-list">
                               {getUniqueTopics(currentPlayback.originalMessages).map(topic => (
-                                <label key={topic} className="topic-checkbox">
+                                <label key={topic} className="recording-topic-checkbox">
                                   <input
                                     type="checkbox"
                                     checked={selectedTopicsFilter.includes(topic)}
@@ -505,7 +614,7 @@ function RecordingPanel({
                                 </label>
                               ))}
                             </div>
-                            <div className="filter-summary">
+                            <div className="recording-filter-summary">
                               Filtered messages: {currentPlayback.messages.length} of {currentPlayback.originalMessages.length}
                             </div>
                           </div>
@@ -513,12 +622,12 @@ function RecordingPanel({
                       </div>
 
                       {/* Playback Controls */}
-                      <div className="playback-section">
+                      <div className="recording-playback-section">
                         {/* Progress Bar */}
-                        <div className="playback-progress">
-                          <div className="progress-bar">
+                        <div className="recording-playback-progress">
+                          <div className="recording-progress-bar">
                             <div 
-                              className="progress-fill" 
+                              className="recording-progress-fill" 
                               style={{ width: `${currentPlayback.messages.length === 0 ? 0 : (currentIndex / currentPlayback.messages.length) * 100}%` }}
                             ></div>
                           </div>
@@ -526,10 +635,10 @@ function RecordingPanel({
                         </div>
 
                         {/* Main Controls */}
-                        <div className="main-controls">
+                        <div className="recording-main-controls">
                           <button 
                             onClick={stepBackward} 
-                            className="step-btn"
+                            className="recording-step-btn"
                             disabled={currentIndex === 0}
                           >
                             <i className="fas fa-step-backward"></i>
@@ -537,7 +646,7 @@ function RecordingPanel({
                           
                           <button 
                             onClick={resetPlayback}
-                            className="reset-btn"
+                            className="recording-reset-btn"
                             title="Reset to beginning"
                           >
                             <i className="fas fa-undo"></i>
@@ -546,14 +655,15 @@ function RecordingPanel({
                           {!isPlaying ? (
                             <button 
                               onClick={isPaused ? resumePlayback : startRealtimePlayback}
-                              className="play-btn main-play-btn"
+                              className="recording-play-btn recording-main-play-btn"
+                              title={isRecordingDisabled ? 'Playback will not publish messages (no connection)' : 'Start playback'}
                             >
                               <i className="fas fa-play"></i>
                             </button>
                           ) : (
                             <button 
                               onClick={pausePlayback}
-                              className="pause-btn main-pause-btn"
+                              className="recording-pause-btn recording-main-pause-btn"
                             >
                               <i className="fas fa-pause"></i>
                             </button>
@@ -561,7 +671,7 @@ function RecordingPanel({
 
                           <button 
                             onClick={stepForward} 
-                            className="step-btn"
+                            className="recording-step-btn"
                             disabled={currentIndex >= (currentPlayback.messages.length)}
                           >
                             <i className="fas fa-step-forward"></i>
@@ -569,8 +679,8 @@ function RecordingPanel({
                         </div>
 
                         {/* Settings Row */}
-                        <div className="playback-settings">
-                          <div className="speed-control">
+                        <div className="recording-playback-settings">
+                          <div className="recording-speed-control">
                             <label>Speed: </label>
                             <select 
                               value={playbackSpeed} 
@@ -584,7 +694,7 @@ function RecordingPanel({
                             </select>
                           </div>
                           
-                          <div className="step-size-control">
+                          <div className="recording-step-size-control">
                             <label>Step Size: </label>
                             <select 
                               value={stepSize} 
@@ -601,12 +711,12 @@ function RecordingPanel({
 
                         {/* Current Message Info */}
                         {getCurrentMessage() && (
-                          <div className="current-message-info">
-                            <div className="message-position">
+                          <div className="recording-current-message-info">
+                            <div className="recording-message-position">
                               <strong>Position:</strong>
                               <span>Message {currentIndex + 1} of {currentPlayback.messages.length}</span>
                             </div>
-                            <div className="message-details">
+                            <div className="recording-message-details">
                               <div>
                                 <strong>Topic:</strong>
                                 <span>{getCurrentMessage().topic}</span>
@@ -624,9 +734,9 @@ function RecordingPanel({
                                 <span>{getCurrentMessage().retain ? 'Yes' : 'No'}</span>
                               </div>
                             </div>
-                            <div className="message-payload">
+                            <div className="recording-message-payload">
                               <strong>Payload:</strong>
-                              <pre className="payload-content">{formatPayload(getCurrentMessage().message || '')}</pre>
+                              <pre className="recording-payload-content">{formatPayload(getCurrentMessage().message || '')}</pre>
                             </div>
                           </div>
                         )}

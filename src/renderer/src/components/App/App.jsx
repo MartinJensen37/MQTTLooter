@@ -722,6 +722,7 @@ function App() {
   // Updated function to render all tab content (always mounted, but conditionally visible)
   const renderAllTabContent = () => {
     const isConnected = connections.find(c => c.id === selectedConnection)?.isConnected || false;
+    const activeConnection = connections.find(c => c.id === selectedConnection); // Add this line
     
     return (
       <div className="tab-content-container">
@@ -760,6 +761,8 @@ function App() {
             connectionName={getSelectedConnectionName()}
             selectedTopic={selectedTopic}
             onPublishMessage={handlePublishMessage}
+            isConnected={isConnected}
+            activeConnectionId={selectedConnection}
           />
         </div>
 
