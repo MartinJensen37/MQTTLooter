@@ -8,6 +8,7 @@ import TopicTreeComponent from '../TopicTree/TopicTreeComponent';
 import MessagePanel from '../MessagePanel/MessagePanel.jsx';
 import PublishingPanel from '../PublishingPanel/PublishingPanel';
 import RecordingPanel from '../RecordingPanel/RecordingPanel';
+import SimulationPanel from '../SimulationPanel/SimulationPanel';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 
@@ -18,12 +19,12 @@ function App() {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [showTopicTree, setShowTopicTree] = useState(true);
   const [topicTreeReady, setTopicTreeReady] = useState(false);
-  const [activeTab, setActiveTab] = useState('logging'); // New tab state
+  const [activeTab, setActiveTab] = useState('logging');
   const [lastSelectedTopics, setLastSelectedTopics] = useState({});
   
   // Panel size states
   const [connectionSidebarWidth, setConnectionSidebarWidth] = useState(280);
-  const [topicTreeWidth, setTopicTreeWidth] = useState(350);
+  const [topicTreeWidth, setTopicTreeWidth] = useState(500);
 
   // Derive activeConnections from connections state
   const activeConnections = useMemo(() => {
@@ -51,8 +52,8 @@ function App() {
           setActiveTab('recording');
           break;
         case 'F4':
-          //event.preventDefault();
-          //setActiveTab('recording');
+          event.preventDefault();
+          setActiveTab('simulation');
           break;
         default:
           break;
@@ -67,6 +68,7 @@ function App() {
     window.removeEventListener('keydown', handleKeyDown);
   };
   }, [selectedConnection]);
+
   // Use ref to store handlers so they can be properly removed
   const handlersRef = useRef(null);
   const topicTreeHandlersRef = useRef(null);
@@ -494,7 +496,6 @@ function App() {
     }
   };
 
-
   const handleConnectionSelect = (connectionId) => {
       // Store the current selected topic for the current connection before switching
       if (selectedConnection && selectedTopic) {
@@ -651,7 +652,6 @@ function App() {
     }));
   };
 
-
   // New function to handle publishing messages
   const handlePublishMessage = async (messageData) => {
     try {
@@ -719,38 +719,64 @@ function App() {
     return messages.filter(msg => msg.connectionId === selectedConnection);
   }, [messages, selectedConnection, connections]);
 
-  // New function to render tab content
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'logging':
-        return (
+  // Updated function to render all tab content (always mounted, but conditionally visible)
+  const renderAllTabContent = () => {
+    const isConnected = connections.find(c => c.id === selectedConnection)?.isConnected || false;
+    
+    return (
+      <div className="tab-content-container">
+        {/* Logging Panel */}
+        <div 
+          className={`tab-content ${activeTab === 'logging' ? 'active' : 'hidden'}`}
+          data-tab="logging"
+        >
           <MessagePanel
             messages={connectionMessages}
             selectedTopic={selectedTopic}
             connectionName={getSelectedConnectionName()}
           />
-        );
-      case 'publishing':
-        return (
+        </div>
+
+        {/* Publishing Panel */}
+        <div 
+          className={`tab-content ${activeTab === 'publishing' ? 'active' : 'hidden'}`}
+          data-tab="publishing"
+        >
           <PublishingPanel
             connectionId={selectedConnection}
             onPublishMessage={handlePublishMessage}
-            isConnected={connections.find(c => c.id === selectedConnection)?.isConnected || false}
+            isConnected={isConnected}
             selectedTopic={selectedTopic}
           />
-        );
-      case 'recording':
-        return (
+        </div>
+
+        {/* Recording Panel */}
+        <div 
+          className={`tab-content ${activeTab === 'recording' ? 'active' : 'hidden'}`}
+          data-tab="recording"
+        >
           <RecordingPanel
             messages={allConnectionMessages}
             connectionName={getSelectedConnectionName()}
             selectedTopic={selectedTopic}
             onPublishMessage={handlePublishMessage}
           />
-        );
-      default:
-        return null;
-    }
+        </div>
+
+        {/* Simulation Panel */}
+        <div 
+          className={`tab-content ${activeTab === 'simulation' ? 'active' : 'hidden'}`}
+          data-tab="simulation"
+        >
+          <SimulationPanel
+            connectionId={selectedConnection}
+            onPublishMessage={handlePublishMessage}
+            isConnected={isConnected}
+            selectedTopic={selectedTopic}
+          />
+        </div>
+      </div>
+    );
   };
 
   // Render main content (topic tree + tab content)
@@ -770,7 +796,7 @@ function App() {
 
     if (!showTopicTree || !topicTreeReady) {
       // Only tab content
-      return renderTabContent();
+      return renderAllTabContent();
     }
 
     // Topic tree + tab content with resizer
@@ -778,7 +804,7 @@ function App() {
       <SplitPane
         split="vertical"
         minSize={250}
-        maxSize={600}
+        maxSize={1000}
         defaultSize={topicTreeWidth}
         onChange={(size) => setTopicTreeWidth(size)}
         resizerStyle={{
@@ -806,7 +832,7 @@ function App() {
             topicTreeService={TopicTreeService}
           />
         </div>
-        {renderTabContent()}
+        {renderAllTabContent()}
       </SplitPane>
     );
   };
@@ -888,6 +914,13 @@ function App() {
                       title="F3 - Recording Panel"
                     >
                       <i className="fas fa-video"></i> Recording <span className="shortcut-hint">F3</span>
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('simulation')} 
+                      className={`tab-btn ${activeTab === 'simulation' ? 'active' : ''}`}
+                      title="F4 - Simulation Panel"
+                    >
+                      <i className="fas fa-microchip"></i> Simulation <span className="shortcut-hint">F4</span>
                     </button>
                   </div>
                 </div>

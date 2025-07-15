@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import './ConnectionModal.css'; // Make sure this import is here
+import './ConnectionModal.css';
 
 function ConnectionModal({ connection, onSave, onCancel }) {
   const [formData, setFormData] = useState({
@@ -21,7 +21,6 @@ function ConnectionModal({ connection, onSave, onCancel }) {
 
   const [errors, setErrors] = useState({});
   const firstInputRef = useRef(null);
-  const modalContentRef = useRef(null);
 
   // Parse broker URL into components
   const parseBrokerUrl = (url) => {
@@ -33,7 +32,6 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       
       return { protocol, hostname, port };
     } catch (error) {
-      // Fallback for invalid URLs
       return { protocol: 'mqtt', hostname: 'localhost', port: 1883 };
     }
   };
@@ -50,7 +48,6 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       let hostname = 'localhost';
       let port = 1883;
 
-      // Parse existing broker URL if available
       if (connection.config.brokerUrl) {
         const parsed = parseBrokerUrl(connection.config.brokerUrl);
         protocol = parsed.protocol;
@@ -73,7 +70,6 @@ function ConnectionModal({ connection, onSave, onCancel }) {
         subscriptions: connection.config.subscriptions || [{ topic: '#', qos: 0 }]
       });
     } else {
-      // Reset to defaults for new connection
       setFormData({
         name: '',
         protocol: 'mqtt',
@@ -89,19 +85,16 @@ function ConnectionModal({ connection, onSave, onCancel }) {
         subscriptions: [{ topic: '#', qos: 0 }]
       });
     }
-    // Clear any existing errors
     setErrors({});
   }, [connection]);
 
   // Focus management
   useEffect(() => {
-    // Small delay to ensure modal is fully rendered
     const timer = setTimeout(() => {
       if (firstInputRef.current) {
         firstInputRef.current.focus();
       }
     }, 100);
-
     return () => clearTimeout(timer);
   }, []);
 
@@ -109,49 +102,23 @@ function ConnectionModal({ connection, onSave, onCancel }) {
   const handleProtocolChange = (protocol) => {
     let defaultPort = 1883;
     switch (protocol) {
-      case 'mqtt':
-        defaultPort = 1883;
-        break;
-      case 'mqtts':
-        defaultPort = 8883;
-        break;
-      case 'ws':
-        defaultPort = 80;
-        break;
-      case 'wss':
-        defaultPort = 443;
-        break;
-      default:
-        defaultPort = 1883;
+      case 'mqtt': defaultPort = 1883; break;
+      case 'mqtts': defaultPort = 8883; break;
+      case 'ws': defaultPort = 80; break;
+      case 'wss': defaultPort = 443; break;
+      default: defaultPort = 1883;
     }
 
-    setFormData(prev => ({
-      ...prev,
-      protocol,
-      port: defaultPort
-    }));
-
-    // Clear protocol-related errors
+    setFormData(prev => ({ ...prev, protocol, port: defaultPort }));
     if (errors.protocol) {
-      setErrors(prev => ({
-        ...prev,
-        protocol: null
-      }));
+      setErrors(prev => ({ ...prev, protocol: null }));
     }
   };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    
-    // Clear error when user starts typing
+    setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: null
-      }));
+      setErrors(prev => ({ ...prev, [field]: null }));
     }
   };
 
@@ -161,10 +128,7 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       ...newSubscriptions[index],
       [field]: field === 'qos' ? parseInt(value) : value
     };
-    setFormData(prev => ({
-      ...prev,
-      subscriptions: newSubscriptions
-    }));
+    setFormData(prev => ({ ...prev, subscriptions: newSubscriptions }));
   };
 
   const addSubscription = () => {
@@ -172,13 +136,6 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       ...prev,
       subscriptions: [...prev.subscriptions, { topic: '', qos: 0 }]
     }));
-
-    // Auto-scroll to bottom after adding new subscription
-    setTimeout(() => {
-      if (modalContentRef.current) {
-        modalContentRef.current.scrollTop = modalContentRef.current.scrollHeight;
-      }
-    }, 100);
   };
 
   const removeSubscription = (index) => {
@@ -209,7 +166,6 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       newErrors.clientId = 'Client ID is required';
     }
 
-    // Validate subscriptions
     formData.subscriptions.forEach((sub, index) => {
       if (!sub.topic.trim()) {
         newErrors[`subscription_${index}`] = 'Topic is required';
@@ -223,20 +179,11 @@ function ConnectionModal({ connection, onSave, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validateForm()) {
-      // Build the broker URL from components
       const brokerUrl = buildBrokerUrl(formData.protocol, formData.hostname, formData.port);
-      
-      // Create the final form data with brokerUrl
-      const finalFormData = {
-        ...formData,
-        brokerUrl
-      };
-      
-      // Remove the individual URL components from the final data
+      const finalFormData = { ...formData, brokerUrl };
       delete finalFormData.protocol;
       delete finalFormData.hostname;
       delete finalFormData.port;
-      
       onSave(finalFormData);
     }
   };
@@ -248,19 +195,20 @@ function ConnectionModal({ connection, onSave, onCancel }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={handleOverlayClick}>
-      <div className="connection-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className="mqtt-modal-overlay" onClick={handleOverlayClick}>
+      <div className="mqtt-modal-container">
+        <div className="mqtt-modal-header">
           <h2>{connection ? 'Edit Connection' : 'New Connection'}</h2>
-          <button className="close-btn" onClick={onCancel} type="button">×</button>
+          <button className="mqtt-modal-close" onClick={onCancel} type="button">×</button>
         </div>
 
-        <div className="modal-content" ref={modalContentRef}>
-          <form onSubmit={handleSubmit}>
-            <div className="form-section">
-              <h3>Connection Details</h3>
+        <form onSubmit={handleSubmit} className="mqtt-modal-form">
+          <div className="mqtt-modal-content">
+            {/* Connection Details Section */}
+            <div className="mqtt-form-section">
+              <h3 className="mqtt-section-title">Connection Details</h3>
               
-              <div className="form-group">
+              <div className="mqtt-form-group">
                 <label htmlFor="name">Connection Name *</label>
                 <input
                   ref={firstInputRef}
@@ -272,52 +220,49 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                   className={errors.name ? 'error' : ''}
                   autoComplete="off"
                 />
-                {errors.name && <span className="error-text">{errors.name}</span>}
+                {errors.name && <span className="mqtt-error-text">{errors.name}</span>}
               </div>
 
-              <div className="form-group">
+              <div className="mqtt-form-group">
                 <label>Broker Connection</label>
-                <div className={`broker-url-row ${(errors.hostname || errors.port) ? 'error' : ''}`}>
-                  <div className="protocol-group">
-                    <select
-                      value={formData.protocol}
-                      onChange={(e) => handleProtocolChange(e.target.value)}
-                    >
-                      <option value="mqtt">mqtt://</option>
-                      <option value="mqtts">mqtts://</option>
-                      <option value="ws">ws://</option>
-                      <option value="wss">wss://</option>
-                    </select>
-                  </div>
+                <div className={`mqtt-broker-url ${(errors.hostname || errors.port) ? 'error' : ''}`}>
+                  <select
+                    value={formData.protocol}
+                    onChange={(e) => handleProtocolChange(e.target.value)}
+                    className="mqtt-protocol"
+                  >
+                    <option value="mqtt">mqtt://</option>
+                    <option value="mqtts">mqtts://</option>
+                    <option value="ws">ws://</option>
+                    <option value="wss">wss://</option>
+                  </select>
                   
-                  <div className="hostname-group">
-                    <input
-                      type="text"
-                      value={formData.hostname}
-                      onChange={(e) => handleInputChange('hostname', e.target.value)}
-                      placeholder="localhost"
-                      autoComplete="off"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={formData.hostname}
+                    onChange={(e) => handleInputChange('hostname', e.target.value)}
+                    placeholder="localhost"
+                    className="mqtt-hostname"
+                    autoComplete="off"
+                  />
                   
-                  <div className="port-separator">:</div>
+                  <span className="mqtt-port-separator">:</span>
                   
-                  <div className="port-group">
-                    <input
-                      type="number"
-                      value={formData.port}
-                      onChange={(e) => handleInputChange('port', parseInt(e.target.value) || '')}
-                      min="1"
-                      max="65535"
-                    />
-                  </div>
+                  <input
+                    type="number"
+                    value={formData.port}
+                    onChange={(e) => handleInputChange('port', parseInt(e.target.value) || '')}
+                    min="1"
+                    max="65535"
+                    className="mqtt-port"
+                  />
                 </div>
-                {errors.hostname && <span className="error-text">{errors.hostname}</span>}
-                {errors.port && <span className="error-text">{errors.port}</span>}
+                {errors.hostname && <span className="mqtt-error-text">{errors.hostname}</span>}
+                {errors.port && <span className="mqtt-error-text">{errors.port}</span>}
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
+              <div className="mqtt-form-row">
+                <div className="mqtt-form-group">
                   <label htmlFor="clientId">Client ID *</label>
                   <input
                     id="clientId"
@@ -327,10 +272,10 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                     className={errors.clientId ? 'error' : ''}
                     autoComplete="off"
                   />
-                  {errors.clientId && <span className="error-text">{errors.clientId}</span>}
+                  {errors.clientId && <span className="mqtt-error-text">{errors.clientId}</span>}
                 </div>
                 
-                <div className="form-group">
+                <div className="mqtt-form-group">
                   <label htmlFor="keepalive">Keep Alive (s)</label>
                   <input
                     id="keepalive"
@@ -344,11 +289,12 @@ function ConnectionModal({ connection, onSave, onCancel }) {
               </div>
             </div>
 
-            <div className="form-section">
-              <h3>Authentication</h3>
+            {/* Authentication Section */}
+            <div className="mqtt-form-section">
+              <h3 className="mqtt-section-title">Authentication</h3>
               
-              <div className="form-row">
-                <div className="form-group">
+              <div className="mqtt-form-row">
+                <div className="mqtt-form-group">
                   <label htmlFor="username">Username</label>
                   <input
                     id="username"
@@ -360,7 +306,7 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                   />
                 </div>
                 
-                <div className="form-group">
+                <div className="mqtt-form-group">
                   <label htmlFor="password">Password</label>
                   <input
                     id="password"
@@ -374,11 +320,12 @@ function ConnectionModal({ connection, onSave, onCancel }) {
               </div>
             </div>
 
-            <div className="form-section">
-              <h3>Options</h3>
+            {/* Options Section */}
+            <div className="mqtt-form-section">
+              <h3 className="mqtt-section-title">Options</h3>
               
-              <div className="form-group">
-                <label className="checkbox-label">
+              <div className="mqtt-form-group">
+                <label className="mqtt-checkbox-label">
                   <input
                     type="checkbox"
                     checked={formData.clean}
@@ -389,17 +336,18 @@ function ConnectionModal({ connection, onSave, onCancel }) {
               </div>
             </div>
 
-            <div className="form-section">
-              <div className="section-header">
-                <h3>Subscriptions</h3>
-                <button type="button" onClick={addSubscription} className="add-subscription-btn">
+            {/* Subscriptions Section */}
+            <div className="mqtt-form-section">
+              <div className="mqtt-section-header">
+                <h3 className="mqtt-section-title">Subscriptions</h3>
+                <button type="button" onClick={addSubscription} className="mqtt-add-btn">
                   + Add Topic
                 </button>
               </div>
               
               {formData.subscriptions.map((subscription, index) => (
-                <div key={index} className="subscription-row">
-                  <div className="form-group flex-grow">
+                <div key={index} className="mqtt-subscription-row">
+                  <div className="mqtt-form-group mqtt-topic-group">
                     <label htmlFor={`topic-${index}`}>Topic</label>
                     <input
                       id={`topic-${index}`}
@@ -411,52 +359,47 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                       autoComplete="off"
                     />
                     {errors[`subscription_${index}`] && (
-                      <span className="error-text">{errors[`subscription_${index}`]}</span>
+                      <span className="mqtt-error-text">{errors[`subscription_${index}`]}</span>
                     )}
                   </div>
                   
-                  <div className="form-group qos-group">
+                  <div className="mqtt-form-group mqtt-qos-group">
                     <label htmlFor={`qos-${index}`}>QoS</label>
                     <select
                       id={`qos-${index}`}
                       value={subscription.qos}
                       onChange={(e) => handleSubscriptionChange(index, 'qos', e.target.value)}
                     >
-                      <option value={0}>QoS 0</option>
-                      <option value={1}>QoS 1</option>
-                      <option value={2}>QoS 2</option>
+                      <option value={0}>0</option>
+                      <option value={1}>1</option>
+                      <option value={2}>2</option>
                     </select>
                   </div>
                   
                   {formData.subscriptions.length > 1 && (
-                    <div className="form-group remove-btn-group">
-                      <label>&nbsp;</label>
-                      <button
-                        type="button"
-                        onClick={() => removeSubscription(index)}
-                        className="remove-subscription-btn1"
-                        title="Remove subscription"
-                      >
-                        <i className="fas fa-trash"></i>
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeSubscription(index)}
+                      className="mqtt-remove-btn"
+                      title="Remove subscription"
+                    >
+                      <i className="fas fa-trash"></i>
+                    </button>
                   )}
                 </div>
               ))}
             </div>
-          </form>
-        </div>
+          </div>
 
-        <div className="modal-footer">
-          <div className="footer-right">
-            <button type="button" onClick={onCancel} className="cancel-btn">
+          <div className="mqtt-modal-footer">
+            <button type="button" onClick={onCancel} className="mqtt-cancel-btn">
               Cancel
             </button>
-            <button onClick={handleSubmit} className="save-btn" type="button">
+            <button type="submit" className="mqtt-save-btn">
               {connection ? 'Update' : 'Create'} Connection
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
