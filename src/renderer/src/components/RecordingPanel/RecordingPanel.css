@@ -13,21 +13,21 @@
 
 /* Recording Panel Header */
 .recording-main-header {
-  padding: 20px 24px;
+  padding: 15px 20px;
   border-bottom: 1px solid #e9ecef;
-  background: white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   flex-shrink: 0;
+  gap: 20px;
 }
 
 .recording-header-left h2 {
   margin: 0;
   color: #2c3e50;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .recording-header-left h2::before {

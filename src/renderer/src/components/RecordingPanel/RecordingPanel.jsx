@@ -420,7 +420,7 @@ function RecordingPanel({
   return (
     <div className={`recording-main-panel ${isRecordingDisabled ? 'recording-disabled' : ''}`}>
       <div className="recording-main-header">
-        <div className="recording-header-left">
+        <div className="header-left">
           <h2>
             Recording & Playback
             {isRecordingDisabled && (

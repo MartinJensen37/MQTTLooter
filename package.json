@@ -32,12 +32,27 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "assets/MQTTLooter_logo_tiny.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/MQTTLooter_logo_tiny.ico",
+      "publisherName": "martinjensen37"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MQTTLooter",
+      "installerIcon": "assets/MQTTLooter_logo_tiny.ico",
+      "uninstallerIcon": "assets/MQTTLooter_logo_tiny.ico",
+      "installerHeaderIcon": "assets/MQTTLooter_logo_tiny.ico",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "artifactName": "${productName} Setup ${version}.${ext}"
     }
   },
   "dependencies": {
