@@ -14,34 +14,45 @@ function ConnectionModal({ connection, onSave, onCancel }) {
     keepalive: 60,
     reconnectPeriod: 1000,
     connectTimeout: 30000,
-    subscriptions: [
-      { topic: '#', qos: 0 }
-    ]
+    protocolVersion: 4,
+    // MQTT 5.0 Properties
+    sessionExpiryInterval: 0,
+    receiveMaximum: 65535,
+    maximumPacketSize: 268435455,
+    topicAliasMaximum: 0,
+    requestResponseInformation: false,
+    requestProblemInformation: true,
+    userProperties: {},
+    // Last Will and Testament
+    willEnabled: false,
+    willTopic: '',
+    willMessage: '',
+    willQos: 0,
+    willRetain: false,
+    willDelayInterval: 0, // MQTT 5.0 only
+    willMessageExpiryInterval: 0, // MQTT 5.0 only
+    subscriptions: [{ topic: '#', qos: 0 }]
   });
 
   const [errors, setErrors] = useState({});
   const firstInputRef = useRef(null);
 
-  // Parse broker URL into components
   const parseBrokerUrl = (url) => {
     try {
       const urlObj = new URL(url);
       const protocol = urlObj.protocol.replace(':', '');
       const hostname = urlObj.hostname;
       const port = parseInt(urlObj.port) || (protocol === 'mqtt' ? 1883 : protocol === 'mqtts' ? 8883 : protocol === 'ws' ? 80 : 443);
-      
       return { protocol, hostname, port };
     } catch (error) {
       return { protocol: 'mqtt', hostname: 'localhost', port: 1883 };
     }
   };
 
-  // Build broker URL from components
   const buildBrokerUrl = (protocol, hostname, port) => {
     return `${protocol}://${hostname}:${port}`;
   };
 
-  // Initialize form data when connection changes
   useEffect(() => {
     if (connection?.config) {
       let protocol = 'mqtt';
@@ -67,6 +78,23 @@ function ConnectionModal({ connection, onSave, onCancel }) {
         keepalive: connection.config.keepalive || 60,
         reconnectPeriod: connection.config.reconnectPeriod || 1000,
         connectTimeout: connection.config.connectTimeout || 30000,
+        protocolVersion: connection.config.protocolVersion || 4,
+        // MQTT 5.0 Properties
+        sessionExpiryInterval: connection.config.sessionExpiryInterval || 0,
+        receiveMaximum: connection.config.receiveMaximum || 65535,
+        maximumPacketSize: connection.config.maximumPacketSize || 268435455,
+        topicAliasMaximum: connection.config.topicAliasMaximum || 0,
+        requestResponseInformation: connection.config.requestResponseInformation || false,
+        requestProblemInformation: connection.config.requestProblemInformation !== undefined ? connection.config.requestProblemInformation : true,
+        userProperties: connection.config.userProperties || {},
+        // Last Will and Testament
+        willEnabled: connection.config.willEnabled || false,
+        willTopic: connection.config.willTopic || '',
+        willMessage: connection.config.willMessage || '',
+        willQos: connection.config.willQos || 0,
+        willRetain: connection.config.willRetain || false,
+        willDelayInterval: connection.config.willDelayInterval || 0,
+        willMessageExpiryInterval: connection.config.willMessageExpiryInterval || 0,
         subscriptions: connection.config.subscriptions || [{ topic: '#', qos: 0 }]
       });
     } else {
@@ -82,13 +110,29 @@ function ConnectionModal({ connection, onSave, onCancel }) {
         keepalive: 60,
         reconnectPeriod: 1000,
         connectTimeout: 30000,
+        protocolVersion: 4,
+        // MQTT 5.0 Properties
+        sessionExpiryInterval: 0,
+        receiveMaximum: 65535,
+        maximumPacketSize: 268435455,
+        topicAliasMaximum: 0,
+        requestResponseInformation: false,
+        requestProblemInformation: true,
+        userProperties: {},
+        // Last Will and Testament
+        willEnabled: false,
+        willTopic: '',
+        willMessage: '',
+        willQos: 0,
+        willRetain: false,
+        willDelayInterval: 0,
+        willMessageExpiryInterval: 0,
         subscriptions: [{ topic: '#', qos: 0 }]
       });
     }
     setErrors({});
   }, [connection]);
 
-  // Focus management
   useEffect(() => {
     const timer = setTimeout(() => {
       if (firstInputRef.current) {
@@ -98,7 +142,6 @@ function ConnectionModal({ connection, onSave, onCancel }) {
     return () => clearTimeout(timer);
   }, []);
 
-  // Update port when protocol changes
   const handleProtocolChange = (protocol) => {
     let defaultPort = 1883;
     switch (protocol) {
@@ -166,6 +209,15 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       newErrors.clientId = 'Client ID is required';
     }
 
+    if (formData.willEnabled) {
+      if (!formData.willTopic.trim()) {
+        newErrors.willTopic = 'Will topic is required when Last Will is enabled';
+      }
+      if (!formData.willMessage.trim()) {
+        newErrors.willMessage = 'Will message is required when Last Will is enabled';
+      }
+    }
+
     formData.subscriptions.forEach((sub, index) => {
       if (!sub.topic.trim()) {
         newErrors[`subscription_${index}`] = 'Topic is required';
@@ -180,10 +232,25 @@ function ConnectionModal({ connection, onSave, onCancel }) {
     e.preventDefault();
     if (validateForm()) {
       const brokerUrl = buildBrokerUrl(formData.protocol, formData.hostname, formData.port);
-      const finalFormData = { ...formData, brokerUrl };
+      const finalFormData = { 
+        ...formData, 
+        brokerUrl,
+        ...(formData.protocolVersion === 5 && {
+          sessionExpiryInterval: formData.sessionExpiryInterval,
+          receiveMaximum: formData.receiveMaximum,
+          maximumPacketSize: formData.maximumPacketSize,
+          topicAliasMaximum: formData.topicAliasMaximum,
+          requestResponseInformation: formData.requestResponseInformation,
+          requestProblemInformation: formData.requestProblemInformation,
+          userProperties: formData.userProperties
+        })
+      };
+      
       delete finalFormData.protocol;
       delete finalFormData.hostname;
       delete finalFormData.port;
+      
+      console.log('Submitting connection with protocol version:', finalFormData.protocolVersion);
       onSave(finalFormData);
     }
   };
@@ -204,6 +271,7 @@ function ConnectionModal({ connection, onSave, onCancel }) {
 
         <form onSubmit={handleSubmit} className="mqtt-modal-form">
           <div className="mqtt-modal-content">
+            
             {/* Connection Details Section */}
             <div className="mqtt-form-section">
               <h3 className="mqtt-section-title">Connection Details</h3>
@@ -287,7 +355,121 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                   />
                 </div>
               </div>
+
+              <div className="mqtt-form-group">
+                <label htmlFor="protocolVersion">MQTT Protocol Version</label>
+                <select
+                  id="protocolVersion"
+                  value={formData.protocolVersion}
+                  onChange={(e) => handleInputChange('protocolVersion', parseInt(e.target.value))}
+                  className="mqtt-protocol-version"
+                >
+                  <option value={4}>MQTT 3.1.1</option>
+                  <option value={5}>MQTT 5.0</option>
+                </select>
+                <div className="mqtt-field-hint">
+                  {formData.protocolVersion === 5 
+                    ? 'MQTT 5.0 includes enhanced features like user properties, message expiry, and topic aliases'
+                    : 'MQTT 3.1.1 is the stable, widely-supported version'
+                  }
+                </div>
+              </div>
             </div>
+
+            {/* MQTT 5.0 Specific Options */}
+            {formData.protocolVersion === 5 && (
+              <div className="mqtt-form-section mqtt5-section">
+                <h3 className="mqtt-section-title">
+                  MQTT 5.0 Properties
+                </h3>
+                
+                <div className="mqtt-form-row">
+                  <div className="mqtt-form-group">
+                    <label htmlFor="sessionExpiryInterval">Session Expiry Interval (seconds)</label>
+                    <input
+                      id="sessionExpiryInterval"
+                      type="number"
+                      value={formData.sessionExpiryInterval}
+                      onChange={(e) => handleInputChange('sessionExpiryInterval', parseInt(e.target.value) || 0)}
+                      min="0"
+                      placeholder="0"
+                    />
+                    <div className="mqtt-field-hint">0 = Session expires when network connection closes</div>
+                  </div>
+                  
+                  <div className="mqtt-form-group">
+                    <label htmlFor="receiveMaximum">Receive Maximum</label>
+                    <input
+                      id="receiveMaximum"
+                      type="number"
+                      value={formData.receiveMaximum}
+                      onChange={(e) => handleInputChange('receiveMaximum', parseInt(e.target.value) || 65535)}
+                      min="1"
+                      max="65535"
+                      placeholder="65535"
+                    />
+                    <div className="mqtt-field-hint">Maximum number of QoS 1 and 2 publications</div>
+                  </div>
+                </div>
+
+                <div className="mqtt-form-row">
+                  <div className="mqtt-form-group">
+                    <label htmlFor="maximumPacketSize">Maximum Packet Size (bytes)</label>
+                    <input
+                      id="maximumPacketSize"
+                      type="number"
+                      value={formData.maximumPacketSize}
+                      onChange={(e) => handleInputChange('maximumPacketSize', parseInt(e.target.value) || 268435455)}
+                      min="1"
+                      placeholder="268435455"
+                    />
+                    <div className="mqtt-field-hint">Maximum packet size this client will accept</div>
+                  </div>
+                  
+                  <div className="mqtt-form-group">
+                    <label htmlFor="topicAliasMaximum">Topic Alias Maximum</label>
+                    <input
+                      id="topicAliasMaximum"
+                      type="number"
+                      value={formData.topicAliasMaximum}
+                      onChange={(e) => handleInputChange('topicAliasMaximum', parseInt(e.target.value) || 0)}
+                      min="0"
+                      max="65535"
+                      placeholder="0"
+                    />
+                    <div className="mqtt-field-hint">0 = No topic aliases supported</div>
+                  </div>
+                </div>
+
+                <div className="mqtt-form-row">
+                  <div className="mqtt-form-group">
+                    <label className="mqtt-connection-modal-checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={formData.requestResponseInformation}
+                        onChange={(e) => handleInputChange('requestResponseInformation', e.target.checked)}
+                      />
+                      <div className="mqtt-connection-modal-checkbox-custom"></div>
+                      <span className="mqtt-connection-modal-checkbox-text">Request Response Information</span>
+                    </label>
+                    <div className="mqtt-field-hint">Request server to return response information</div>
+                  </div>
+                  
+                  <div className="mqtt-form-group">
+                    <label className="mqtt-connection-modal-checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={formData.requestProblemInformation}
+                        onChange={(e) => handleInputChange('requestProblemInformation', e.target.checked)}
+                      />
+                      <div className="mqtt-connection-modal-checkbox-custom"></div>
+                      <span className="mqtt-connection-modal-checkbox-text">Request Problem Information</span>
+                    </label>
+                    <div className="mqtt-field-hint">Request server to return problem information in case of failures</div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Authentication Section */}
             <div className="mqtt-form-section">
@@ -320,18 +502,133 @@ function ConnectionModal({ connection, onSave, onCancel }) {
               </div>
             </div>
 
-            {/* Options Section */}
+            {/* Last Will and Testament */}
             <div className="mqtt-form-section">
-              <h3 className="mqtt-section-title">Options</h3>
+              <h3 className="mqtt-section-title">Last Will and Testament</h3>
               
               <div className="mqtt-form-group">
-                <label className="mqtt-checkbox-label">
+                <label className="mqtt-connection-modal-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={formData.willEnabled}
+                    onChange={(e) => handleInputChange('willEnabled', e.target.checked)}
+                  />
+                  <div className="mqtt-connection-modal-checkbox-custom"></div>
+                  <span className="mqtt-connection-modal-checkbox-text">Enable Last Will Message</span>
+                </label>
+                <div className="mqtt-field-hint">
+                  The broker will publish this message if the client disconnects unexpectedly
+                </div>
+              </div>
+
+              {formData.willEnabled && (
+                <>
+                  <div className="mqtt-form-group">
+                    <label htmlFor="willTopic">Will Topic *</label>
+                    <input
+                      id="willTopic"
+                      type="text"
+                      value={formData.willTopic}
+                      onChange={(e) => handleInputChange('willTopic', e.target.value)}
+                      placeholder="status/client/offline"
+                      className={errors.willTopic ? 'error' : ''}
+                      autoComplete="off"
+                    />
+                    {errors.willTopic && <span className="mqtt-error-text">{errors.willTopic}</span>}
+                  </div>
+
+                  <div className="mqtt-form-group">
+                    <label htmlFor="willMessage">Will Message *</label>
+                    <input
+                      id="willMessage"
+                      type="text"
+                      value={formData.willMessage}
+                      onChange={(e) => handleInputChange('willMessage', e.target.value)}
+                      placeholder="Client disconnected unexpectedly"
+                      className={errors.willMessage ? 'error' : ''}
+                      autoComplete="off"
+                    />
+                    {errors.willMessage && <span className="mqtt-error-text">{errors.willMessage}</span>}
+                  </div>
+
+                  <div className="mqtt-form-row">
+                    <div className="mqtt-form-group">
+                      <label htmlFor="willQos">Will QoS</label>
+                      <select
+                        id="willQos"
+                        value={formData.willQos}
+                        onChange={(e) => handleInputChange('willQos', parseInt(e.target.value))}
+                      >
+                        <option value={0}>0 - At most once</option>
+                        <option value={1}>1 - At least once</option>
+                        <option value={2}>2 - Exactly once</option>
+                      </select>
+                    </div>
+                    
+                    <div className="mqtt-form-group">
+                      <label className="mqtt-connection-modal-checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={formData.willRetain}
+                          onChange={(e) => handleInputChange('willRetain', e.target.checked)}
+                        />
+                        <div className="mqtt-connection-modal-checkbox-custom"></div>
+                        <span className="mqtt-connection-modal-checkbox-text">Retain Will Message</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {formData.protocolVersion === 5 && (
+                    <div className="mqtt-form-row">
+                      <div className="mqtt-form-group">
+                        <label htmlFor="willDelayInterval">Will Delay Interval (s)</label>
+                        <input
+                          id="willDelayInterval"
+                          type="number"
+                          value={formData.willDelayInterval}
+                          onChange={(e) => handleInputChange('willDelayInterval', parseInt(e.target.value) || 0)}
+                          min="0"
+                          placeholder="0"
+                        />
+                        <div className="mqtt-field-hint">Delay before publishing the will message</div>
+                      </div>
+                      
+                      <div className="mqtt-form-group">
+                        <label htmlFor="willMessageExpiryInterval">Will Message Expiry (s)</label>
+                        <input
+                          id="willMessageExpiryInterval"
+                          type="number"
+                          value={formData.willMessageExpiryInterval}
+                          onChange={(e) => handleInputChange('willMessageExpiryInterval', parseInt(e.target.value) || 0)}
+                          min="0"
+                          placeholder="0"
+                        />
+                        <div className="mqtt-field-hint">0 = Will message never expires</div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Options Section */}
+            <div className="mqtt-form-section">
+              <h3 className="mqtt-section-title">Other Options</h3>
+              
+              <div className="mqtt-form-group">
+                <label className="mqtt-connection-modal-checkbox-label">
                   <input
                     type="checkbox"
                     checked={formData.clean}
                     onChange={(e) => handleInputChange('clean', e.target.checked)}
                   />
-                  Clean Session
+                  <div className="mqtt-connection-modal-checkbox-custom"></div>
+                  <span className="mqtt-connection-modal-checkbox-text">
+                    Clean Session
+                    {formData.protocolVersion === 5 && (
+                      <span className="mqtt5-note"> (Clean Start in MQTT 5.0)</span>
+                    )}
+                  </span>
                 </label>
               </div>
             </div>

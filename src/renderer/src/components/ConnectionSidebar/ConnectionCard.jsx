@@ -39,6 +39,16 @@ function ConnectionCard({
     }
   };
 
+  const getMqttVersion = () => {
+    const version = connection.config?.protocolVersion || connection.protocolVersion || 4;
+    return version === 5 ? 'v5' : 'v3.1.1';
+  };
+
+  const getMqttVersionClass = () => {
+    const version = connection.config?.protocolVersion || connection.protocolVersion || 4;
+    return version === 5 ? 'mqtt5' : 'mqtt311';
+  };
+
   const handleCardClick = () => {
     onSelect();
   };
@@ -77,9 +87,12 @@ function ConnectionCard({
       }}
     >
       <div className="card-content">
-        {/* Status dot in top right corner */}
+        {/* Status dot and MQTT version bubble in top right corner */}
         <div className="connection-status">
           <div className={getStatusDot()}></div>
+          <div className={`mqtt-version-bubble ${getMqttVersionClass()}`}>
+            {getMqttVersion()}
+          </div>
         </div>
         
         <div className="connection-info">

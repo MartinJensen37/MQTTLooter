@@ -140,10 +140,14 @@
 
 /* Status dot positioned in top right corner */
 .connection-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
   position: absolute;
   top: 12px;
-  right: 16px;
-  z-index: 1;
+  right: 12px;
+  z-index: 2;
 }
 
 .status-dot {
@@ -413,4 +417,32 @@
     height: 20px;
     font-size: 9px;
   }
+}
+
+.mqtt-version-bubble {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 6px;
+  border-radius: 12px;
+  margin-left: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border: 1px solid;
+  min-width: 30px;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  z-index: 3;
+}
+
+.mqtt-version-bubble.mqtt311 {
+  background: rgba(255, 255, 255, 0.8);
+  color: #000000;
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.mqtt-version-bubble.mqtt5 {
+  background: rgba(255, 255, 255, 0.8);
+  color: #000000;
+  border-color: rgba(255, 255, 255, 0.8);
 }

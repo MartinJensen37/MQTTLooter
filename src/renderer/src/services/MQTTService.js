@@ -23,7 +23,6 @@ class MQTTService {
   handleEvent(eventType, data) {
     const { id: connectionId } = data;
     
-    // Update connection status
     if (this.connections.has(connectionId)) {
       const connection = this.connections.get(connectionId);
       
@@ -31,6 +30,8 @@ class MQTTService {
         case 'connected':
           connection.isConnected = true;
           connection.status = 'connected';
+          connection.protocolVersion = data.protocolVersion;
+          if (data.properties) connection.mqtt5Properties = data.properties;
           break;
         case 'disconnected':
           connection.isConnected = false;
@@ -39,12 +40,15 @@ class MQTTService {
         case 'error':
           connection.status = 'error';
           break;
+        case 'reconnecting':
+          connection.status = 'reconnecting';
+          connection.reconnectAttempt = data.attempt;
+          break;
       }
       
       this.connections.set(connectionId, connection);
     }
 
-    // Call registered handlers
     const handlers = this.eventHandlers.get(`${connectionId}:${eventType}`) || new Set();
     const globalHandlers = this.eventHandlers.get(`*:${eventType}`) || new Set();
     
@@ -57,7 +61,6 @@ class MQTTService {
     });
   }
 
-  // Event handling methods
   on(connectionId, eventType, handler) {
     const key = `${connectionId}:${eventType}`;
     if (!this.eventHandlers.has(key)) {
@@ -81,38 +84,41 @@ class MQTTService {
     }
   }
 
-  // Connection management
   async connect(connectionId, config) {
     const connectionData = {
       id: connectionId,
       config,
       status: 'connecting',
       isConnected: false,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      protocolVersion: config.protocolVersion || 4,
+      ...(config.protocolVersion === 5 && {
+        mqtt5Properties: config.properties || {}
+      })
     };
 
     this.connections.set(connectionId, connectionData);
 
     try {
-      console.log(`MQTTService: Connecting ${connectionId}`);
       const result = await window.electronAPI.mqtt.connect(connectionId, config);
       
       if (result.success) {
         connectionData.status = 'connected';
         connectionData.isConnected = true;
+        connectionData.protocolVersion = result.data?.protocolVersion || config.protocolVersion || 4;
+        if (result.data?.properties) {
+          connectionData.mqtt5Properties = result.data.properties;
+        }
         this.connections.set(connectionId, connectionData);
-        console.log(`MQTTService: Successfully connected ${connectionId}`);
       } else {
         connectionData.status = 'error';
         connectionData.isConnected = false;
         this.connections.set(connectionId, connectionData);
-        console.error(`MQTTService: Failed to connect ${connectionId}:`, result.error);
         throw new Error(result.error);
       }
       
       return result;
     } catch (error) {
-      console.error(`MQTTService: Connect error for ${connectionId}:`, error);
       const connectionData = this.connections.get(connectionId);
       if (connectionData) {
         connectionData.status = 'error';
@@ -125,20 +131,16 @@ class MQTTService {
 
   async disconnect(connectionId) {
     try {
-      console.log(`MQTTService: Disconnecting ${connectionId}`);
       const result = await window.electronAPI.mqtt.disconnect(connectionId);
       
       if (result.success) {
-        // Update connection status but DON'T remove from connections
         const connection = this.connections.get(connectionId);
         if (connection) {
           connection.isConnected = false;
           connection.status = 'disconnected';
           this.connections.set(connectionId, connection);
-          console.log(`MQTTService: Successfully disconnected ${connectionId}, keeping connection config`);
         }
         
-        // Clean up connection-specific event handlers (but keep the connection)
         const keysToDelete = [];
         this.eventHandlers.forEach((_, key) => {
           if (key.startsWith(`${connectionId}:`) && !key.startsWith('*:')) {
@@ -146,36 +148,27 @@ class MQTTService {
           }
         });
         keysToDelete.forEach(key => {
-          console.log(`Cleaning up connection-specific event handler: ${key}`);
           this.eventHandlers.delete(key);
         });
       } else {
-        console.error(`MQTTService: Failed to disconnect ${connectionId}:`, result.error);
         throw new Error(result.error);
       }
       
       return result;
     } catch (error) {
-      console.error(`MQTTService: Disconnect error for ${connectionId}:`, error);
       throw error;
     }
   }
 
-  // New method for completely removing a connection (used by delete function)
   async deleteConnection(connectionId) {
     try {
-      console.log(`MQTTService: Deleting connection ${connectionId}`);
-      
-      // First disconnect if connected
       const connection = this.connections.get(connectionId);
       if (connection?.isConnected) {
         await this.disconnect(connectionId);
       }
       
-      // Remove from local connections completely
       this.connections.delete(connectionId);
       
-      // Clean up ALL event handlers for this connection
       const keysToDelete = [];
       this.eventHandlers.forEach((_, key) => {
         if (key.startsWith(`${connectionId}:`)) {
@@ -183,51 +176,40 @@ class MQTTService {
         }
       });
       keysToDelete.forEach(key => {
-        console.log(`Cleaning up event handler for deleted connection: ${key}`);
         this.eventHandlers.delete(key);
       });
       
-      console.log(`MQTTService: Successfully deleted connection ${connectionId}`);
       return { success: true };
     } catch (error) {
-      console.error(`MQTTService: Delete connection error for ${connectionId}:`, error);
       throw error;
     }
   }
 
-  async subscribe(connectionId, topic, qos = 0) {
-    return await window.electronAPI.mqtt.subscribe(connectionId, topic, qos);
+  async subscribe(connectionId, topic, qos = 0, properties = {}) {
+    return await window.electronAPI.mqtt.subscribe(connectionId, topic, qos, properties);
   }
 
-  async unsubscribe(connectionId, topic) {
-    return await window.electronAPI.mqtt.unsubscribe(connectionId, topic);
+  async unsubscribe(connectionId, topic, properties = {}) {
+    return await window.electronAPI.mqtt.unsubscribe(connectionId, topic, properties);
   }
 
   async publish(connectionId, data) {
-    try {
-      console.log(`MQTTService: Publishing message to ${connectionId}:`, data);
-      
-      // Extract data and call with separate parameters to match index.js
-      const { topic, message, qos, retain } = data;
-      const options = { qos: qos || 0, retain: retain || false };
-      
-      const result = await window.electronAPI.mqtt.publish(connectionId, topic, message, options);
-      
-      if (result.success) {
-        console.log(`MQTTService: Successfully published message to ${connectionId}`);
-      } else {
-        console.error(`MQTTService: Failed to publish message to ${connectionId}:`, result.error);
-        throw new Error(result.error);
-      }
-      
-      return result;
-    } catch (error) {
-      console.error(`MQTTService: Publish error for ${connectionId}:`, error);
-      throw error;
+    const { topic, message, qos, retain, properties } = data;
+    const options = { 
+      qos: qos || 0, 
+      retain: retain || false,
+      ...(properties && { properties })
+    };
+    
+    const result = await window.electronAPI.mqtt.publish(connectionId, topic, message, options);
+    
+    if (!result.success) {
+      throw new Error(result.error);
     }
+    
+    return result;
   }
 
-  // Connection info
   getConnection(connectionId) {
     return this.connections.get(connectionId);
   }
@@ -236,19 +218,56 @@ class MQTTService {
     return Array.from(this.connections.values());
   }
 
-  async refreshConnectionsFromMain() {
-    try {
-      console.log('MQTTService: Refreshing connections from main process');
-      const result = await window.electronAPI.mqtt.getConnections();
-      if (result.success) {
-        console.log('MQTTService: Received connections from main:', result.data);
-        return result.data;
-      }
-      throw new Error(result.error);
-    } catch (error) {
-      console.error('MQTTService: Failed to refresh connections:', error);
-      throw error;
+  async getConnectionStatistics(connectionId) {
+    const result = await window.electronAPI.mqtt.getConnectionStatistics(connectionId);
+    if (result.success) {
+      return result.data;
     }
+    throw new Error(result.error);
+  }
+
+  async getAllStatistics() {
+    const result = await window.electronAPI.mqtt.getAllStatistics();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error);
+  }
+  
+  async updateConnectionConfig(connectionId, config) {
+    const connection = this.connections.get(connectionId);
+    if (connection) {
+      connection.config = config;
+      this.connections.set(connectionId, connection);
+    }
+    return { success: true };
+  }
+
+  async refreshConnectionsFromMain() {
+    const result = await window.electronAPI.mqtt.getConnections();
+    if (result.success) {
+      return result.data;
+    }
+    throw new Error(result.error);
+  }
+
+  isConnected(connectionId) {
+    const connection = this.connections.get(connectionId);
+    return connection?.isConnected || false;
+  }
+
+  getProtocolVersion(connectionId) {
+    const connection = this.connections.get(connectionId);
+    return connection?.protocolVersion || 4;
+  }
+
+  supportsMqtt5(connectionId) {
+    return this.getProtocolVersion(connectionId) === 5;
+  }
+
+  getMqtt5Properties(connectionId) {
+    const connection = this.connections.get(connectionId);
+    return connection?.mqtt5Properties || {};
   }
 }
 

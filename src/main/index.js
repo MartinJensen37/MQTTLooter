@@ -55,12 +55,14 @@ function setupMQTTEventForwarding() {
     });
 }
 
-// Generic MQTT IPC Handlers
 ipcMain.handle('mqtt-connect', async (event, connectionId, config) => {
   try {
-    await mqttManager.connect(connectionId, config);
-    return { success: true };
+    console.log(`IPC: Connecting ${connectionId} with protocol version ${config.protocolVersion}`);
+    const result = await mqttManager.connect(connectionId, config);
+    console.log(`IPC: Successfully connected ${connectionId}`);
+    return { success: true, data: result };
   } catch (error) {
+    console.error(`IPC: Failed to connect ${connectionId}:`, error);
     return { success: false, error: error.message };
   }
 });
@@ -74,20 +76,26 @@ ipcMain.handle('mqtt-disconnect', async (event, connectionId) => {
   }
 });
 
-ipcMain.handle('mqtt-subscribe', async (event, connectionId, topic, qos) => {
+ipcMain.handle('mqtt-subscribe', async (event, connectionId, topic, qos = 0, properties = {}) => {
   try {
-    await mqttManager.subscribe(connectionId, topic, qos);
-    return { success: true };
+    console.log(`IPC: Subscribing ${connectionId} to ${topic} with QoS ${qos}`);
+    const result = await mqttManager.subscribe(connectionId, topic, qos, properties);
+    console.log(`IPC: Subscription successful for ${connectionId}: ${topic}`);
+    return { success: true, data: result };
   } catch (error) {
+    console.error(`IPC: Subscribe failed for ${connectionId}:`, error.message);
     return { success: false, error: error.message };
   }
 });
 
-ipcMain.handle('mqtt-unsubscribe', async (event, connectionId, topic) => {
+ipcMain.handle('mqtt-unsubscribe', async (event, connectionId, topic, properties = {}) => {
   try {
-    await mqttManager.unsubscribe(connectionId, topic);
-    return { success: true };
+    console.log(`IPC: Unsubscribing ${connectionId} from ${topic}`);
+    const result = await mqttManager.unsubscribe(connectionId, topic, properties);
+    console.log(`IPC: Unsubscription successful for ${connectionId}: ${topic}`);
+    return { success: true, data: result };
   } catch (error) {
+    console.error(`IPC: Unsubscribe failed for ${connectionId}:`, error.message);
     return { success: false, error: error.message };
   }
 });

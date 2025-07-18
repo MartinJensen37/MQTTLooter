@@ -8,11 +8,19 @@ class MQTTConnection extends EventEmitter {
     this.config = config;
     this.client = null;
     this.isConnected = false;
-    this.subscriptions = new Set();
+    this.subscriptions = new Map();
     this.eventHandlers = new Map();
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 3; // Limit reconnection attempts
-    this.isDestroyed = false; // Flag to prevent operations on destroyed connections
+    this.maxReconnectAttempts = 3;
+    this.isDestroyed = false;
+    this.connectionStats = {
+      messagesReceived: 0,
+      messagesPublished: 0,
+      connectionStartTime: null,
+      lastMessageTime: null,
+      bytesReceived: 0,
+      bytesSent: 0
+    };
   }
 
   connect() {
@@ -25,125 +33,172 @@ class MQTTConnection extends EventEmitter {
       try {
         const options = {
           clientId: this.config.clientId || `mqttlooter_${Math.random().toString(36).substr(2, 9)}`,
-          username: this.config.username || undefined,
-          password: this.config.password || undefined,
           clean: this.config.clean !== undefined ? this.config.clean : true,
           keepalive: this.config.keepalive || 60,
           connectTimeout: this.config.connectTimeout || 30000,
-          // CRITICAL: Limit reconnection attempts and add backoff
-          reconnectPeriod: this.config.reconnectPeriod || 5000,
-          will: this.config.will || undefined,
-          ca: this.config.ca || undefined,
-          cert: this.config.cert || undefined,
-          key: this.config.key || undefined,
-          rejectUnauthorized: this.config.rejectUnauthorized !== undefined ? this.config.rejectUnauthorized : true
+          reconnectPeriod: 0,
+          protocolVersion: this.config.protocolVersion || 4
         };
+
+        // Authentication
+        if (this.config.username) options.username = this.config.username;
+        if (this.config.password) options.password = this.config.password;
+
+        // Last Will and Testament
+        if (this.config.willEnabled && this.config.willTopic && this.config.willMessage) {
+          options.will = {
+            topic: this.config.willTopic,
+            payload: this.config.willMessage,
+            qos: this.config.willQos || 0,
+            retain: this.config.willRetain || false
+          };
+
+          // MQTT 5.0 will properties
+          if (this.config.protocolVersion === 5) {
+            options.will.properties = {};
+            if (this.config.willDelayInterval > 0) {
+              options.will.properties.willDelayInterval = this.config.willDelayInterval;
+            }
+            if (this.config.willMessageExpiryInterval > 0) {
+              options.will.properties.messageExpiryInterval = this.config.willMessageExpiryInterval;
+            }
+          }
+        }
+
+        // MQTT 5.0 specific handling
+        if (this.config.protocolVersion === 5) {
+          options.cleanStart = options.clean;
+          delete options.clean;
+          
+          // MQTT 5.0 properties
+          if (this.config.sessionExpiryInterval > 0 || 
+              this.config.receiveMaximum !== 65535 || 
+              this.config.maximumPacketSize !== 268435455 ||
+              this.config.topicAliasMaximum > 0 ||
+              this.config.requestResponseInformation ||
+              !this.config.requestProblemInformation) {
+            
+            options.properties = {};
+            if (this.config.sessionExpiryInterval > 0) {
+              options.properties.sessionExpiryInterval = this.config.sessionExpiryInterval;
+            }
+            if (this.config.receiveMaximum !== 65535) {
+              options.properties.receiveMaximum = this.config.receiveMaximum;
+            }
+            if (this.config.maximumPacketSize !== 268435455) {
+              options.properties.maximumPacketSize = this.config.maximumPacketSize;
+            }
+            if (this.config.topicAliasMaximum > 0) {
+              options.properties.topicAliasMaximum = this.config.topicAliasMaximum;
+            }
+            if (this.config.requestResponseInformation) {
+              options.properties.requestResponseInformation = true;
+            }
+            if (!this.config.requestProblemInformation) {
+              options.properties.requestProblemInformation = false;
+            }
+          }
+        }
+
+        const connectionTimeout = setTimeout(() => {
+          if (this.client) this.client.end(true);
+          reject(new Error(`Connection timeout after ${options.connectTimeout}ms`));
+        }, options.connectTimeout);
 
         this.client = mqtt.connect(this.config.brokerUrl, options);
 
-        const connectHandler = (connack) => {
-          if (this.isDestroyed) return; // Don't proceed if destroyed
-          
-          console.log(`MQTT Connected: ${this.config.name} (${this.id})`);
-          this.isConnected = true;
-          this.reconnectAttempts = 0; // Reset counter on successful connection
-          
-          // Auto-subscribe to configured topics
-          this.config.subscriptions?.forEach(sub => {
-            this.subscribe(sub.topic, sub.qos || 0).catch(error => {
-              console.error(`Auto-subscribe failed for ${sub.topic}:`, error);
-              // Don't let subscription errors break the connection
-            });
-          });
+        if (!this.client) {
+          clearTimeout(connectionTimeout);
+          reject(new Error('MQTT client creation failed'));
+          return;
+        }
 
-          this.emit('connected', { id: this.id, connack });
-          resolve(connack);
-        };
-
-        const messageHandler = (topic, message, packet) => {
+        const connectHandler = async (connack) => {
+          clearTimeout(connectionTimeout);
           if (this.isDestroyed) return;
           
-          this.emit('message', {
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+          this.connectionStats.connectionStartTime = Date.now();
+          
+          const connectionData = {
             id: this.id,
-            topic,
-            message: message.toString(),
-            qos: packet.qos,
-            retain: packet.retain,
-            timestamp: Date.now()
-          });
+            connack,
+            protocolVersion: this.config.protocolVersion || 4
+          };
+
+          // Auto-subscribe to configured topics
+          if (this.config.subscriptions && Array.isArray(this.config.subscriptions)) {
+            for (const subscription of this.config.subscriptions) {
+              if (subscription.topic && subscription.topic.trim()) {
+                try {
+                  await this.subscribe(subscription.topic, subscription.qos || 0);
+                } catch (error) {
+                  console.error(`Failed to auto-subscribe to ${subscription.topic}:`, error);
+                }
+              }
+            }
+          }
+
+          this.emit('connected', connectionData);
+          resolve(connectionData);
         };
 
         const errorHandler = (error) => {
+          clearTimeout(connectionTimeout);
           if (this.isDestroyed) return;
           
-          console.error(`MQTT Error (${this.id}):`, error);
-          this.reconnectAttempts++;
+          this.emit('error', { 
+            id: this.id, 
+            error: error.message,
+            code: error.code,
+            protocolVersion: this.config.protocolVersion
+          });
           
-          // Disable further reconnection if max attempts reached
-          if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.warn(`Max reconnection attempts (${this.maxReconnectAttempts}) reached for ${this.id}. Disabling reconnection.`);
-            if (this.client && this.client.options) {
-              this.client.options.reconnectPeriod = 0; // Disable reconnection
-            }
-          }
-          
-          this.emit('error', { id: this.id, error: error.message });
-          
-          // Only reject on first error, not on reconnection errors
-          if (this.reconnectAttempts === 1) {
+          if (!this.isConnected) {
             reject(error);
           }
         };
 
         const closeHandler = () => {
+          clearTimeout(connectionTimeout);
           if (this.isDestroyed) return;
           
-          console.log(`MQTT Disconnected: ${this.id}`);
           this.isConnected = false;
           this.emit('disconnected', { id: this.id });
         };
 
-        const reconnectHandler = () => {
-          if (this.isDestroyed) {
-            // If connection is destroyed, force end the client
-            if (this.client) {
-              this.client.end(true);
-            }
-            return;
-          }
+        const messageHandler = (topic, message, packet) => {
+          if (this.isDestroyed) return;
           
-          this.reconnectAttempts++;
-          console.log(`MQTT Reconnecting: ${this.id} (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-          
-          // Stop reconnection if max attempts reached
-          if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.warn(`Max reconnection attempts reached for ${this.id}. Stopping reconnection.`);
-            if (this.client) {
-              this.client.options.reconnectPeriod = 0;
-              this.client.end(true);
-            }
-            return;
-          }
-          
-          this.emit('reconnecting', { id: this.id, attempt: this.reconnectAttempts });
+          this.connectionStats.messagesReceived++;
+          this.connectionStats.lastMessageTime = Date.now();
+          this.connectionStats.bytesReceived += message.length;
+
+          this.emit('message', {
+            id: this.id,
+            topic,
+            message: message.toString(),
+            packet,
+            timestamp: Date.now(),
+            qos: packet.qos,
+            retain: packet.retain,
+            protocolVersion: this.config.protocolVersion || 4
+          });
         };
 
-        // Store handlers for cleanup
+        // Store and attach handlers
         this.eventHandlers.set('connect', connectHandler);
-        this.eventHandlers.set('message', messageHandler);
         this.eventHandlers.set('error', errorHandler);
         this.eventHandlers.set('close', closeHandler);
-        this.eventHandlers.set('reconnect', reconnectHandler);
+        this.eventHandlers.set('message', messageHandler);
 
-        // Attach handlers
         this.client.on('connect', connectHandler);
-        this.client.on('message', messageHandler);
         this.client.on('error', errorHandler);
         this.client.on('close', closeHandler);
-        this.client.on('reconnect', reconnectHandler);
+        this.client.on('message', messageHandler);
 
       } catch (error) {
-        console.error(`Failed to create MQTT connection for ${this.id}:`, error);
         reject(error);
       }
     });
@@ -151,82 +206,89 @@ class MQTTConnection extends EventEmitter {
 
   disconnect() {
     return new Promise((resolve) => {
-      console.log(`Disconnecting MQTT connection: ${this.id}`);
-      
-      // Mark as destroyed to prevent any further operations
       this.isDestroyed = true;
       
       if (this.client) {
-        // Disable reconnection immediately
-        if (this.client.options) {
-          this.client.options.reconnectPeriod = 0;
-          this.client.options.maxReconnectTimes = 0;
-        }
-
-        // Remove all event listeners before disconnecting
         this.eventHandlers.forEach((handler, event) => {
           this.client.removeListener(event, handler);
         });
         this.eventHandlers.clear();
 
-        // Force end the connection
         this.client.end(true, {}, () => {
-          console.log(`MQTT client forcefully disconnected: ${this.id}`);
           this.client = null;
           this.isConnected = false;
           this.subscriptions.clear();
           resolve();
         });
-        
-        // Fallback timeout in case end() doesn't call callback
+
         setTimeout(() => {
           if (this.client) {
-            console.warn(`Force cleanup timeout for ${this.id}`);
             this.client = null;
             this.isConnected = false;
             this.subscriptions.clear();
           }
           resolve();
-        }, 2000);
+        }, 1000);
       } else {
         resolve();
       }
     });
   }
 
-  subscribe(topic, qos = 0) {
+  subscribe(topic, qos = 0, properties = {}) {
     return new Promise((resolve, reject) => {
       if (!this.client || !this.isConnected || this.isDestroyed) {
         reject(new Error('Not connected'));
         return;
       }
 
-      this.client.subscribe(topic, { qos }, (err, granted) => {
+      const subscribeOptions = { qos };
+      if (this.config.protocolVersion === 5 && Object.keys(properties).length > 0) {
+        subscribeOptions.properties = properties;
+      }
+
+      this.client.subscribe(topic, subscribeOptions, (err, granted) => {
         if (err) {
           reject(err);
         } else {
-          this.subscriptions.add(topic);
-          this.emit('subscribed', { id: this.id, topic, qos, granted });
-          resolve(granted);
+          this.subscriptions.set(topic, { qos, properties, granted });
+          const subscriptionData = {
+            id: this.id,
+            topic,
+            qos,
+            granted,
+            protocolVersion: this.config.protocolVersion || 4
+          };
+          this.emit('subscribed', subscriptionData);
+          resolve(subscriptionData);
         }
       });
     });
   }
 
-  unsubscribe(topic) {
+  unsubscribe(topic, properties = {}) {
     return new Promise((resolve, reject) => {
       if (!this.client || !this.isConnected || this.isDestroyed) {
         reject(new Error('Not connected'));
         return;
       }
 
-      this.client.unsubscribe(topic, (err) => {
+      const unsubscribeOptions = this.config.protocolVersion === 5 && Object.keys(properties).length > 0 
+        ? { properties } 
+        : undefined;
+
+      this.client.unsubscribe(topic, unsubscribeOptions, (err) => {
         if (err) {
           reject(err);
         } else {
           this.subscriptions.delete(topic);
-          this.emit('unsubscribed', { id: this.id, topic });
-          resolve();
+          const unsubscriptionData = {
+            id: this.id,
+            topic,
+            protocolVersion: this.config.protocolVersion || 4
+          };
+          this.emit('unsubscribed', unsubscriptionData);
+          resolve(unsubscriptionData);
         }
       });
     });
@@ -242,15 +304,31 @@ class MQTTConnection extends EventEmitter {
       const publishOptions = {
         qos: options.qos || 0,
         retain: options.retain || false,
-        ...options
+        dup: options.dup || false
       };
 
-      this.client.publish(topic, message, publishOptions, (err) => {
+      if (this.config.protocolVersion === 5 && options.properties) {
+        publishOptions.properties = options.properties;
+      }
+
+      this.client.publish(topic, message, publishOptions, (err, packet) => {
         if (err) {
           reject(err);
         } else {
-          this.emit('published', { id: this.id, topic, message, options: publishOptions });
-          resolve();
+          this.connectionStats.messagesPublished++;
+          this.connectionStats.bytesSent += (typeof message === 'string' ? message.length : message.byteLength || 0);
+          
+          const publishData = {
+            id: this.id,
+            topic,
+            message,
+            options: publishOptions,
+            timestamp: Date.now(),
+            protocolVersion: this.config.protocolVersion || 4
+          };
+          
+          this.emit('published', publishData);
+          resolve(publishData);
         }
       });
     });
@@ -261,10 +339,28 @@ class MQTTConnection extends EventEmitter {
       id: this.id,
       config: this.config,
       isConnected: this.isConnected,
-      subscriptions: Array.from(this.subscriptions),
+      subscriptions: Object.fromEntries(this.subscriptions),
       reconnectAttempts: this.reconnectAttempts,
       maxReconnectAttempts: this.maxReconnectAttempts,
-      isDestroyed: this.isDestroyed
+      isDestroyed: this.isDestroyed,
+      protocolVersion: this.config.protocolVersion || 4,
+      statistics: {
+        ...this.connectionStats,
+        uptime: this.connectionStats.connectionStartTime 
+          ? Date.now() - this.connectionStats.connectionStartTime 
+          : 0
+      }
+    };
+  }
+
+  getStatistics() {
+    return {
+      ...this.connectionStats,
+      uptime: this.connectionStats.connectionStartTime 
+        ? Date.now() - this.connectionStats.connectionStartTime 
+        : 0,
+      subscriptionCount: this.subscriptions.size,
+      protocolVersion: this.config.protocolVersion || 4
     };
   }
 }
@@ -273,7 +369,7 @@ class MQTTConnectionManager extends EventEmitter {
   constructor() {
     super();
     this.connections = new Map();
-    this.connectionHandlers = new Map(); // Track forwarded event handlers
+    this.connectionHandlers = new Map();
   }
 
   createConnection(id, config) {
@@ -283,20 +379,14 @@ class MQTTConnectionManager extends EventEmitter {
 
     const connection = new MQTTConnection(id, config);
     
-    // Create handlers map for this connection
     const handlers = {};
-    
-    // Forward all events with connection context - but store handlers for cleanup
     ['connected', 'disconnected', 'message', 'error', 'reconnecting', 'subscribed', 'unsubscribed', 'published']
       .forEach(event => {
-        const handler = (data) => {
-          this.emit(event, data);
-        };
+        const handler = (data) => this.emit(event, data);
         handlers[event] = handler;
         connection.on(event, handler);
       });
 
-    // Store handlers for cleanup
     this.connectionHandlers.set(id, handlers);
     this.connections.set(id, connection);
     
@@ -309,7 +399,6 @@ class MQTTConnectionManager extends EventEmitter {
     if (!connection) {
       connection = this.createConnection(id, config);
     } else {
-      // Update config if connection exists but not connected
       if (!connection.isConnected) {
         connection.config = config;
       }
@@ -319,14 +408,11 @@ class MQTTConnectionManager extends EventEmitter {
   }
 
   async disconnect(id) {
-    console.log(`MQTTConnectionManager: Disconnecting connection ${id}`);
     const connection = this.connections.get(id);
     
     if (connection) {
-      // Ensure connection is properly disconnected
       await connection.disconnect();
       
-      // Clean up forwarded event handlers
       const handlers = this.connectionHandlers.get(id);
       if (handlers) {
         Object.entries(handlers).forEach(([event, handler]) => {
@@ -335,31 +421,27 @@ class MQTTConnectionManager extends EventEmitter {
         this.connectionHandlers.delete(id);
       }
       
-      // Remove from connections map
       this.connections.delete(id);
-      
-      console.log(`MQTTConnectionManager: Successfully disconnected and removed ${id}`);
       return true;
     }
     
-    console.warn(`MQTTConnectionManager: Connection ${id} not found for disconnection`);
     return false;
   }
 
-  async subscribe(id, topic, qos = 0) {
+  async subscribe(id, topic, qos = 0, properties = {}) {
     const connection = this.connections.get(id);
     if (!connection) {
       throw new Error(`Connection ${id} not found`);
     }
-    return await connection.subscribe(topic, qos);
+    return await connection.subscribe(topic, qos, properties);
   }
 
-  async unsubscribe(id, topic) {
+  async unsubscribe(id, topic, properties = {}) {
     const connection = this.connections.get(id);
     if (!connection) {
       throw new Error(`Connection ${id} not found`);
     }
-    return await connection.unsubscribe(topic);
+    return await connection.unsubscribe(topic, properties);
   }
 
   async publish(id, topic, message, options = {}) {
@@ -382,9 +464,23 @@ class MQTTConnectionManager extends EventEmitter {
     return connections;
   }
 
-  // Enhanced cleanup method
+  getConnectionStatistics(id) {
+    const connection = this.connections.get(id);
+    if (!connection) {
+      throw new Error(`Connection ${id} not found`);
+    }
+    return connection.getStatistics();
+  }
+
+  getAllStatistics() {
+    const stats = {};
+    this.connections.forEach((connection, id) => {
+      stats[id] = connection.getStatistics();
+    });
+    return stats;
+  }
+
   async disconnectAll() {
-    console.log('MQTTConnectionManager: Disconnecting all connections...');
     const disconnectPromises = Array.from(this.connections.keys()).map(id => {
       return this.disconnect(id).catch(error => {
         console.error(`Error disconnecting ${id}:`, error);
@@ -392,19 +488,15 @@ class MQTTConnectionManager extends EventEmitter {
     });
     
     await Promise.all(disconnectPromises);
-    console.log('MQTTConnectionManager: All connections disconnected');
   }
 
-  // Clean up method for when the manager itself is destroyed
   cleanup() {
-    console.log('Cleaning up MQTTConnectionManager...');
     this.disconnectAll();
     this.removeAllListeners();
     this.connectionHandlers.clear();
   }
 }
 
-// Make sure to export the classes properly
 module.exports = {
   MQTTConnectionManager,
   MQTTConnection

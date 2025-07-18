@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import MessageTemplateService from '../../services/MessageTemplateService';
 import './PublishingPanel.css';
 
 function PublishingPanel({ 
@@ -15,6 +16,9 @@ function PublishingPanel({
   const [isPublishing, setIsPublishing] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState('');
   const [showQosDropdown, setShowQosDropdown] = useState(false);
+  const [messageTemplates, setMessageTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templateService] = useState(new MessageTemplateService());
 
   // Load form data from localStorage on mount
   useEffect(() => {
@@ -44,6 +48,21 @@ function PublishingPanel({
       }
     }
   }, [connectionId]);
+  useEffect(() => {
+    setMessageTemplates(templateService.getAllTemplates());
+  }, []);
+
+  const handleTemplateSelect = (templateId) => {
+    const template = templateService.getTemplate(templateId);
+    if (template) {
+      const processed = templateService.processTemplate(template);
+      setTopic(processed.topic);
+      setMessage(processed.payload);
+      setQos(processed.qos);
+      setRetain(processed.retain);
+      setSelectedTemplate(templateId);
+    }
+  };
 
   // Save form state whenever form values change
   useEffect(() => {
@@ -365,9 +384,23 @@ function PublishingPanel({
               )}
             </div>
           </div>
-
-          <div className="form-options">
-            <div className="form-group">
+            <div className="form-options">
+              <div className="form-group">
+                          <div className="template-section">
+              <label>Message Templates:</label>
+              <select
+                value={selectedTemplate || ''}
+                onChange={(e) => handleTemplateSelect(e.target.value)}
+                className="form-control"
+              >
+                <option value="">Select a template...</option>
+                {messageTemplates.map(template => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} ({template.category})
+                  </option>
+                ))}
+              </select>
+            </div>
               <label htmlFor="qos">Quality of Service:</label>
               <div className="custom-select-wrapper">
                 <button
