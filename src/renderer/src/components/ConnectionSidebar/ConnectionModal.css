@@ -163,7 +163,6 @@
   margin-bottom: 0;
 }
 
-/* Broker URL Input */
 .mqtt-broker-url {
   display: flex;
   align-items: stretch;
@@ -191,9 +190,12 @@
   padding: 10px 8px;
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 13px;
-  width: 100px;
+  width: 110px; /* Increased from 100px to accommodate longer protocols */
+  min-width: 110px; /* Ensure minimum width */
+  max-width: 110px; /* Prevent expansion */
   flex-shrink: 0;
   color: #495057;
+  box-sizing: border-box; /* Ensure padding is included in width */
 }
 
 .mqtt-protocol:focus {
@@ -210,7 +212,8 @@
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 13px;
   padding: 10px 12px;
-  min-width: 150px;
+  min-width: 120px; /* Reduced from 150px to give more space */
+  box-sizing: border-box;
 }
 
 .mqtt-hostname:focus {
@@ -230,18 +233,22 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  min-width: 24px; /* Ensure separator has minimum width */
 }
 
 .mqtt-port {
   border: none;
   border-radius: 0;
   background: white;
-  width: 90px;
+  width: 80px; /* Reduced from 90px */
+  min-width: 80px;
+  max-width: 80px;
   text-align: center;
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 13px;
   padding: 10px 8px;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .mqtt-port:focus {
@@ -252,7 +259,7 @@
 /* Connection Modal Custom Checkbox Styling */
 .mqtt-connection-modal-checkbox-label {
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Changed from center to flex-start */
   gap: 12px;
   cursor: pointer;
   font-weight: 500;
@@ -264,6 +271,7 @@
   border: 1px solid #e9ecef;
   transition: all 0.2s ease;
   font-size: 14px;
+  min-height: 42px;
 }
 
 .mqtt-connection-modal-checkbox-label:hover {
@@ -285,6 +293,7 @@
   position: relative;
   transition: all 0.3s ease;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .mqtt-connection-modal-checkbox-label input[type="checkbox"]:checked + .mqtt-connection-modal-checkbox-custom {
@@ -312,11 +321,22 @@
   line-height: 1.4;
   font-size: 14px;
   color: #495057;
+  white-space: nowrap; /* Prevent text from wrapping */
+  overflow: hidden; /* Hide overflow if text is too long */
+  text-overflow: ellipsis; /* Add ellipsis for very long text */
+  display: flex;
+  align-items: center; /* Center the text vertically within its container */
+  min-height: 20px; /* Ensure minimum height for text container */
+}
+
+.mqtt-connection-modal-checkbox-text .mqtt5-note {
+  white-space: normal; /* Allow the note to wrap if needed */
+  display: inline;
 }
 
 /* Form row checkbox alignment */
 .mqtt-form-row .mqtt-form-group .mqtt-connection-modal-checkbox-label {
-  align-items: center;
+  align-items: flex-start;
   padding-top: 0px;
 }
 
@@ -543,4 +563,85 @@
   font-weight: normal;
   font-style: italic;
   margin-left: 6px;
+}
+
+.mqtt-certificate-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mqtt-file-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #f8f9fa;
+  border: 2px dashed #ced4da;
+  border-radius: 6px;
+  color: #495057;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  text-align: center;
+  min-height: 44px;
+}
+
+.mqtt-file-upload-btn:hover {
+  background: #e9ecef;
+  border-color: #007bff;
+  color: #007bff;
+}
+
+.mqtt-certificate-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #e7f3ff;
+  border: 1px solid #b8daff;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.mqtt-cert-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mqtt-cert-name {
+  font-weight: 500;
+  color: #0056b3;
+}
+
+.mqtt-cert-size {
+  color: #6c757d;
+  font-size: 12px;
+}
+
+.mqtt-cert-remove {
+  background: none;
+  border: none;
+  color: #dc3545;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.mqtt-cert-remove:hover {
+  background: #f5c6cb;
+  color: #721c24;
+}
+
+/* TLS Section Styling */
+.mqtt-form-section .mqtt-certificate-upload {
+  margin-top: 8px;
+}
+
+.mqtt-form-section .mqtt-file-upload-btn i {
+  font-size: 16px;
 }

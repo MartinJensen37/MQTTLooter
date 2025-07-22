@@ -1,4 +1,5 @@
 const mqtt = require('mqtt');
+const fs = require('fs');
 const { EventEmitter } = require('events');
 
 class MQTTConnection extends EventEmitter {
@@ -23,89 +24,138 @@ class MQTTConnection extends EventEmitter {
     };
   }
 
-  connect() {
-    return new Promise((resolve, reject) => {
-      if (this.isDestroyed) {
-        reject(new Error('Connection has been destroyed'));
-        return;
+connect() {
+  return new Promise((resolve, reject) => {
+    if (this.isDestroyed) {
+      reject(new Error('Connection has been destroyed'));
+      return;
+    }
+
+    try {
+      const options = {
+        clientId: this.config.clientId || `mqttlooter_${Math.random().toString(36).substr(2, 9)}`,
+        clean: this.config.clean !== undefined ? this.config.clean : true,
+        keepalive: this.config.keepalive || 60,
+        connectTimeout: this.config.connectTimeout || 30000,
+        reconnectPeriod: 0,
+        protocolVersion: this.config.protocolVersion || 4
+      };
+
+      // Authentication
+      if (this.config.username) options.username = this.config.username;
+      if (this.config.password) options.password = this.config.password;
+
+      // TLS/SSL Configuration
+      if (this.config.tls && (this.config.tls.enabled || 
+          this.config.brokerUrl.startsWith('mqtts://') || 
+          this.config.brokerUrl.startsWith('wss://'))) {
+        
+        options.rejectUnauthorized = this.config.tls.rejectUnauthorized !== undefined 
+          ? this.config.tls.rejectUnauthorized 
+          : true;
+
+        // Server name for SNI
+        if (this.config.tls.servername) {
+          options.servername = this.config.tls.servername;
+        }
+
+        // CA Certificate
+        if (this.config.tls.ca && this.config.tls.ca.content) {
+          options.ca = Buffer.from(this.config.tls.ca.content, 'utf8');
+        }
+
+        // Client Certificate
+        if (this.config.tls.cert && this.config.tls.cert.content) {
+          options.cert = Buffer.from(this.config.tls.cert.content, 'utf8');
+        }
+
+        // Private Key
+        if (this.config.tls.key && this.config.tls.key.content) {
+          options.key = Buffer.from(this.config.tls.key.content, 'utf8');
+          
+          // Private Key Passphrase
+          if (this.config.tls.passphrase) {
+            options.passphrase = this.config.tls.passphrase;
+          }
+        }
+
+        // ALPN Protocols (if specified)
+        if (this.config.tls.alpnProtocols && this.config.tls.alpnProtocols.length > 0) {
+          options.ALPNProtocols = this.config.tls.alpnProtocols;
+        }
+
+        console.log(`TLS configuration applied for connection ${this.id}:`, {
+          rejectUnauthorized: options.rejectUnauthorized,
+          hasCa: !!options.ca,
+          hasCert: !!options.cert,
+          hasKey: !!options.key,
+          hasPassphrase: !!options.passphrase,
+          servername: options.servername
+        });
       }
 
-      try {
-        const options = {
-          clientId: this.config.clientId || `mqttlooter_${Math.random().toString(36).substr(2, 9)}`,
-          clean: this.config.clean !== undefined ? this.config.clean : true,
-          keepalive: this.config.keepalive || 60,
-          connectTimeout: this.config.connectTimeout || 30000,
-          reconnectPeriod: 0,
-          protocolVersion: this.config.protocolVersion || 4
+      // Last Will and Testament
+      if (this.config.willEnabled && this.config.willTopic && this.config.willMessage) {
+        options.will = {
+          topic: this.config.willTopic,
+          payload: this.config.willMessage,
+          qos: this.config.willQos || 0,
+          retain: this.config.willRetain || false
         };
 
-        // Authentication
-        if (this.config.username) options.username = this.config.username;
-        if (this.config.password) options.password = this.config.password;
-
-        // Last Will and Testament
-        if (this.config.willEnabled && this.config.willTopic && this.config.willMessage) {
-          options.will = {
-            topic: this.config.willTopic,
-            payload: this.config.willMessage,
-            qos: this.config.willQos || 0,
-            retain: this.config.willRetain || false
-          };
-
-          // MQTT 5.0 will properties
-          if (this.config.protocolVersion === 5) {
-            options.will.properties = {};
-            if (this.config.willDelayInterval > 0) {
-              options.will.properties.willDelayInterval = this.config.willDelayInterval;
-            }
-            if (this.config.willMessageExpiryInterval > 0) {
-              options.will.properties.messageExpiryInterval = this.config.willMessageExpiryInterval;
-            }
-          }
-        }
-
-        // MQTT 5.0 specific handling
+        // MQTT 5.0 will properties
         if (this.config.protocolVersion === 5) {
-          options.cleanStart = options.clean;
-          delete options.clean;
-          
-          // MQTT 5.0 properties
-          if (this.config.sessionExpiryInterval > 0 || 
-              this.config.receiveMaximum !== 65535 || 
-              this.config.maximumPacketSize !== 268435455 ||
-              this.config.topicAliasMaximum > 0 ||
-              this.config.requestResponseInformation ||
-              !this.config.requestProblemInformation) {
-            
-            options.properties = {};
-            if (this.config.sessionExpiryInterval > 0) {
-              options.properties.sessionExpiryInterval = this.config.sessionExpiryInterval;
-            }
-            if (this.config.receiveMaximum !== 65535) {
-              options.properties.receiveMaximum = this.config.receiveMaximum;
-            }
-            if (this.config.maximumPacketSize !== 268435455) {
-              options.properties.maximumPacketSize = this.config.maximumPacketSize;
-            }
-            if (this.config.topicAliasMaximum > 0) {
-              options.properties.topicAliasMaximum = this.config.topicAliasMaximum;
-            }
-            if (this.config.requestResponseInformation) {
-              options.properties.requestResponseInformation = true;
-            }
-            if (!this.config.requestProblemInformation) {
-              options.properties.requestProblemInformation = false;
-            }
+          options.will.properties = {};
+          if (this.config.willDelayInterval > 0) {
+            options.will.properties.willDelayInterval = this.config.willDelayInterval;
+          }
+          if (this.config.willMessageExpiryInterval > 0) {
+            options.will.properties.messageExpiryInterval = this.config.willMessageExpiryInterval;
           }
         }
+      }
 
-        const connectionTimeout = setTimeout(() => {
-          if (this.client) this.client.end(true);
-          reject(new Error(`Connection timeout after ${options.connectTimeout}ms`));
-        }, options.connectTimeout);
+      // MQTT 5.0 specific handling
+      if (this.config.protocolVersion === 5) {
+        options.cleanStart = options.clean;
+        delete options.clean;
+        
+        // MQTT 5.0 properties
+        if (this.config.sessionExpiryInterval > 0 || 
+            this.config.receiveMaximum !== 65535 || 
+            this.config.maximumPacketSize !== 268435455 ||
+            this.config.topicAliasMaximum > 0 ||
+            this.config.requestResponseInformation ||
+            !this.config.requestProblemInformation) {
+          
+          options.properties = {};
+          if (this.config.sessionExpiryInterval > 0) {
+            options.properties.sessionExpiryInterval = this.config.sessionExpiryInterval;
+          }
+          if (this.config.receiveMaximum !== 65535) {
+            options.properties.receiveMaximum = this.config.receiveMaximum;
+          }
+          if (this.config.maximumPacketSize !== 268435455) {
+            options.properties.maximumPacketSize = this.config.maximumPacketSize;
+          }
+          if (this.config.topicAliasMaximum > 0) {
+            options.properties.topicAliasMaximum = this.config.topicAliasMaximum;
+          }
+          if (this.config.requestResponseInformation) {
+            options.properties.requestResponseInformation = true;
+          }
+          if (!this.config.requestProblemInformation) {
+            options.properties.requestProblemInformation = false;
+          }
+        }
+      }
 
-        this.client = mqtt.connect(this.config.brokerUrl, options);
+      const connectionTimeout = setTimeout(() => {
+        if (this.client) this.client.end(true);
+        reject(new Error(`Connection timeout after ${options.connectTimeout}ms`));
+      }, options.connectTimeout);
+
+      this.client = mqtt.connect(this.config.brokerUrl, options);
 
         if (!this.client) {
           clearTimeout(connectionTimeout);

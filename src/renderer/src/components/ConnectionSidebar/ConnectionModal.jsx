@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-toastify';
 import './ConnectionModal.css';
 
 function ConnectionModal({ connection, onSave, onCancel }) {
@@ -15,6 +16,17 @@ function ConnectionModal({ connection, onSave, onCancel }) {
     reconnectPeriod: 1000,
     connectTimeout: 30000,
     protocolVersion: 4,
+    // TLS/SSL Certificate options
+    tls: {
+      enabled: false,
+      rejectUnauthorized: true,
+      ca: null,
+      cert: null,
+      key: null,
+      passphrase: '',
+      servername: '',
+      alpnProtocols: []
+    },
     // MQTT 5.0 Properties
     sessionExpiryInterval: 0,
     receiveMaximum: 65535,
@@ -29,8 +41,8 @@ function ConnectionModal({ connection, onSave, onCancel }) {
     willMessage: '',
     willQos: 0,
     willRetain: false,
-    willDelayInterval: 0, // MQTT 5.0 only
-    willMessageExpiryInterval: 0, // MQTT 5.0 only
+    willDelayInterval: 0,
+    willMessageExpiryInterval: 0,
     subscriptions: [{ topic: '#', qos: 0 }]
   });
 
@@ -79,6 +91,16 @@ function ConnectionModal({ connection, onSave, onCancel }) {
         reconnectPeriod: connection.config.reconnectPeriod || 1000,
         connectTimeout: connection.config.connectTimeout || 30000,
         protocolVersion: connection.config.protocolVersion || 4,
+        tls: {
+          enabled: connection.config.tls?.enabled || false,
+          rejectUnauthorized: connection.config.tls?.rejectUnauthorized !== undefined ? connection.config.tls.rejectUnauthorized : true,
+          ca: connection.config.tls?.ca || null,
+          cert: connection.config.tls?.cert || null,
+          key: connection.config.tls?.key || null,
+          passphrase: connection.config.tls?.passphrase || '',
+          servername: connection.config.tls?.servername || '',
+          alpnProtocols: connection.config.tls?.alpnProtocols || []
+        },
         // MQTT 5.0 Properties
         sessionExpiryInterval: connection.config.sessionExpiryInterval || 0,
         receiveMaximum: connection.config.receiveMaximum || 65535,
@@ -98,6 +120,7 @@ function ConnectionModal({ connection, onSave, onCancel }) {
         subscriptions: connection.config.subscriptions || [{ topic: '#', qos: 0 }]
       });
     } else {
+      // For new connections - make sure TLS object is properly initialized
       setFormData({
         name: '',
         protocol: 'mqtt',
@@ -111,6 +134,17 @@ function ConnectionModal({ connection, onSave, onCancel }) {
         reconnectPeriod: 1000,
         connectTimeout: 30000,
         protocolVersion: 4,
+        // TLS/SSL Certificate options - ADD THIS MISSING OBJECT
+        tls: {
+          enabled: false,
+          rejectUnauthorized: true,
+          ca: null,
+          cert: null,
+          key: null,
+          passphrase: '',
+          servername: '',
+          alpnProtocols: []
+        },
         // MQTT 5.0 Properties
         sessionExpiryInterval: 0,
         receiveMaximum: 65535,
@@ -259,6 +293,40 @@ function ConnectionModal({ connection, onSave, onCancel }) {
     if (e.target === e.currentTarget) {
       onCancel();
     }
+  };
+
+  const handleFileSelect = async (fileType, event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const fileContent = await file.text();
+      setFormData(prev => ({
+        ...prev,
+        tls: {
+          ...prev.tls,
+          [fileType]: {
+            name: file.name,
+            content: fileContent,
+            size: file.size,
+            lastModified: file.lastModified
+          }
+        }
+      }));
+    } catch (error) {
+      console.error(`Error reading ${fileType} file:`, error);
+      toast.error(`Failed to read ${fileType} file`);
+    }
+  };
+
+  const clearCertificateFile = (fileType) => {
+    setFormData(prev => ({
+      ...prev,
+      tls: {
+        ...prev.tls,
+        [fileType]: null
+      }
+    }));
   };
 
   return (
@@ -500,6 +568,187 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                   />
                 </div>
               </div>
+            </div>
+            <div className="mqtt-form-section">
+              <h3 className="mqtt-section-title">TLS/SSL Configuration</h3>
+              
+              <div className="mqtt-form-group">
+                <label className="mqtt-connection-modal-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={formData.tls.enabled}
+                    onChange={(e) => handleInputChange('tls', { ...formData.tls, enabled: e.target.checked })}
+                  />
+                  <div className="mqtt-connection-modal-checkbox-custom"></div>
+                  <span className="mqtt-connection-modal-checkbox-text">Enable TLS/SSL</span>
+                </label>
+                <div className="mqtt-field-hint">
+                  Enable secure connection using TLS/SSL (required for mqtts:// and wss://)
+                </div>
+              </div>
+
+              {(formData.tls.enabled || formData.protocol === 'mqtts' || formData.protocol === 'wss') && (
+                <>
+                  <div className="mqtt-form-group">
+                    <label className="mqtt-connection-modal-checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={formData.tls.rejectUnauthorized}
+                        onChange={(e) => handleInputChange('tls', { ...formData.tls, rejectUnauthorized: e.target.checked })}
+                      />
+                      <div className="mqtt-connection-modal-checkbox-custom"></div>
+                      <span className="mqtt-connection-modal-checkbox-text">Verify Server Certificate</span>
+                    </label>
+                    <div className="mqtt-field-hint">
+                      Uncheck to allow self-signed certificates (not recommended for production)
+                    </div>
+                  </div>
+
+                  <div className="mqtt-form-group">
+                    <label htmlFor="servername">Server Name (SNI)</label>
+                    <input
+                      id="servername"
+                      type="text"
+                      value={formData.tls.servername}
+                      onChange={(e) => handleInputChange('tls', { ...formData.tls, servername: e.target.value })}
+                      placeholder="Optional - override hostname for SNI"
+                      autoComplete="off"
+                    />
+                    <div className="mqtt-field-hint">
+                      Server Name Indication - leave empty to use hostname
+                    </div>
+                  </div>
+
+                  {/* CA Certificate */}
+                  <div className="mqtt-form-group">
+                    <label>CA Certificate (Optional)</label>
+                    <div className="mqtt-certificate-upload">
+                      <input
+                        type="file"
+                        accept=".crt,.pem,.cer"
+                        onChange={(e) => handleFileSelect('ca', e)}
+                        style={{ display: 'none' }}
+                        id="ca-cert-upload"
+                      />
+                      <label htmlFor="ca-cert-upload" className="mqtt-file-upload-btn">
+                        <i className="fas fa-upload"></i>
+                        Choose CA Certificate
+                      </label>
+                      {formData.tls.ca && (
+                        <div className="mqtt-certificate-info">
+                          <div className="mqtt-cert-details">
+                            <span className="mqtt-cert-name">{formData.tls.ca.name}</span>
+                            <span className="mqtt-cert-size">({(formData.tls.ca.size / 1024).toFixed(1)} KB)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => clearCertificateFile('ca')}
+                            className="mqtt-cert-remove"
+                            title="Remove certificate"
+                          >
+                            <i className="fas fa-times"></i>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mqtt-field-hint">
+                      Certificate Authority certificate for server verification
+                    </div>
+                  </div>
+
+                  {/* Client Certificate */}
+                  <div className="mqtt-form-group">
+                    <label>Client Certificate (Optional)</label>
+                    <div className="mqtt-certificate-upload">
+                      <input
+                        type="file"
+                        accept=".crt,.pem,.cer"
+                        onChange={(e) => handleFileSelect('cert', e)}
+                        style={{ display: 'none' }}
+                        id="client-cert-upload"
+                      />
+                      <label htmlFor="client-cert-upload" className="mqtt-file-upload-btn">
+                        <i className="fas fa-upload"></i>
+                        Choose Client Certificate
+                      </label>
+                      {formData.tls.cert && (
+                        <div className="mqtt-certificate-info">
+                          <div className="mqtt-cert-details">
+                            <span className="mqtt-cert-name">{formData.tls.cert.name}</span>
+                            <span className="mqtt-cert-size">({(formData.tls.cert.size / 1024).toFixed(1)} KB)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => clearCertificateFile('cert')}
+                            className="mqtt-cert-remove"
+                            title="Remove certificate"
+                          >
+                            <i className="fas fa-times"></i>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mqtt-field-hint">
+                      Client certificate for mutual TLS authentication
+                    </div>
+                  </div>
+
+                  {/* Private Key */}
+                  <div className="mqtt-form-group">
+                    <label>Private Key (Optional)</label>
+                    <div className="mqtt-certificate-upload">
+                      <input
+                        type="file"
+                        accept=".key,.pem"
+                        onChange={(e) => handleFileSelect('key', e)}
+                        style={{ display: 'none' }}
+                        id="private-key-upload"
+                      />
+                      <label htmlFor="private-key-upload" className="mqtt-file-upload-btn">
+                        <i className="fas fa-upload"></i>
+                        Choose Private Key
+                      </label>
+                      {formData.tls.key && (
+                        <div className="mqtt-certificate-info">
+                          <div className="mqtt-cert-details">
+                            <span className="mqtt-cert-name">{formData.tls.key.name}</span>
+                            <span className="mqtt-cert-size">({(formData.tls.key.size / 1024).toFixed(1)} KB)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => clearCertificateFile('key')}
+                            className="mqtt-cert-remove"
+                            title="Remove key"
+                          >
+                            <i className="fas fa-times"></i>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mqtt-field-hint">
+                      Private key corresponding to the client certificate
+                    </div>
+                  </div>
+
+                  {/* Passphrase for private key */}
+                  {formData.tls.key && (
+                    <div className="mqtt-form-group">
+                      <label htmlFor="key-passphrase">Private Key Passphrase</label>
+                      <input
+                        id="key-passphrase"
+                        type="password"
+                        value={formData.tls.passphrase}
+                        onChange={(e) => handleInputChange('tls', { ...formData.tls, passphrase: e.target.value })}
+                        placeholder="Leave empty if key is not encrypted"
+                        autoComplete="new-password"
+                      />
+                      <div className="mqtt-field-hint">
+                        Passphrase for encrypted private key
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Last Will and Testament */}
