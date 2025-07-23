@@ -492,7 +492,7 @@
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  margin-bottom: 8px;
+  margin-bottom: 18px;
 }
 
 .flex-grow {
@@ -500,8 +500,8 @@
 }
 
 .remove-subscription-btn {
-  width: 32px;
-  height: 32px;
+  width: 45px;
+  height: 45px;
   border: none;
   background: #dc3545;
   color: white;
@@ -510,7 +510,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 22px;
 }
 
 .remove-subscription-btn:hover {

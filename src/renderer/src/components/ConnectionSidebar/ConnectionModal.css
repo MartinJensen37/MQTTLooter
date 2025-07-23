@@ -448,7 +448,7 @@
   color: white;
   border: none;
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: 16px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -464,7 +464,7 @@
   background: #dc3545;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 12px;
   width: 32px;
@@ -473,7 +473,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  align-self: flex-end;
+  margin-top: 28px;
   transition: all 0.2s ease;
 }
 
