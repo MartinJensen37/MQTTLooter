@@ -645,3 +645,92 @@
 .mqtt-form-section .mqtt-file-upload-btn i {
   font-size: 16px;
 }
+
+.connection-card.collapsed {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+  margin: 4px auto;
+}
+
+.connection-card.collapsed:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.connection-card.collapsed.selected {
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.connection-card.collapsed.active {
+  background: #d4edda;
+  border-color: #28a745;
+}
+
+.connection-card.collapsed.inactive {
+  background: #f8d7da;
+  border-color: #dc3545;
+}
+
+.connection-card.collapsed .connection-status-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.connection-card.collapsed .connection-status-dot.connected {
+  background: #28a745;
+  box-shadow: 0 0 8px rgba(40, 167, 69, 0.5);
+}
+
+.connection-card.collapsed .connection-status-dot.disconnected {
+  background: #dc3545;
+}
+
+.connection-card.collapsed .connection-status-dot.connecting {
+  background: #ffc107;
+  animation: pulse 1.5s infinite;
+}
+
+.connection-card.collapsed .connection-status-dot.error {
+  background: #dc3545;
+  border: 2px solid #fff;
+}
+
+/* Pulse animation for connecting state */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+  }
+}
+
+/* Responsive adjustments for collapsed state */
+@media (max-width: 768px) {
+  .connection-card.collapsed {
+    width: 40px;
+    height: 40px;
+    margin: 2px auto;
+  }
+  
+  .connection-card.collapsed .connection-status-dot {
+    width: 16px;
+    height: 16px;
+  }
+}

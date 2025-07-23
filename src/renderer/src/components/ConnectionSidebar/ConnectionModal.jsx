@@ -16,6 +16,8 @@ function ConnectionModal({ connection, onSave, onCancel }) {
     reconnectPeriod: 1000,
     connectTimeout: 30000,
     protocolVersion: 4,
+    // Websocket
+    wsPath: '/mqtt',
     // TLS/SSL Certificate options
     tls: {
       enabled: false,
@@ -55,14 +57,25 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       const protocol = urlObj.protocol.replace(':', '');
       const hostname = urlObj.hostname;
       const port = parseInt(urlObj.port) || (protocol === 'mqtt' ? 1883 : protocol === 'mqtts' ? 8883 : protocol === 'ws' ? 80 : 443);
-      return { protocol, hostname, port };
+      const pathname = urlObj.pathname || '';
+      
+      return { protocol, hostname, port, pathname };
     } catch (error) {
-      return { protocol: 'mqtt', hostname: 'localhost', port: 1883 };
+      return { protocol: 'mqtt', hostname: 'localhost', port: 1883, pathname: '' };
     }
   };
 
-  const buildBrokerUrl = (protocol, hostname, port) => {
-    return `${protocol}://${hostname}:${port}`;
+  const buildBrokerUrl = (protocol, hostname, port, wsPath = '') => {
+    let baseUrl = `${protocol}://${hostname}:${port}`;
+    
+    // Add WebSocket path for ws:// and wss:// protocols
+    if ((protocol === 'ws' || protocol === 'wss') && wsPath) {
+      // Ensure path starts with /
+      const path = wsPath.startsWith('/') ? wsPath : `/${wsPath}`;
+      baseUrl += path;
+    }
+    
+    return baseUrl;
   };
 
   useEffect(() => {
@@ -70,12 +83,17 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       let protocol = 'mqtt';
       let hostname = 'localhost';
       let port = 1883;
+      let wsPath = '/mqtt';
 
       if (connection.config.brokerUrl) {
         const parsed = parseBrokerUrl(connection.config.brokerUrl);
         protocol = parsed.protocol;
         hostname = parsed.hostname;
         port = parsed.port;
+        // Extract WebSocket path from URL if present
+        if ((protocol === 'ws' || protocol === 'wss') && parsed.pathname) {
+          wsPath = parsed.pathname;
+        }
       }
 
       setFormData({
@@ -83,6 +101,7 @@ function ConnectionModal({ connection, onSave, onCancel }) {
         protocol,
         hostname,
         port,
+        wsPath: connection.config.wsPath || wsPath,
         clientId: connection.config.clientId || `mqttlooter_${Date.now()}`,
         username: connection.config.username || '',
         password: connection.config.password || '',
@@ -120,12 +139,13 @@ function ConnectionModal({ connection, onSave, onCancel }) {
         subscriptions: connection.config.subscriptions || [{ topic: '#', qos: 0 }]
       });
     } else {
-      // For new connections - make sure TLS object is properly initialized
+      // For new connections
       setFormData({
         name: '',
         protocol: 'mqtt',
         hostname: 'localhost',
         port: 1883,
+        wsPath: '/mqtt',
         clientId: `mqttlooter_${Date.now()}`,
         username: '',
         password: '',
@@ -134,7 +154,6 @@ function ConnectionModal({ connection, onSave, onCancel }) {
         reconnectPeriod: 1000,
         connectTimeout: 30000,
         protocolVersion: 4,
-        // TLS/SSL Certificate options - ADD THIS MISSING OBJECT
         tls: {
           enabled: false,
           rejectUnauthorized: true,
@@ -178,15 +197,37 @@ function ConnectionModal({ connection, onSave, onCancel }) {
 
   const handleProtocolChange = (protocol) => {
     let defaultPort = 1883;
+    let defaultWsPath = '/mqtt';
+    
     switch (protocol) {
-      case 'mqtt': defaultPort = 1883; break;
-      case 'mqtts': defaultPort = 8883; break;
-      case 'ws': defaultPort = 80; break;
-      case 'wss': defaultPort = 443; break;
-      default: defaultPort = 1883;
+      case 'mqtt': 
+        defaultPort = 1883; 
+        defaultWsPath = '';
+        break;
+      case 'mqtts': 
+        defaultPort = 8883; 
+        defaultWsPath = '';
+        break;
+      case 'ws': 
+        defaultPort = 8000; 
+        defaultWsPath = '/mqtt';
+        break;
+      case 'wss': 
+        defaultPort = 443; 
+        defaultWsPath = '/mqtt';
+        break;
+      default: 
+        defaultPort = 1883;
+        defaultWsPath = '';
     }
 
-    setFormData(prev => ({ ...prev, protocol, port: defaultPort }));
+    setFormData(prev => ({ 
+      ...prev, 
+      protocol, 
+      port: defaultPort,
+      wsPath: defaultWsPath
+    }));
+    
     if (errors.protocol) {
       setErrors(prev => ({ ...prev, protocol: null }));
     }
@@ -243,6 +284,14 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       newErrors.clientId = 'Client ID is required';
     }
 
+    if ((formData.protocol === 'ws' || formData.protocol === 'wss')) {
+      if (!formData.wsPath.trim()) {
+        newErrors.wsPath = 'WebSocket path is required for WebSocket connections';
+      } else if (!formData.wsPath.startsWith('/')) {
+        newErrors.wsPath = 'WebSocket path must start with /';
+      }
+    }
+
     if (formData.willEnabled) {
       if (!formData.willTopic.trim()) {
         newErrors.willTopic = 'Will topic is required when Last Will is enabled';
@@ -265,7 +314,7 @@ function ConnectionModal({ connection, onSave, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validateForm()) {
-      const brokerUrl = buildBrokerUrl(formData.protocol, formData.hostname, formData.port);
+      const brokerUrl = buildBrokerUrl(formData.protocol, formData.hostname, formData.port, formData.wsPath);
       const finalFormData = { 
         ...formData, 
         brokerUrl,
@@ -283,6 +332,7 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       delete finalFormData.protocol;
       delete finalFormData.hostname;
       delete finalFormData.port;
+      // Keep wsPath in finalFormData for the connection manager
       
       console.log('Submitting connection with protocol version:', finalFormData.protocolVersion);
       onSave(finalFormData);
@@ -396,6 +446,26 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                 {errors.hostname && <span className="mqtt-error-text">{errors.hostname}</span>}
                 {errors.port && <span className="mqtt-error-text">{errors.port}</span>}
               </div>
+
+              {/* WebSocket Path Field - Show only for WebSocket protocols */}
+              {(formData.protocol === 'ws' || formData.protocol === 'wss') && (
+                <div className="mqtt-form-group">
+                  <label htmlFor="wsPath">WebSocket Path</label>
+                  <input
+                    id="wsPath"
+                    type="text"
+                    value={formData.wsPath}
+                    onChange={(e) => handleInputChange('wsPath', e.target.value)}
+                    placeholder="/mqtt"
+                    className={errors.wsPath ? 'error' : ''}
+                    autoComplete="off"
+                  />
+                  <div className="mqtt-field-hint">
+                    Path on the server where WebSocket MQTT is available (e.g., /mqtt, /ws, /websocket)
+                  </div>
+                  {errors.wsPath && <span className="mqtt-error-text">{errors.wsPath}</span>}
+                </div>
+              )}
 
               <div className="mqtt-form-row">
                 <div className="mqtt-form-group">

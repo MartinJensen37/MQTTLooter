@@ -32,6 +32,21 @@ connect() {
     }
 
     try {
+      // Build the complete broker URL including WebSocket path
+      let brokerUrl = this.config.brokerUrl;
+      
+      // For WebSocket connections, ensure the path is included
+      if ((this.config.brokerUrl.startsWith('ws://') || this.config.brokerUrl.startsWith('wss://')) && this.config.wsPath) {
+        const url = new URL(this.config.brokerUrl);
+        if (!url.pathname || url.pathname === '/') {
+          // If no path in the URL, add the wsPath
+          const path = this.config.wsPath.startsWith('/') ? this.config.wsPath : `/${this.config.wsPath}`;
+          brokerUrl = `${url.protocol}//${url.host}${path}`;
+        }
+      }
+
+      console.log(`Connecting to broker: ${brokerUrl}`);
+
       const options = {
         clientId: this.config.clientId || `mqttlooter_${Math.random().toString(36).substr(2, 9)}`,
         clean: this.config.clean !== undefined ? this.config.clean : true,
@@ -47,8 +62,8 @@ connect() {
 
       // TLS/SSL Configuration
       if (this.config.tls && (this.config.tls.enabled || 
-          this.config.brokerUrl.startsWith('mqtts://') || 
-          this.config.brokerUrl.startsWith('wss://'))) {
+          brokerUrl.startsWith('mqtts://') || 
+          brokerUrl.startsWith('wss://'))) {
         
         options.rejectUnauthorized = this.config.tls.rejectUnauthorized !== undefined 
           ? this.config.tls.rejectUnauthorized 
@@ -92,6 +107,19 @@ connect() {
           hasPassphrase: !!options.passphrase,
           servername: options.servername
         });
+      }
+
+      // WebSocket specific options
+      if (brokerUrl.startsWith('ws://') || brokerUrl.startsWith('wss://')) {
+        console.log(`WebSocket connection with path: ${this.config.wsPath || 'default'}`);
+        
+        // Additional WebSocket options can be added here if needed
+        // For example, custom headers, protocols, etc.
+        if (this.config.wsHeaders) {
+          options.wsOptions = {
+            headers: this.config.wsHeaders
+          };
+        }
       }
 
       // Last Will and Testament
@@ -155,7 +183,8 @@ connect() {
         reject(new Error(`Connection timeout after ${options.connectTimeout}ms`));
       }, options.connectTimeout);
 
-      this.client = mqtt.connect(this.config.brokerUrl, options);
+      // Use the complete broker URL with WebSocket path
+      this.client = mqtt.connect(brokerUrl, options);
 
         if (!this.client) {
           clearTimeout(connectionTimeout);

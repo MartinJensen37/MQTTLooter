@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import SplitPane from 'react-split-pane';
-import { toast, ToastContainer } from 'react-toastify';
 import MQTTService from '../../services/MQTTService.js';
 import TopicTreeService from '../../services/TopicTreeService.js';
 import ConnectionSidebar from '../ConnectionSidebar/ConnectionSidebar';
@@ -9,7 +8,6 @@ import MessagePanel from '../MessagePanel/MessagePanel.jsx';
 import PublishingPanel from '../PublishingPanel/PublishingPanel';
 import RecordingPanel from '../RecordingPanel/RecordingPanel';
 import SimulationPanel from '../SimulationPanel/SimulationPanel';
-import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 
 function App() {
@@ -25,6 +23,30 @@ function App() {
   // Panel size states
   const [connectionSidebarWidth, setConnectionSidebarWidth] = useState(280);
   const [topicTreeWidth, setTopicTreeWidth] = useState(500);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Notification stack - change from single notification to array
+  const [notifications, setNotifications] = useState([]);
+
+  const showFeedback = (message, type = 'success') => {
+    const newNotification = {
+      id: Date.now() + Math.random(), // Unique ID
+      message,
+      type,
+      timestamp: Date.now()
+    };
+    
+    setNotifications(prev => [...prev, newNotification]);
+    
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(notif => notif.id !== newNotification.id));
+    }, 2000);
+  };
+
+  // Function to manually remove a notification
+  const removeNotification = (notificationId) => {
+    setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
+  };
 
   // Derive activeConnections from connections state
   const activeConnections = useMemo(() => {
@@ -32,6 +54,76 @@ function App() {
       .filter(conn => conn.isConnected || conn.status === 'connected')
       .map(conn => conn.id);
   }, [connections]);
+
+  // Load connections from localStorage on app start
+  useEffect(() => {
+    const savedConnections = localStorage.getItem('mqtt-connections');
+    if (savedConnections) {
+      try {
+        const parsedConnections = JSON.parse(savedConnections);
+        // Set all loaded connections as disconnected initially
+        const disconnectedConnections = parsedConnections.map(conn => ({
+          ...conn,
+          isConnected: false,
+          status: 'disconnected'
+        }));
+        setConnections(disconnectedConnections);
+        
+        // Don't register with MQTTService here - they'll be registered when connecting
+        
+      } catch (error) {
+        console.error('Failed to load connections from localStorage:', error);
+        localStorage.removeItem('mqtt-connections');
+      }
+    }
+  }, []);
+
+  // Save connections to localStorage whenever connections change
+  useEffect(() => {
+    if (connections.length > 0) {
+      // Only save the essential connection data (config + metadata, not runtime state)
+      const connectionsToSave = connections.map(conn => ({
+        id: conn.id,
+        config: conn.config,
+        // Don't save runtime state like isConnected, status, etc.
+      }));
+      localStorage.setItem('mqtt-connections', JSON.stringify(connectionsToSave));
+    } else {
+      // Remove from localStorage if no connections
+      localStorage.removeItem('mqtt-connections');
+    }
+  }, [connections]);
+
+  // Load sidebar preferences from localStorage
+  useEffect(() => {
+    const savedSidebarState = localStorage.getItem('mqtt-sidebar-state');
+    if (savedSidebarState) {
+      try {
+        const state = JSON.parse(savedSidebarState);
+        if (state.collapsed !== undefined) {
+          setSidebarCollapsed(state.collapsed);
+        }
+        if (state.width !== undefined) {
+          setConnectionSidebarWidth(state.width);
+        }
+        if (state.topicTreeWidth !== undefined) {
+          setTopicTreeWidth(state.topicTreeWidth);
+        }
+      } catch (error) {
+        console.error('Failed to load sidebar state:', error);
+      }
+    }
+  }, []);
+
+  // Save sidebar preferences to localStorage
+  useEffect(() => {
+    const sidebarState = {
+      collapsed: sidebarCollapsed,
+      width: connectionSidebarWidth,
+      topicTreeWidth: topicTreeWidth
+    };
+    localStorage.setItem('mqtt-sidebar-state', JSON.stringify(sidebarState));
+  }, [sidebarCollapsed, connectionSidebarWidth, topicTreeWidth]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -73,238 +165,270 @@ function App() {
   const handlersRef = useRef(null);
   const topicTreeHandlersRef = useRef(null);
 
-  useEffect(() => {
-    // Wait for TopicTreeService to be ready
-    const checkTopicTreeReady = () => {
-      if (TopicTreeService.isReady()) {
-        setTopicTreeReady(true);
-        setupTopicTreeListeners();
-      } else {
-        setTimeout(checkTopicTreeReady, 100);
-      }
-    };
-    checkTopicTreeReady();
+useEffect(() => {
+  // Wait for TopicTreeService to be ready
+  const checkTopicTreeReady = () => {
+    if (TopicTreeService.isReady()) {
+      setTopicTreeReady(true);
+      setupTopicTreeListeners();
+    } else {
+      setTimeout(checkTopicTreeReady, 100);
+    }
+  };
+  checkTopicTreeReady();
 
-    // Define event handlers and store them in ref for cleanup
-    const handleConnected = (data) => {
-      console.log('Connected event:', data.id);
-      toast.success(`Connected to ${data.id}`);
-      
-      // Update connection status to connected
-      setConnections(prev => prev.map(conn => 
+  // Define event handlers and store them in ref for cleanup
+  const handleConnected = (data) => {
+    console.log('Connection established:', data);
+    setConnections(prev => 
+      prev.map(conn => 
         conn.id === data.id 
           ? { ...conn, status: 'connected', isConnected: true }
           : conn
-      ));
-      
-      updateConnectionsList();
-      
-      // Set as selected connection if it's the first one or if no connection is selected
-      setSelectedConnection(current => {
-        if (!current) {
-          return data.id;
-        }
-        return current;
-      });
-    };
+      )
+    );
+    
+    // Use setConnections with a callback to get fresh state
+    setConnections(prev => {
+      const connection = prev.find(conn => conn.id === data.id);
+      const connectionName = connection?.config?.name || data.id || 'Unknown Connection';
+      showFeedback(`Connected to ${connectionName}`, 'success');
+      return prev; // Don't change state, just use it for the message
+    });
+    
+    // Update connection status in storage
+    const savedConnections = JSON.parse(localStorage.getItem('mqtt-connections') || '[]');
+    const updatedConnections = savedConnections.map(conn => 
+      conn.id === data.id ? { ...conn, status: 'connected' } : conn
+    );
+    localStorage.setItem('mqtt-connections', JSON.stringify(updatedConnections));
+  };
 
-    const handleDisconnected = (data) => {
-      console.log('Disconnected event:', data.id);
-      toast.info(`Disconnected from ${data.id}`);
-      
-      // Update connection status to disconnected
-      setConnections(prev => prev.map(conn => 
+  const handleDisconnected = (data) => {
+    console.log('Disconnected event:', data);
+    
+    // Use setConnections with a callback to get fresh state for the message
+    setConnections(prev => {      
+      // Return the updated connections
+      return prev.map(conn => 
         conn.id === data.id 
           ? { ...conn, status: 'disconnected', isConnected: false }
           : conn
-      ));
+      );
+    });
+    
+    // Clean up the topic tree when disconnecting
+    TopicTreeService.removeTopicTree(data.id);
+    
+    // DELETE messages for this connection when disconnecting
+    setMessages(prev => prev.filter(msg => msg.connectionId !== data.id));
+    
+    // Clear selected topic if it belongs to the disconnected connection
+    setSelectedTopic(current => {
+      if (current && current.connectionId === data.id) {
+        return null;
+      }
+      return current;
+    });
+    
+    // Clear the last selected topic for this connection when disconnecting
+    setLastSelectedTopics(prev => {
+      const newTopics = { ...prev };
+      delete newTopics[data.id];
+      return newTopics;
+    });
+    
+    // Clear selected connection if it was disconnected, or switch to another active one
+    setSelectedConnection(current => {
+      if (current === data.id) {
+        // Find another active connection to select
+        // We need to check the updated connections after the state update
+        setTimeout(() => {
+          setSelectedConnection(currentSelected => {
+            if (currentSelected === data.id) {
+              // Get fresh active connections
+              const freshConnections = MQTTService.getAllConnections();
+              const freshActiveIds = freshConnections
+                .filter(conn => conn.isConnected || conn.status === 'connected')
+                .map(conn => conn.id)
+                .filter(id => id !== data.id); // Exclude the disconnected one
+              
+              const newSelectedConnection = freshActiveIds.length > 0 ? freshActiveIds[0] : null;
+              
+              // If switching to a new connection, restore its last selected topic
+              if (newSelectedConnection) {
+                const lastTopic = lastSelectedTopics[newSelectedConnection];
+                if (lastTopic) {
+                  setSelectedTopic(lastTopic);
+                } else {
+                  setSelectedTopic(null);
+                }
+              }
+              
+              return newSelectedConnection;
+            }
+            return currentSelected;
+          });
+        }, 100);
+        return current; // Keep current for now, setTimeout will update if needed
+      }
+      return current;
+    });
+  };
+
+  const handleMessage = (data) => {
+    const newMessage = {
+      id: Date.now() + Math.random(),
+      connectionId: data.id,
+      topic: data.topic,
+      message: data.message,
+      qos: data.qos,
+      retain: data.retain,
+      timestamp: data.timestamp || Date.now()
+    };
+    
+    setMessages(prev => {
+      // Add the new message
+      const newMessages = [newMessage, ...prev];
       
-      // Clean up the topic tree when disconnecting
+      // Group messages by topic and connection
+      const messagesByTopic = {};
+      
+      newMessages.forEach(msg => {
+        const topicKey = `${msg.connectionId}::${msg.topic}`;
+        if (!messagesByTopic[topicKey]) {
+          messagesByTopic[topicKey] = [];
+        }
+        messagesByTopic[topicKey].push(msg);
+      });
+      
+      // Limit each topic to 300 messages, keep the most recent ones
+      Object.keys(messagesByTopic).forEach(topicKey => {
+        if (messagesByTopic[topicKey].length > 300) {
+          messagesByTopic[topicKey] = messagesByTopic[topicKey].slice(0, 300);
+        }
+      });
+      
+      // Flatten back to single array
+      const limitedMessages = [];
+      Object.values(messagesByTopic).forEach(topicMessages => {
+        limitedMessages.push(...topicMessages);
+      });
+      
+      // Sort by timestamp (most recent first)
+      return limitedMessages.sort((a, b) => b.timestamp - a.timestamp);
+    });
+  };
+
+  const handleError = (data) => {
+    console.log('Error event:', data);
+    
+    // Properly extract error message - check code first, then error
+    const errorMessage = data.code || data.error || data.message || 'Unknown error';
+    
+    // Use setConnections with a callback to get fresh state for the message
+    setConnections(prev => {
+      const connection = prev.find(conn => conn.id === data.id);
+      const connectionName = connection?.config?.name || data.id || 'Unknown Connection';
+      
+      showFeedback(`Connection error (${connectionName}): ${errorMessage}`, 'error');
+      
+      // Return updated connections
+      return prev.map(conn => 
+        conn.id === data.id 
+          ? { ...conn, status: 'disconnected', isConnected: false }
+          : conn
+      );
+    });
+    
+    // Clean up topic tree on connection error
+    if (data.id) {
       TopicTreeService.removeTopicTree(data.id);
       
-      // DELETE messages for this connection when disconnecting
+      // DELETE messages for this connection when error occurs
       setMessages(prev => prev.filter(msg => msg.connectionId !== data.id));
       
-      // Clear selected topic if it belongs to the disconnected connection
+      // Clear selected topic if it belongs to the error connection
       setSelectedTopic(current => {
         if (current && current.connectionId === data.id) {
           return null;
         }
         return current;
       });
-      
-      // Clear the last selected topic for this connection when disconnecting
-      setLastSelectedTopics(prev => {
-        const newTopics = { ...prev };
-        delete newTopics[data.id];
-        return newTopics;
-      });
-      
-      updateConnectionsList();
-      
-      // Clear selected connection if it was disconnected, or switch to another active one
-      setSelectedConnection(current => {
-        if (current === data.id) {
-          // Find another active connection to select
-          // We need to check the updated connections after the state update
-          setTimeout(() => {
-            setSelectedConnection(currentSelected => {
-              if (currentSelected === data.id) {
-                // Get fresh active connections
-                const freshConnections = MQTTService.getAllConnections();
-                const freshActiveIds = freshConnections
-                  .filter(conn => conn.isConnected || conn.status === 'connected')
-                  .map(conn => conn.id)
-                  .filter(id => id !== data.id); // Exclude the disconnected one
-                
-                const newSelectedConnection = freshActiveIds.length > 0 ? freshActiveIds[0] : null;
-                
-                // If switching to a new connection, restore its last selected topic
-                if (newSelectedConnection) {
-                  const lastTopic = lastSelectedTopics[newSelectedConnection];
-                  if (lastTopic) {
-                    setSelectedTopic(lastTopic);
-                  } else {
-                    setSelectedTopic(null);
-                  }
-                }
-                
-                return newSelectedConnection;
-              }
-              return currentSelected;
-            });
-          }, 100);
-          return current; // Keep current for now, setTimeout will update if needed
-        }
-        return current;
-      });
-    };
-  
-    const handleMessage = (data) => {
-      const newMessage = {
-        id: Date.now() + Math.random(),
-        connectionId: data.id,
-        topic: data.topic,
-        message: data.message,
-        qos: data.qos,
-        retain: data.retain,
-        timestamp: data.timestamp || Date.now()
-      };
-      
-      setMessages(prev => {
-        // Add the new message
-        const newMessages = [newMessage, ...prev];
-        
-        // Group messages by topic and connection
-        const messagesByTopic = {};
-        const otherMessages = [];
-        
-        newMessages.forEach(msg => {
-          const topicKey = `${msg.connectionId}::${msg.topic}`;
-          if (!messagesByTopic[topicKey]) {
-            messagesByTopic[topicKey] = [];
-          }
-          messagesByTopic[topicKey].push(msg);
-        });
-        
-        // Limit each topic to 300 messages, keep the most recent ones
-        Object.keys(messagesByTopic).forEach(topicKey => {
-          if (messagesByTopic[topicKey].length > 300) {
-            messagesByTopic[topicKey] = messagesByTopic[topicKey].slice(0, 300);
-          }
-        });
-        
-        // Flatten back to single array
-        const limitedMessages = [];
-        Object.values(messagesByTopic).forEach(topicMessages => {
-          limitedMessages.push(...topicMessages);
-        });
-        
-        // Sort by timestamp (most recent first)
-        return limitedMessages.sort((a, b) => b.timestamp - a.timestamp);
-      });
-    };
+    }
+  };
 
-    const handleError = (data) => {
-      console.log('Error event:', data);
-      toast.error(`Connection error: ${data.error}`);
+  // Store handlers in ref for cleanup - store the actual function references
+  handlersRef.current = {
+    handleConnected,
+    handleDisconnected,
+    handleMessage,
+    handleError
+  };
+
+  // Set up MQTT event handlers
+  console.log('Setting up MQTT event listeners...');
+  MQTTService.onAny('connected', handleConnected);
+  MQTTService.onAny('disconnected', handleDisconnected);
+  MQTTService.onAny('message', handleMessage);
+  MQTTService.onAny('error', handleError);
+
+  // Cleanup function to remove listeners
+  return () => {
+    console.log('Cleaning up MQTT event listeners...');
+    
+    // Get the stored handler references
+    if (handlersRef.current) {
+      const { handleConnected, handleDisconnected, handleMessage, handleError } = handlersRef.current;
       
-      // Set connection to disconnected on error
-      if (data.id) {
-        setConnections(prev => prev.map(conn => 
-          conn.id === data.id 
-            ? { ...conn, status: 'disconnected', isConnected: false }
-            : conn
-        ));
-        
-        // Clean up topic tree on connection error
-        TopicTreeService.removeTopicTree(data.id);
-        
-        // DELETE messages for this connection when error occurs
-        setMessages(prev => prev.filter(msg => msg.connectionId !== data.id));
-        
-        // Clear selected topic if it belongs to the error connection
-        setSelectedTopic(current => {
-          if (current && current.connectionId === data.id) {
-            return null;
-          }
-          return current;
-        });
+      // Correct way to remove global event handlers (onAny uses '*' as connectionId)
+      MQTTService.off('*', 'connected', handleConnected);
+      MQTTService.off('*', 'disconnected', handleDisconnected);
+      MQTTService.off('*', 'message', handleMessage);
+      MQTTService.off('*', 'error', handleError);
+      
+      console.log('MQTT Event listeners removed');
+    }
+
+    // Clean up TopicTreeService listeners
+    if (topicTreeHandlersRef.current) {
+      const { handleTreeCreated, handleTreeUpdated, handleTreeCleared, handleTreeError } = topicTreeHandlersRef.current;
+      
+      // Remove TopicTreeService listeners (assuming it has an 'off' method)
+      if (typeof TopicTreeService.off === 'function') {
+        TopicTreeService.off('treeCreated', handleTreeCreated);
+        TopicTreeService.off('treeUpdated', handleTreeUpdated);
+        TopicTreeService.off('treeCleared', handleTreeCleared);
+        TopicTreeService.off('treeError', handleTreeError);
       }
       
-      updateConnectionsList();
-    };
+      console.log('TopicTree Event listeners removed');
+    }
+  };
+}, []);
 
-    // Store handlers in ref for cleanup - store the actual function references
-    handlersRef.current = {
-      handleConnected,
-      handleDisconnected,
-      handleMessage,
-      handleError
-    };
-
-    // Set up MQTT event handlers
-    console.log('Setting up MQTT event listeners...');
-    MQTTService.onAny('connected', handleConnected);
-    MQTTService.onAny('disconnected', handleDisconnected);
-    MQTTService.onAny('message', handleMessage);
-    MQTTService.onAny('error', handleError);
-
-    updateConnectionsList();
-
-    // Cleanup function to remove listeners
-    return () => {
-      console.log('Cleaning up MQTT event listeners...');
-      
-      // Get the stored handler references
-      if (handlersRef.current) {
-        const { handleConnected, handleDisconnected, handleMessage, handleError } = handlersRef.current;
-        
-        // Correct way to remove global event handlers (onAny uses '*' as connectionId)
-        MQTTService.off('*', 'connected', handleConnected);
-        MQTTService.off('*', 'disconnected', handleDisconnected);
-        MQTTService.off('*', 'message', handleMessage);
-        MQTTService.off('*', 'error', handleError);
-        
-        console.log('MQTT Event listeners removed');
-      }
-
-      // Clean up TopicTreeService listeners
-      if (topicTreeHandlersRef.current) {
-        const { handleTreeCreated, handleTreeUpdated, handleTreeCleared, handleTreeError } = topicTreeHandlersRef.current;
-        
-        // Remove TopicTreeService listeners (assuming it has an 'off' method)
-        if (typeof TopicTreeService.off === 'function') {
-          TopicTreeService.off('treeCreated', handleTreeCreated);
-          TopicTreeService.off('treeUpdated', handleTreeUpdated);
-          TopicTreeService.off('treeCleared', handleTreeCleared);
-          TopicTreeService.off('treeError', handleTreeError);
-        }
-        
-        console.log('TopicTree Event listeners removed');
-      }
-    };
-  }, []); // Empty dependency array - run only once
+  const handleClearMessages = (topicPath) => {
+    if (!selectedConnection) {
+      showFeedback('No connection selected', 'error');
+      return;
+    }
+    
+    console.log(`Clearing messages for topic: ${topicPath} on connection: ${selectedConnection}`);
+    
+    // Remove messages for the specific topic and connection from state
+    setMessages(prev => prev.filter(msg => 
+      !(msg.connectionId === selectedConnection && msg.topic === topicPath)
+    ));
+    
+    // Clear the topic message count in the topic tree
+    if (typeof TopicTreeService.clearTopicMessages === 'function') {
+      TopicTreeService.clearTopicMessages(selectedConnection, topicPath);
+    } else {
+      console.warn('TopicTreeService.clearTopicMessages method not yet implemented');
+    }
+    
+    showFeedback('Messages cleared for topic', 'success');
+  };
 
   const setupTopicTreeListeners = () => {
     // Define TopicTree handlers
@@ -317,11 +441,11 @@ function App() {
     };
 
     const handleTreeCleared = (data) => {
-      toast.info(`Topic tree cleared for ${data.connectionId}`);
+      showFeedback(`Topic tree cleared for ${data.connectionId}`, 'info');
     };
 
     const handleTreeError = (data) => {
-      toast.error(`Topic tree error: ${data.error}`);
+      showFeedback(`Topic tree error: ${data.error}`, 'error');
     };
 
     // Store TopicTree handlers in ref for cleanup
@@ -345,6 +469,13 @@ function App() {
       const mainConnections = await MQTTService.refreshConnectionsFromMain();
       const localConnections = MQTTService.getAllConnections();
       
+      // If we have no local connections but we have connections in state (from localStorage),
+      // don't overwrite them with empty array
+      if (localConnections.length === 0 && connections.length > 0) {
+        console.log('App.jsx: Skipping connection update - preserving loaded connections');
+        return;
+      }
+      
       // Merge main process data with local data
       const mergedConnections = localConnections.map(localConn => {
         const mainConn = mainConnections[localConn.id];
@@ -367,13 +498,15 @@ function App() {
       
     } catch (error) {
       console.error('Failed to update connections list:', error);
-      // Fallback to local connections only
-      const localConnections = MQTTService.getAllConnections();
-      setConnections(localConnections.map(conn => ({
-        ...conn,
-        isConnected: false,
-        status: 'disconnected'
-      })));
+      // Fallback - don't overwrite existing connections with empty array
+      if (connections.length === 0) {
+        const localConnections = MQTTService.getAllConnections();
+        setConnections(localConnections.map(conn => ({
+          ...conn,
+          isConnected: false,
+          status: 'disconnected'
+        })));
+      }
     }
   };
 
@@ -430,7 +563,7 @@ function App() {
           } catch (connectError) {
             // Handle connection/subscription errors
             console.error('Connection error during update:', connectError);
-            toast.error(`Connection failed: ${connectError.message || 'Unknown error'}`);
+            showFeedback(`Connection failed: ${connectError.message || 'Unknown error'}`, 'error');
             
             // Set to disconnected on error but KEEP the updated config
             setConnections(prev => prev.map(conn => 
@@ -446,6 +579,7 @@ function App() {
           }
         } else {
           console.log('Connection was not active, config updated successfully');
+          showFeedback('Connection updated successfully', 'success');
           // For disconnected connections, just keep the updated config
           // Don't call updateConnectionsList() as it might overwrite our changes
         }
@@ -464,9 +598,10 @@ function App() {
           
           // Select the new connection
           setSelectedConnection(connectionId);
+          showFeedback('Connection created successfully', 'success');
         } catch (connectError) {
           console.error('Connection error during creation:', connectError);
-          toast.error(`Failed to connect: ${connectError.message || 'Unknown error'}`);
+          showFeedback(`Failed to connect: ${connectError.message || 'Unknown error'}`, 'error');
           
           // Set to disconnected on error but keep the config
           setConnections(prev => prev.map(conn => 
@@ -478,7 +613,7 @@ function App() {
       }
     } catch (error) {
       console.error('Connection error:', error);
-      toast.error(`Failed to ${connectionData.id ? 'update' : 'create'} connection: ${error.message}`);
+      showFeedback(`Failed to ${connectionData.id ? 'update' : 'create'} connection: ${error.message}`, 'error');
       
       // Set to disconnected on error, but preserve the updated config
       if (connectionData.id) {
@@ -497,24 +632,24 @@ function App() {
   };
 
   const handleConnectionSelect = (connectionId) => {
-      // Store the current selected topic for the current connection before switching
-      if (selectedConnection && selectedTopic) {
-        setLastSelectedTopics(prev => ({
-          ...prev,
-          [selectedConnection]: selectedTopic
-        }));
-      }
-      
-      setSelectedConnection(connectionId);
-      
-      // Restore the last selected topic for the new connection
-      const lastTopic = lastSelectedTopics[connectionId];
-      if (lastTopic) {
-        setSelectedTopic(lastTopic);
-      } else {
-        setSelectedTopic(null); // Clear if no previous topic
-      }
-    };
+    // Store the current selected topic for the current connection before switching
+    if (selectedConnection && selectedTopic) {
+      setLastSelectedTopics(prev => ({
+        ...prev,
+        [selectedConnection]: selectedTopic
+      }));
+    }
+    
+    setSelectedConnection(connectionId);
+    
+    // Restore the last selected topic for the new connection
+    const lastTopic = lastSelectedTopics[connectionId];
+    if (lastTopic) {
+      setSelectedTopic(lastTopic);
+    } else {
+      setSelectedTopic(null); // Clear if no previous topic
+    }
+  };
 
   const handleConnectionToggle = async (connectionId) => {
     try {
@@ -524,7 +659,7 @@ function App() {
       const localConnection = connections.find(c => c.id === connectionId);
       
       if (!localConnection) {
-        toast.error('Connection not found');
+        showFeedback('Connection not found', 'error');
         return;
       }
 
@@ -549,7 +684,7 @@ function App() {
         });
         
         await MQTTService.disconnect(connectionId);
-        toast.info(`Disconnecting from ${localConnection.config?.name || connectionId}`);
+        showFeedback(`Disconnecting from ${localConnection.config?.name || connectionId}`, 'info');
       } else {
         // Set connecting state immediately
         setConnections(prev => prev.map(conn => 
@@ -558,7 +693,7 @@ function App() {
             : conn
         ));
         
-        toast.info(`Connecting to ${localConnection.config?.name || connectionId}`);
+        showFeedback(`Connecting to ${localConnection.config?.name || connectionId}`, 'info');
         
         try {
           await MQTTService.connect(connectionId, localConnection.config);
@@ -579,13 +714,13 @@ function App() {
       
     } catch (error) {
       console.error('Toggle connection error:', error);
-      toast.error(`Failed to toggle connection: ${error.message}`);
+      //showFeedback(`Failed to toggle connection: ${error.message}`, 'error');
       // Still update the list to reflect current state
       await updateConnectionsList();
     }
   };
 
-   const handleConnectionDelete = async (connectionId) => {
+  const handleConnectionDelete = async (connectionId) => {
     try {
       console.log(`Deleting connection: ${connectionId}`);
       
@@ -604,6 +739,9 @@ function App() {
         delete newTopics[connectionId];
         return newTopics;
       });
+      
+      // Remove from local state
+      setConnections(prev => prev.filter(conn => conn.id !== connectionId));
       
       // Clear selected connection if it was deleted
       setSelectedConnection(current => {
@@ -630,14 +768,11 @@ function App() {
         return current;
       });
       
-      // Update connections list to reflect the deletion
-      await updateConnectionsList();
-      
-      toast.success('Connection removed');
+      showFeedback('Connection deleted successfully', 'success');
       
     } catch (error) {
       console.error('Delete connection error:', error);
-      toast.error(`Failed to delete connection: ${error.message}`);
+      showFeedback(`Failed to delete connection: ${error.message}`, 'error');
     }
   };
 
@@ -656,14 +791,14 @@ function App() {
   const handlePublishMessage = async (messageData) => {
     try {
       if (!selectedConnection) {
-        toast.error('No active connection selected');
+        showFeedback('No active connection selected', 'error');
         return;
       }
 
       // Check if the selected connection is actually connected
       const connection = connections.find(c => c.id === selectedConnection);
       if (!connection?.isConnected) {
-        toast.error('Selected connection is not active');
+        showFeedback('Selected connection is not active', 'error');
         return;
       }
 
@@ -674,11 +809,10 @@ function App() {
         qos: messageData.qos,
         retain: messageData.retain
       });
-
       
     } catch (error) {
       console.error('Failed to publish message:', error);
-      toast.error(`Failed to publish message: ${error.message}`);
+      showFeedback(`Failed to publish message: ${error.message}`, 'error');
     }
   };
 
@@ -719,10 +853,23 @@ function App() {
     return messages.filter(msg => msg.connectionId === selectedConnection);
   }, [messages, selectedConnection, connections]);
 
+  const handleToggleSidebarCollapse = useCallback(() => {
+    setSidebarCollapsed(prev => {
+      const newCollapsed = !prev;
+      // Adjust sidebar width when collapsing/expanding
+      if (newCollapsed) {
+        setConnectionSidebarWidth(60); // Collapsed width
+      } else {
+        setConnectionSidebarWidth(280); // Expanded width
+      }
+      return newCollapsed;
+    });
+  }, []);
+
   // Updated function to render all tab content (always mounted, but conditionally visible)
   const renderAllTabContent = () => {
     const isConnected = connections.find(c => c.id === selectedConnection)?.isConnected || false;
-    const activeConnection = connections.find(c => c.id === selectedConnection); // Add this line
+    const activeConnection = connections.find(c => c.id === selectedConnection);
     
     return (
       <div className="tab-content-container">
@@ -735,6 +882,7 @@ function App() {
             messages={connectionMessages}
             selectedTopic={selectedTopic}
             connectionName={getSelectedConnectionName()}
+            onClearMessages={handleClearMessages}
           />
         </div>
 
@@ -782,7 +930,6 @@ function App() {
     );
   };
 
-  // Render main content (topic tree + tab content)
   const renderMainContent = () => {
     if (!selectedConnection) {
       return (
@@ -802,12 +949,12 @@ function App() {
       return renderAllTabContent();
     }
 
-    // Topic tree + tab content with resizer
+    // Topic tree + tab content with resizer - Remove ALL size limits
     return (
       <SplitPane
         split="vertical"
-        minSize={250}
-        maxSize={1000}
+        minSize={50}
+        // Remove maxSize completely to allow unlimited expansion
         defaultSize={topicTreeWidth}
         onChange={(size) => setTopicTreeWidth(size)}
         resizerStyle={{
@@ -840,30 +987,68 @@ function App() {
     );
   };
 
-  return (
+
+ return (
     <div className="app">
+      {/* Notification Stack */}
+      <div className="notification-stack">
+        {notifications.map((notification) => (
+          <div 
+            key={notification.id}
+            className={`notification ${notification.type}`}
+            onClick={() => removeNotification(notification.id)}
+          >
+            <i className={`fas ${
+              notification.type === 'success' ? 'fa-check-circle' :
+              notification.type === 'error' ? 'fa-exclamation-circle' :
+              notification.type === 'warning' ? 'fa-exclamation-triangle' :
+              'fa-info-circle'
+            }`}></i>
+            <span className="notification-message">{notification.message}</span>
+            <button 
+              className="notification-close"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeNotification(notification.id);
+              }}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+
       <SplitPane
         split="vertical"
-        minSize={250}
-        maxSize={450}
+        minSize={sidebarCollapsed ? 60 : 250}
+        maxSize={sidebarCollapsed ? 60 : undefined}
         defaultSize={connectionSidebarWidth}
-        onChange={(size) => setConnectionSidebarWidth(size)}
+        onChange={(size) => {
+          if (!sidebarCollapsed) {
+            setConnectionSidebarWidth(size);
+          }
+        }}
         resizerStyle={{
           background: '#e9ecef',
           opacity: 0.8,
           zIndex: 2,
-          cursor: 'col-resize',
+          cursor: sidebarCollapsed ? 'default' : 'col-resize',
           width: '4px',
           border: 'none',
-          transition: 'opacity 0.2s'
+          transition: 'opacity 0.2s',
+          pointerEvents: sidebarCollapsed ? 'none' : 'auto'
         }}
         onResizerMouseEnter={(e) => {
-          e.target.style.opacity = '1';
-          e.target.style.background = '#28a745';
+          if (!sidebarCollapsed) {
+            e.target.style.opacity = '1';
+            e.target.style.background = '#28a745';
+          }
         }}
         onResizerMouseLeave={(e) => {
-          e.target.style.opacity = '0.8';
-          e.target.style.background = '#e9ecef';
+          if (!sidebarCollapsed) {
+            e.target.style.opacity = '0.8';
+            e.target.style.background = '#e9ecef';
+          }
         }}
       >
         <ConnectionSidebar
@@ -874,6 +1059,8 @@ function App() {
           onConnectionDelete={handleConnectionDelete}
           onConnectionToggle={handleConnectionToggle}
           selectedConnectionId={selectedConnection}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={handleToggleSidebarCollapse}
         />
         
         <div className="main-content">
@@ -935,8 +1122,6 @@ function App() {
           </div>
         </div>
       </SplitPane>
-
-      <ToastContainer position="top-right" autoClose={2500} />
     </div>
   );
 }

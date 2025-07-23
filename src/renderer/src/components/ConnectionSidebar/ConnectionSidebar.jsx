@@ -14,7 +14,9 @@ function ConnectionSidebar({
   onConnectionCreate, 
   onConnectionDelete,
   onConnectionToggle,
-  selectedConnectionId 
+  selectedConnectionId,
+  isCollapsed = false,
+  onToggleCollapse
 }) {
   const [showModal, setShowModal] = useState(false);
   const [editingConnection, setEditingConnection] = useState(null);
@@ -36,6 +38,11 @@ function ConnectionSidebar({
       }
     }
   }, [selectedConnectionId, localSelectedId, activeConnections, onConnectionSelect]);
+  
+  useEffect(() => {
+    console.log('ConnectionSidebar: Received connections prop:', connections);
+    console.log('ConnectionSidebar: Connections length:', connections?.length);
+  }, [connections]);
 
   // Sync with parent selectedConnectionId
   useEffect(() => {
@@ -122,37 +129,48 @@ function ConnectionSidebar({
     setConnectionToDelete(null);
   }, []);
 
+  // Handle logo click to toggle collapse
+  const handleLogoClick = useCallback(() => {
+    if (onToggleCollapse) {
+      onToggleCollapse();
+    }
+  }, [onToggleCollapse]);
+
   // Determine which connection is actually selected
   const effectiveSelectedId = selectedConnectionId || localSelectedId;
 
   return (
-    <div className="connection-sidebar" key={forceRenderKey}>
+    <div className={`connection-sidebar ${isCollapsed ? 'collapsed' : ''}`} key={forceRenderKey}>
       <div className="sidebar-header">
-        <div className="logo-section">
+        <div className="logo-section" onClick={handleLogoClick} title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
           <img src={mqttLooterLogo} alt="MQTTLooter" className="app-logo" />
-          <h1>MQTTLooter</h1>
+          {!isCollapsed && <h1>MQTTLooter</h1>}
         </div>
       </div>
 
       <div className="connections-section">
-        <div className="section-header">
-          <h3>Connections</h3>
-          <div className="connection-stats">
-            {activeConnections.length > 0 && (
-              <span className="active-count">
-                {activeConnections.length} active
-              </span>
-            )}
+        {!isCollapsed && (
+          <div className="section-header">
+            <h3>Connections</h3>
+            <div className="connection-stats">
+              {activeConnections.length > 0 && (
+                <span className="active-count">
+                  {activeConnections.length} active
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="connections-list">
           {connections.length === 0 ? (
-            <div className="no-connections">
-              <div className="no-connections-icon">🔌</div>
-              <p>No connections yet</p>
-              <p className="hint">Click the + button to add your first MQTT connection</p>
-            </div>
+            !isCollapsed && (
+              <div className="no-connections">
+                <div className="no-connections-icon">🔌</div>
+                <p>No connections yet</p>
+                <p className="hint">Click the + button to add your first MQTT connection</p>
+              </div>
+            )
           ) : (
             connections.map(connection => {
               const isSelected = effectiveSelectedId === connection.id;
@@ -163,6 +181,7 @@ function ConnectionSidebar({
                   connection={connection}
                   isActive={activeConnections.includes(connection.id)}
                   isSelected={isSelected}
+                  isCollapsed={isCollapsed}
                   onSelect={() => handleConnectionSelect(connection.id)}
                   onToggle={() => onConnectionToggle(connection.id)}
                   onEdit={() => handleEditConnection(connection)}

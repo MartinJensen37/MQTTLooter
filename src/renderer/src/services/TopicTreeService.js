@@ -203,6 +203,34 @@ class TopicTreeService {
       trees: exports
     };
   }
+
+  clearTopicMessages(connectionId, topicPath) {
+  const tree = this.topicTrees.get(connectionId);
+    if (tree) {
+      const success = tree.clearTopicMessages(topicPath);
+      if (success) {
+        // Emit an event to notify that topic messages were cleared
+        this.emitEvent('topicMessagesCleared', { 
+          connectionId, 
+          topicPath,
+          statistics: tree.getStatistics()
+        });
+        
+        // Also emit a tree updated event to refresh the UI
+        const node = tree.getNode(topicPath);
+        if (node) {
+          this.emitEvent('treeUpdated', { 
+            connectionId, 
+            topic: topicPath, 
+            node: node.toJSON(),
+            statistics: tree.getStatistics()
+          });
+        }
+      }
+      return success;
+    }
+    return false;
+  }
 }
 
 // Create singleton instance

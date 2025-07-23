@@ -15,6 +15,7 @@
   overflow: hidden;
   background: white;
   min-height: 0;
+  min-width: 0;
 }
 
 .main-header {
@@ -39,6 +40,7 @@
   position: relative;
   margin-top: 0; /* No margin to connect with tabs */
   overflow: hidden;
+  min-width: 0;
 }
 
 
@@ -105,8 +107,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-width: 250px;
-  max-width: 600px;
   height: 100%;
 }
 
@@ -397,4 +397,189 @@
 .tab-content.hidden {
   display: none;
   z-index: 0;
+}
+/* Copy Feedback Toast */
+.copy-feedback {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #28a745;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 25px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  animation: slideInRight 0.3s ease-out;
+}
+
+.copy-feedback.error {
+  background: #dc3545;
+}
+
+.copy-feedback.warning {
+  background: #ffc107;
+  color: #212529;
+}
+
+.copy-feedback.info {
+  background: #007bff;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-stack {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+}
+
+.notification {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 25px; /* Completely rounded corners */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  animation: slideInRight 0.3s ease-out;
+  position: relative;
+  min-width: 300px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.notification:hover {
+  transform: translateX(-5px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.notification.success {
+  background: #28a745; /* Match MessagePanel green */
+  color: white;
+  border: none;
+}
+
+.notification.error {
+  background: #dc3545; /* Match MessagePanel red */
+  color: white;
+  border: none;
+}
+
+.notification.warning {
+  background: #ffc107; /* Match MessagePanel yellow */
+  color: #212529; /* Dark text for better contrast on yellow */
+  border: none;
+}
+
+.notification.info {
+  background: #007bff; /* Match MessagePanel blue */
+  color: white;
+  border: none;
+}
+
+.notification i {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.notification-message {
+  flex: 1;
+  font-weight: 600;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.notification-close {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.notification-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+  transform: scale(1.1);
+}
+
+/* Special styling for warning notification close button */
+.notification.warning .notification-close {
+  background: rgba(33, 37, 41, 0.2);
+  color: #212529;
+}
+
+.notification.warning .notification-close:hover {
+  background: rgba(33, 37, 41, 0.3);
+  color: #212529;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Remove the old single notification styles */
+.copy-feedback {
+  display: none; /* Hide the old single notification */
+}
+
+/* Responsive adjustments for notifications */
+@media (max-width: 768px) {
+  .notification-stack {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+  
+  .notification {
+    min-width: auto;
+    font-size: 13px;
+    padding: 10px 14px;
+  }
+  
+  .notification i {
+    font-size: 14px;
+  }
+  
+  .notification-close {
+    width: 20px;
+    height: 20px;
+    font-size: 14px;
+  }
 }

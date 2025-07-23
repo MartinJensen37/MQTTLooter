@@ -269,6 +269,7 @@ class MQTTService {
     const connection = this.connections.get(connectionId);
     return connection?.mqtt5Properties || {};
   }
+
 }
 
 export default new MQTTService();

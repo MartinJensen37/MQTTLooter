@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './MessagePanel.css';
 
 function MessagePanel({ 
@@ -35,9 +35,19 @@ function MessagePanel({
     return sorted;
   }, [messages, showRetainedOnly, sortBy, sortOrder]); // FIXED: Added messages dependency
 
-  // Get the most recent message for the selected topic (for topic details) - FIXED
+  // Get the most recent message for the selected topic (for topic details)
   const topicDetails = React.useMemo(() => {
-    if (!selectedTopic || processedMessages.length === 0) return null;
+    if (!selectedTopic) return null;
+    
+    // If there are no messages, return default values
+    if (processedMessages.length === 0) {
+      return {
+        timestamp: null,
+        qos: 0,
+        retain: false,
+        topic: selectedTopic.topicPath
+      };
+    }
     
     // Find the message with the highest timestamp (most recent)
     const mostRecentMessage = processedMessages.reduce((latest, current) => {
@@ -45,7 +55,21 @@ function MessagePanel({
     }, processedMessages[0]);
     
     return mostRecentMessage;
-  }, [selectedTopic, processedMessages]); // This will now update when messages change
+  }, [selectedTopic, processedMessages]);
+
+  // Handle click outside for export dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showTopicExportMenu && !event.target.closest('.message-export-wrapper')) {
+        setShowTopicExportMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showTopicExportMenu]);
 
   const showCopyFeedback = (message) => {
     setCopyFeedback(message);
@@ -82,6 +106,7 @@ function MessagePanel({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     setShowTopicExportMenu(false);
+    showCopyFeedback('Topic exported as JSON!');
   };
 
   const exportTopicAsCSV = () => {
@@ -109,6 +134,23 @@ function MessagePanel({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     setShowTopicExportMenu(false);
+    showCopyFeedback('Topic exported as CSV!');
+  };
+
+  const clearTopicMessages = () => {
+    console.log('Clear button clicked'); // Debug log
+    console.log('selectedTopic:', selectedTopic); // Debug log
+    console.log('onClearMessages function:', onClearMessages); // Debug log
+    
+    if (selectedTopic && onClearMessages) {
+      console.log('Calling onClearMessages with topic:', selectedTopic.topicPath); // Debug log
+      onClearMessages(selectedTopic.topicPath);
+      showCopyFeedback('Messages cleared for this topic!');
+    } else {
+      console.log('Cannot clear - missing selectedTopic or onClearMessages'); // Debug log
+      if (!selectedTopic) console.log('selectedTopic is missing');
+      if (!onClearMessages) console.log('onClearMessages function is missing');
+    }
   };
 
   const copyTopicPath = () => {
@@ -166,7 +208,7 @@ function MessagePanel({
         </div>
       </div>
 
-      {/* Topic Details Box - This will now update with each new message */}
+ {/* Topic Details Box - Now always shows when topic is selected */}
       {selectedTopic && topicDetails && (
         <div className="topic-details-box">
           <div className="topic-details-header">
@@ -191,7 +233,9 @@ function MessagePanel({
               
               <div className="topic-info-item">
                 <label>Last Message:</label>
-                <span className="timestamp">{formatTimestamp(topicDetails.timestamp)}</span>
+                <span className="timestamp">
+                  {topicDetails.timestamp ? formatTimestamp(topicDetails.timestamp) : 'N/A'}
+                </span>
               </div>
               
               <div className="topic-info-item">
@@ -209,21 +253,44 @@ function MessagePanel({
               </div>
             </div>
             
-            <div className="topic-export-section">
-              <div className="topic-export-dropdown">
-                <button 
-                  onClick={() => setShowTopicExportMenu(!showTopicExportMenu)} 
-                  className="export-topic-btn"
+            <div className="topic-actions-section">
+              <button 
+                onClick={clearTopicMessages}
+                className="clear-messages-btn"
+                title="Clear messages for this topic"
+                disabled={processedMessages.length === 0}
+              >
+                <i className="fas fa-trash"></i> Clear Messages
+              </button>
+
+              <div className="message-export-wrapper message-custom-select-wrapper">
+                <button
+                  type="button"
+                  className="message-custom-select-button"
+                  onClick={() => setShowTopicExportMenu(!showTopicExportMenu)}
+                  disabled={processedMessages.length === 0}
                   title="Export topic data"
                 >
-                  <i className="fas fa-download"></i> Export <i className="fas fa-chevron-down"></i>
+                  <span className="select-value">
+                    <i className="fas fa-download"></i> Export
+                  </span>
+                  <i className={`fas fa-chevron-down ${showTopicExportMenu ? 'rotated' : ''}`}></i>
                 </button>
+                
                 {showTopicExportMenu && (
-                  <div className="export-menu">
-                    <button onClick={exportTopicAsJSON} className="export-menu-item">
+                  <div className="message-custom-select-dropdown">
+                    <button
+                      type="button"
+                      className="message-dropdown-option"
+                      onClick={exportTopicAsJSON}
+                    >
                       <i className="fas fa-file-code"></i> Export as JSON
                     </button>
-                    <button onClick={exportTopicAsCSV} className="export-menu-item">
+                    <button
+                      type="button"
+                      className="message-dropdown-option"
+                      onClick={exportTopicAsCSV}
+                    >
                       <i className="fas fa-file-csv"></i> Export as CSV
                     </button>
                   </div>
@@ -244,7 +311,7 @@ function MessagePanel({
             <p>
               {!selectedTopic 
                 ? "Select a topic from the topic tree to view its messages"
-                : `No messages received for topic "${selectedTopic.topicPath}"`
+                : `No messages received for topic "${selectedTopic.topicPath}" yet`
               }
             </p>
           </div>

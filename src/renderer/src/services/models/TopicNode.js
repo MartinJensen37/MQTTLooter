@@ -231,6 +231,37 @@ class TopicNode {
       timestampCount: this.messageTimestamps.length
     };
   }
+  clearMessages() {
+    // Store the counts before clearing for propagation
+    const previousCount = this.messageCount;
+    
+    // Clear all message-related data
+    this.messageCount = 0;
+    this.lastMessage = null;
+    this.lastMessageTime = null;
+    this.messageTimestamps = [];
+    this.messageRate = 0;
+    this.lastRateCalculation = Date.now();
+    this.hasDirectMessages = false;
+    
+    // Reset adaptive rate calculation properties
+    this.lastMessageInterval = 0;
+    this.averageInterval = 0;
+    this.intervalSamples = [];
+    this.adaptiveTimeWindow = 5000; // Reset to default
+    
+    // Propagate the count reduction up the tree
+    this.propagateMessageCountReduction(previousCount);
+  }
+
+  propagateMessageCountReduction(countToReduce) {
+    let current = this.parent;
+    while (current) {
+      current.messageCount = Math.max(0, current.messageCount - countToReduce);
+      current = current.parent;
+    }
+  }
+
 }
 
 export default TopicNode;

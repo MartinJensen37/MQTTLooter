@@ -16,6 +16,7 @@ function PublishingPanel({
   const [isPublishing, setIsPublishing] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState('');
   const [showQosDropdown, setShowQosDropdown] = useState(false);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
   const [messageTemplates, setMessageTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [templateService] = useState(new MessageTemplateService());
@@ -48,19 +49,21 @@ function PublishingPanel({
       }
     }
   }, [connectionId]);
+
   useEffect(() => {
     setMessageTemplates(templateService.getAllTemplates());
-  }, []);
+  }, [templateService]);
 
   const handleTemplateSelect = (templateId) => {
     const template = templateService.getTemplate(templateId);
     if (template) {
       const processed = templateService.processTemplate(template);
       setTopic(processed.topic);
-      setMessage(processed.payload);
+      setPayload(processed.payload);
       setQos(processed.qos);
       setRetain(processed.retain);
       setSelectedTemplate(templateId);
+      setShowTemplateDropdown(false);
     }
   };
 
@@ -171,8 +174,11 @@ function PublishingPanel({
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (showQosDropdown && !event.target.closest('.custom-select-wrapper')) {
+      if (showQosDropdown && !event.target.closest('.qos-select-wrapper')) {
         setShowQosDropdown(false);
+      }
+      if (showTemplateDropdown && !event.target.closest('.template-select-wrapper')) {
+        setShowTemplateDropdown(false);
       }
     };
 
@@ -180,8 +186,7 @@ function PublishingPanel({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showQosDropdown]);
-
+  }, [showQosDropdown, showTemplateDropdown]);
 
   const loadFromSelectedTopic = () => {
     if (!selectedTopic) {
@@ -221,6 +226,7 @@ function PublishingPanel({
     setPayload('');
     setQos(0);
     setRetain(false);
+    setSelectedTemplate(null);
     // Also clear from localStorage
     localStorage.removeItem('publish-form-state');
   };
@@ -295,6 +301,12 @@ function PublishingPanel({
     );
   };
 
+  const getSelectedTemplateName = () => {
+    if (!selectedTemplate) return 'Select a template...';
+    const template = messageTemplates.find(t => t.id === selectedTemplate);
+    return template ? `${template.name} (${template.category})` : 'Select a template...';
+  };
+
   return (
     <div className="publishing-panel">
       {/* Feedback Toast */}
@@ -314,6 +326,49 @@ function PublishingPanel({
 
       <div className="publishing-content">
         <div className="publish-form">
+          {/* Message Templates Section */}
+          <div className="form-group">
+            <label htmlFor="templates">Message Templates:</label>
+            <div className="template-select-wrapper publish-custom-select-wrapper">
+              <button
+                type="button"
+                className="publish-custom-select-button"
+                onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                disabled={isPublishing}
+              >
+                <span className="select-value">
+                  {getSelectedTemplateName()}
+                </span>
+                <i className={`fas fa-chevron-down ${showTemplateDropdown ? 'rotated' : ''}`}></i>
+              </button>
+              
+              {showTemplateDropdown && (
+                <div className="publish-custom-select-dropdown">
+                  <button
+                    type="button"
+                    className={`publish-dropdown-option ${!selectedTemplate ? 'selected' : ''}`}
+                    onClick={() => {
+                      setSelectedTemplate(null);
+                      setShowTemplateDropdown(false);
+                    }}
+                  >
+                    Select a template...
+                  </button>
+                  {messageTemplates.map(template => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      className={`publish-dropdown-option ${selectedTemplate === template.id ? 'selected' : ''}`}
+                      onClick={() => handleTemplateSelect(template.id)}
+                    >
+                      {template.name} ({template.category})
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="form-group">
             <label htmlFor="topic">Topic:</label>
             <div className="topic-input-wrapper">
@@ -384,28 +439,14 @@ function PublishingPanel({
               )}
             </div>
           </div>
-            <div className="form-options">
-              <div className="form-group">
-                          <div className="template-section">
-              <label>Message Templates:</label>
-              <select
-                value={selectedTemplate || ''}
-                onChange={(e) => handleTemplateSelect(e.target.value)}
-                className="form-control"
-              >
-                <option value="">Select a template...</option>
-                {messageTemplates.map(template => (
-                  <option key={template.id} value={template.id}>
-                    {template.name} ({template.category})
-                  </option>
-                ))}
-              </select>
-            </div>
+
+          <div className="form-options">
+            <div className="form-group">
               <label htmlFor="qos">Quality of Service:</label>
-              <div className="custom-select-wrapper">
+              <div className="qos-select-wrapper publish-custom-select-wrapper">
                 <button
                   type="button"
-                  className="custom-select-button"
+                  className="publish-custom-select-button"
                   onClick={() => setShowQosDropdown(!showQosDropdown)}
                   disabled={isPublishing}
                 >
@@ -418,10 +459,10 @@ function PublishingPanel({
                 </button>
                 
                 {showQosDropdown && (
-                  <div className="custom-select-dropdown">
+                  <div className="publish-custom-select-dropdown">
                     <button
                       type="button"
-                      className={`dropdown-option ${qos === 0 ? 'selected' : ''}`}
+                      className={`publish-dropdown-option ${qos === 0 ? 'selected' : ''}`}
                       onClick={() => {
                         setQos(0);
                         setShowQosDropdown(false);
@@ -431,7 +472,7 @@ function PublishingPanel({
                     </button>
                     <button
                       type="button"
-                      className={`dropdown-option ${qos === 1 ? 'selected' : ''}`}
+                      className={`publish-dropdown-option ${qos === 1 ? 'selected' : ''}`}
                       onClick={() => {
                         setQos(1);
                         setShowQosDropdown(false);
@@ -441,7 +482,7 @@ function PublishingPanel({
                     </button>
                     <button
                       type="button"
-                      className={`dropdown-option ${qos === 2 ? 'selected' : ''}`}
+                      className={`publish-dropdown-option ${qos === 2 ? 'selected' : ''}`}
                       onClick={() => {
                         setQos(2);
                         setShowQosDropdown(false);
@@ -455,14 +496,15 @@ function PublishingPanel({
             </div>
 
             <div className="form-group retain-group">
-              <label className="checkbox-label">
+              <label htmlFor="retain" className="retain-checkbox-label">
                 <input
+                  id="retain"
                   type="checkbox"
                   checked={retain}
                   onChange={(e) => setRetain(e.target.checked)}
                   disabled={isPublishing}
                 />
-                <span className="checkbox-custom"></span>
+                <span className="publish-checkbox-custom"></span>
                 Retain message
                 <span className="retain-info" title="Retained messages are stored by the broker and sent to new subscribers">
                   <i className="fas fa-info-circle"></i>
@@ -501,8 +543,6 @@ function PublishingPanel({
             >
               <i className="fas fa-download"></i> Use Selected Topic
             </button>
-            
-
 
             <button 
               type="button"

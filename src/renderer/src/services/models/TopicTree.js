@@ -208,6 +208,26 @@ class TopicTree {
       timestamp: Date.now()
     };
   }
+
+  clearTopicMessages(topicPath) {
+    // Get the node for this topic
+    const node = this.topicLookup.get(topicPath);
+    if (!node) {
+      return false; // Topic not found
+    }
+    
+    // Store the previous count for tree statistics
+    const previousCount = node.messageCount;
+    
+    // Clear messages from the node
+    node.clearMessages();
+    
+    // Update the tree's total message count
+    this.messageCount = Math.max(0, this.messageCount - previousCount);
+    
+    return true;
+  }
+   
 }
 
 export default TopicTree;

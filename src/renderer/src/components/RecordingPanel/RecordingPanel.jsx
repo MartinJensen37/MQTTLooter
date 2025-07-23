@@ -423,12 +423,6 @@ function RecordingPanel({
         <div className="header-left">
           <h2>
             Recording & Playback
-            {isRecordingDisabled && (
-              <span className="recording-connection-status">
-                <i className="fas fa-exclamation-triangle"></i>
-                No Active Connection
-              </span>
-            )}
           </h2>
         </div>
       </div>

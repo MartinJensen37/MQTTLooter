@@ -5,6 +5,7 @@ function ConnectionCard({
   connection, 
   isActive, 
   isSelected, 
+  isCollapsed = false,
   onSelect, 
   onToggle, 
   onEdit, 
@@ -49,6 +50,36 @@ function ConnectionCard({
     return version === 5 ? 'mqtt5' : 'mqtt311';
   };
 
+  // Helper functions for status styling and text (for collapsed mode)
+  const getStatusClass = () => {
+    if (connection.status === 'connecting' || connection.status === 'disconnecting') {
+      return 'connecting';
+    }
+    if (isActive || connection.status === 'connected') {
+      return 'connected';
+    }
+    if (connection.status === 'error') {
+      return 'error';
+    }
+    return 'disconnected';
+  };
+
+  const getStatusText = () => {
+    if (connection.status === 'connecting') {
+      return 'Connecting...';
+    }
+    if (connection.status === 'disconnecting') {
+      return 'Disconnecting...';
+    }
+    if (isActive || connection.status === 'connected') {
+      return 'Connected';
+    }
+    if (connection.status === 'error') {
+      return 'Error';
+    }
+    return 'Disconnected';
+  };
+
   const handleCardClick = () => {
     onSelect();
   };
@@ -68,6 +99,22 @@ function ConnectionCard({
     onDelete();
   };
 
+  // Collapsed version - render minimal dot
+  if (isCollapsed) {
+    return (
+      <div 
+        className={`connection-card collapsed ${isActive ? 'active' : 'inactive'} ${isSelected ? 'selected' : ''}`}
+        onClick={handleCardClick}
+        title={`${connection.config?.name || 'Unnamed'}\n${getBrokerInfo()}\nStatus: ${getStatusText()}\nMQTT: ${getMqttVersion()}\nClient: ${connection.config?.clientId || 'Auto'}`}
+      >
+        <div className={`connection-status-dot ${getStatusClass()}`}>
+          <div className={`mqtt-version-indicator ${getMqttVersionClass()}`}></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Regular expanded version
   const cardClassName = [
     'connection-card',
     getStatusColor(),
