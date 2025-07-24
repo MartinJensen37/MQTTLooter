@@ -4,27 +4,23 @@ import './MessagePanel.css';
 function MessagePanel({ 
   messages, 
   selectedTopic, 
-  onClearFilter, 
   onClearMessages,
-  connectionName 
+  connectionName,
+  showFeedback 
 }) {
   const [sortBy, setSortBy] = useState('timestamp');
   const [sortOrder, setSortOrder] = useState('desc');
   const [showRetainedOnly, setShowRetainedOnly] = useState(false);
   const [showTopicExportMenu, setShowTopicExportMenu] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState('');
 
-  // Filter and sort messages - FIXED: Include messages in dependencies
+  // Filter and sort messages
   const processedMessages = React.useMemo(() => {
-    // Messages are already filtered by connection and topic in App.jsx
     let filtered = messages;
     
-    // Apply retained filter if enabled
     if (showRetainedOnly) {
       filtered = filtered.filter(msg => msg.retain);
     }
     
-    // Sort messages
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === 'timestamp') {
         return sortOrder === 'desc' ? b.timestamp - a.timestamp : a.timestamp - b.timestamp;
@@ -33,13 +29,12 @@ function MessagePanel({
     });
     
     return sorted;
-  }, [messages, showRetainedOnly, sortBy, sortOrder]); // FIXED: Added messages dependency
+  }, [messages, showRetainedOnly, sortBy, sortOrder]);
 
-  // Get the most recent message for the selected topic (for topic details)
+  // Get most recent message for topic details
   const topicDetails = React.useMemo(() => {
     if (!selectedTopic) return null;
     
-    // If there are no messages, return default values
     if (processedMessages.length === 0) {
       return {
         timestamp: null,
@@ -49,7 +44,6 @@ function MessagePanel({
       };
     }
     
-    // Find the message with the highest timestamp (most recent)
     const mostRecentMessage = processedMessages.reduce((latest, current) => {
       return current.timestamp > latest.timestamp ? current : latest;
     }, processedMessages[0]);
@@ -57,7 +51,7 @@ function MessagePanel({
     return mostRecentMessage;
   }, [selectedTopic, processedMessages]);
 
-  // Handle click outside for export dropdown
+  // Close export dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showTopicExportMenu && !event.target.closest('.message-export-wrapper')) {
@@ -70,11 +64,6 @@ function MessagePanel({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showTopicExportMenu]);
-
-  const showCopyFeedback = (message) => {
-    setCopyFeedback(message);
-    setTimeout(() => setCopyFeedback(''), 2000);
-  };
 
   const exportTopicAsJSON = () => {
     if (!selectedTopic || processedMessages.length === 0) return;
@@ -106,7 +95,10 @@ function MessagePanel({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     setShowTopicExportMenu(false);
-    showCopyFeedback('Topic exported as JSON!');
+    
+    if (showFeedback) {
+      showFeedback('Topic exported as JSON!', 'success');
+    }
   };
 
   const exportTopicAsCSV = () => {
@@ -134,29 +126,25 @@ function MessagePanel({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     setShowTopicExportMenu(false);
-    showCopyFeedback('Topic exported as CSV!');
+    
+    if (showFeedback) {
+      showFeedback('Topic exported as CSV!', 'success');
+    }
   };
 
   const clearTopicMessages = () => {
-    console.log('Clear button clicked'); // Debug log
-    console.log('selectedTopic:', selectedTopic); // Debug log
-    console.log('onClearMessages function:', onClearMessages); // Debug log
-    
     if (selectedTopic && onClearMessages) {
-      console.log('Calling onClearMessages with topic:', selectedTopic.topicPath); // Debug log
       onClearMessages(selectedTopic.topicPath);
-      showCopyFeedback('Messages cleared for this topic!');
-    } else {
-      console.log('Cannot clear - missing selectedTopic or onClearMessages'); // Debug log
-      if (!selectedTopic) console.log('selectedTopic is missing');
-      if (!onClearMessages) console.log('onClearMessages function is missing');
+      // Clear feedback is handled in App.jsx
     }
   };
 
   const copyTopicPath = () => {
     if (selectedTopic) {
       navigator.clipboard.writeText(selectedTopic.topicPath);
-      showCopyFeedback('Topic path copied!');
+      if (showFeedback) {
+        showFeedback('Topic path copied!', 'success');
+      }
     }
   };
 
@@ -165,7 +153,9 @@ function MessagePanel({
       event.stopPropagation();
     }
     navigator.clipboard.writeText(payload);
-    showCopyFeedback('Payload copied!');
+    if (showFeedback) {
+      showFeedback('Payload copied!', 'success');
+    }
   };
 
   const formatTimestamp = (timestamp) => {
@@ -188,13 +178,6 @@ function MessagePanel({
 
   return (
     <div className="message-panel">
-      {/* Copy Feedback Toast */}
-      {copyFeedback && (
-        <div className="copy-feedback">
-          <i className="fas fa-check-circle"></i> {copyFeedback}
-        </div>
-      )}
-
       <div className="message-panel-header">
         <div className="header-left">
           <h2>
@@ -208,7 +191,7 @@ function MessagePanel({
         </div>
       </div>
 
- {/* Topic Details Box - Now always shows when topic is selected */}
+      {/* Topic Details Box */}
       {selectedTopic && topicDetails && (
         <div className="topic-details-box">
           <div className="topic-details-header">

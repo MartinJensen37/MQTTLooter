@@ -883,6 +883,7 @@ useEffect(() => {
             selectedTopic={selectedTopic}
             connectionName={getSelectedConnectionName()}
             onClearMessages={handleClearMessages}
+            showFeedback={showFeedback}
           />
         </div>
 
@@ -896,6 +897,7 @@ useEffect(() => {
             onPublishMessage={handlePublishMessage}
             isConnected={isConnected}
             selectedTopic={selectedTopic}
+            showFeedback={showFeedback}
           />
         </div>
 

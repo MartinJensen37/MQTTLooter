@@ -6,7 +6,8 @@ function PublishingPanel({
   connectionId,
   onPublishMessage,
   isConnected = false,
-  selectedTopic = null
+  selectedTopic = null,
+  showFeedback
 }) {
   const [topic, setTopic] = useState('');
   const [payload, setPayload] = useState('');
@@ -14,7 +15,6 @@ function PublishingPanel({
   const [retain, setRetain] = useState(false);
   const [publishHistory, setPublishHistory] = useState([]);
   const [isPublishing, setIsPublishing] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState('');
   const [showQosDropdown, setShowQosDropdown] = useState(false);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
   const [messageTemplates, setMessageTemplates] = useState([]);
@@ -23,7 +23,6 @@ function PublishingPanel({
 
   // Load form data from localStorage on mount
   useEffect(() => {
-    // Load form state
     const savedFormState = localStorage.getItem('publish-form-state');
     if (savedFormState) {
       try {
@@ -37,7 +36,6 @@ function PublishingPanel({
       }
     }
 
-    // Load history for specific connection
     if (connectionId) {
       const savedHistory = localStorage.getItem(`publish-history-${connectionId}`);
       if (savedHistory) {
@@ -50,10 +48,12 @@ function PublishingPanel({
     }
   }, [connectionId]);
 
+  // Load message templates
   useEffect(() => {
     setMessageTemplates(templateService.getAllTemplates());
   }, [templateService]);
 
+  // Handle template selection
   const handleTemplateSelect = (templateId) => {
     const template = templateService.getTemplate(templateId);
     if (template) {
@@ -67,14 +67,9 @@ function PublishingPanel({
     }
   };
 
-  // Save form state whenever form values change
+  // Save form state to localStorage
   useEffect(() => {
-    const formState = {
-      topic,
-      payload,
-      qos,
-      retain
-    };
+    const formState = { topic, payload, qos, retain };
     localStorage.setItem('publish-form-state', JSON.stringify(formState));
   }, [topic, payload, qos, retain]);
 
@@ -85,21 +80,8 @@ function PublishingPanel({
     }
   }, [publishHistory, connectionId]);
 
+  // Publish message handler
   const handlePublish = async () => {
-    if (!topic.trim()) {
-      showCopyFeedback('Please enter a topic', 'error');
-      return;
-    }
-
-    if (!connectionId) {
-      showCopyFeedback('No connection selected', 'error');
-      return;
-    }
-
-    if (!isConnected) {
-      showCopyFeedback('Connect to client before sending', 'error');
-      return;
-    }
 
     const messageData = {
       topic: topic.trim(),
@@ -116,9 +98,8 @@ function PublishingPanel({
         await onPublishMessage(messageData);
       }
 
-      // Add to history only if it's unique (excluding timestamp)
+      // Add to history (avoid duplicates)
       setPublishHistory(prev => {
-        // Check if a message with same topic, payload, qos, and retain already exists
         const isDuplicate = prev.some(item => 
           item.topic === messageData.topic &&
           item.payload === messageData.payload &&
@@ -127,11 +108,10 @@ function PublishingPanel({
         );
 
         if (!isDuplicate) {
-          const newHistory = [messageData, ...prev.slice(0, 9)]; // Keep last 10
-          return newHistory;
+          return [messageData, ...prev.slice(0, 9)]; // Keep last 10
         }
         
-        // If duplicate, don't add to history but move existing to top
+        // Move existing item to top with updated timestamp
         const existingIndex = prev.findIndex(item => 
           item.topic === messageData.topic &&
           item.payload === messageData.payload &&
@@ -140,17 +120,14 @@ function PublishingPanel({
         );
 
         if (existingIndex > 0) {
-          // Move existing item to top with updated timestamp
           const updatedItem = { ...prev[existingIndex], timestamp: messageData.timestamp };
-          const newHistory = [
+          return [
             updatedItem,
             ...prev.slice(0, existingIndex),
             ...prev.slice(existingIndex + 1)
           ];
-          return newHistory;
         }
 
-        // If it's already at the top, just update timestamp
         if (existingIndex === 0) {
           const newHistory = [...prev];
           newHistory[0] = { ...newHistory[0], timestamp: messageData.timestamp };
@@ -160,18 +137,17 @@ function PublishingPanel({
         return prev;
       });
 
-      // Show success feedback
-      showCopyFeedback('Message published successfully!', 'success');
+      if (showFeedback) showFeedback('Message published successfully!', 'success');
 
-      // DON'T clear form - keep fields filled for easy republishing
     } catch (error) {
       console.error('Publish failed:', error);
-      showCopyFeedback('Failed to publish message', 'error');
+      if (showFeedback) showFeedback('Failed to publish message', 'error');
     } finally {
       setIsPublishing(false);
     }
   };
 
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showQosDropdown && !event.target.closest('.qos-select-wrapper')) {
@@ -188,32 +164,31 @@ function PublishingPanel({
     };
   }, [showQosDropdown, showTemplateDropdown]);
 
+  // Load data from selected topic
   const loadFromSelectedTopic = () => {
     if (!selectedTopic) {
-      showCopyFeedback('No topic selected', 'error');
+      if (showFeedback) showFeedback('No topic selected', 'error');
       return;
     }
 
-    // Set the topic path
     setTopic(selectedTopic.topicPath || selectedTopic.topic || '');
     
-    // Get message data from the known structure
     const messageData = selectedTopic.node?.lastMessage;
 
     if (messageData) {
       setPayload(messageData.payload || '');
       setQos(messageData.qos || 0);
       setRetain(messageData.retain || false);
-      showCopyFeedback('Form filled with selected topic data', 'success');
+      if (showFeedback) showFeedback('Form filled with selected topic data', 'success');
     } else {
-      // Just set the topic, clear other fields
       setPayload('');
       setQos(0);
       setRetain(false);
-      showCopyFeedback('Topic loaded, ready for new message', 'success');
+      if (showFeedback) showFeedback('Topic loaded, ready for new message', 'success');
     }
   };
 
+  // Load data from history item
   const loadFromHistory = (historyItem) => {
     setTopic(historyItem.topic);
     setPayload(historyItem.payload);
@@ -221,38 +196,38 @@ function PublishingPanel({
     setRetain(historyItem.retain);
   };
 
+  // Clear form data
   const clearForm = () => {
     setTopic('');
     setPayload('');
     setQos(0);
     setRetain(false);
     setSelectedTemplate(null);
-    // Also clear from localStorage
     localStorage.removeItem('publish-form-state');
+    if (showFeedback) showFeedback('Message details cleared', 'info');
   };
 
+  // Clear publish history
   const clearHistory = () => {
     setPublishHistory([]);
     if (connectionId) {
       localStorage.removeItem(`publish-history-${connectionId}`);
     }
+    if (showFeedback) showFeedback('Publish history cleared', 'info');
   };
 
-  const showCopyFeedback = (message, type = 'success') => {
-    setCopyFeedback({ message, type });
-    setTimeout(() => setCopyFeedback(''), 3000);
-  };
-
+  // Format JSON payload
   const formatJsonPayload = () => {
     try {
       const parsed = JSON.parse(payload);
       setPayload(JSON.stringify(parsed, null, 2));
-      showCopyFeedback('JSON formatted successfully!', 'success');
+      if (showFeedback) showFeedback('JSON formatted successfully!', 'success');
     } catch (error) {
-      showCopyFeedback('Invalid JSON format', 'error');
+      if (showFeedback) showFeedback('Invalid JSON format', 'error');
     }
   };
 
+  // Check if string is valid JSON
   const isValidJson = (str) => {
     if (!str.trim()) return false;
     try {
@@ -263,11 +238,13 @@ function PublishingPanel({
     }
   };
 
+  // Copy text to clipboard
   const copyToClipboard = (text, feedbackMsg) => {
     navigator.clipboard.writeText(text);
-    showCopyFeedback(feedbackMsg, 'success');
+    if (showFeedback) showFeedback(feedbackMsg, 'success');
   };
 
+  // Get QoS badge CSS class
   const getQoSBadgeClass = (qos) => {
     switch (qos) {
       case 0: return 'qos-0';
@@ -277,6 +254,7 @@ function PublishingPanel({
     }
   };
 
+  // Get connection status indicator
   const getConnectionStatusIndicator = () => {
     if (!connectionId) {
       return (
@@ -301,6 +279,7 @@ function PublishingPanel({
     );
   };
 
+  // Get selected template name for display
   const getSelectedTemplateName = () => {
     if (!selectedTemplate) return 'Select a template...';
     const template = messageTemplates.find(t => t.id === selectedTemplate);
@@ -309,14 +288,6 @@ function PublishingPanel({
 
   return (
     <div className="publishing-panel">
-      {/* Feedback Toast */}
-      {copyFeedback && (
-        <div className={`publish-feedback ${copyFeedback.type === 'error' ? 'error' : 'success'}`}>
-          <i className={`fas ${copyFeedback.type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'}`}></i> 
-          {copyFeedback.message}
-        </div>
-      )}
-
       <div className="publishing-panel-header">
         <div className="header-left">
           <h2>Message Publishing</h2>
