@@ -82,7 +82,6 @@ function PublishingPanel({
 
   // Publish message handler
   const handlePublish = async () => {
-
     const messageData = {
       topic: topic.trim(),
       payload,
@@ -147,6 +146,38 @@ function PublishingPanel({
     }
   };
 
+  const removeRetainedMessage = async () => {
+
+    const messageData = {
+      topic: topic.trim(),
+      payload: '', // Empty payload to remove retained message
+      qos: 0,
+      retain: true, // Must be retained to remove retained message
+      timestamp: new Date().toISOString()
+    };
+
+    setIsPublishing(true);
+
+    try {
+      if (onPublishMessage) {
+        await onPublishMessage(messageData);
+      }
+
+      if (showFeedback) showFeedback('Retained message removed successfully!', 'success');
+
+    } catch (error) {
+      console.error('Remove retained message failed:', error);
+      if (showFeedback) showFeedback('Failed to remove retained message', 'error');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const hasRetainedMessage = () => {
+    return selectedTopic?.node?.lastMessage?.retain === true;
+  };
+
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -204,7 +235,6 @@ function PublishingPanel({
     setRetain(false);
     setSelectedTemplate(null);
     localStorage.removeItem('publish-form-state');
-    if (showFeedback) showFeedback('Message details cleared', 'info');
   };
 
   // Clear publish history
@@ -213,7 +243,6 @@ function PublishingPanel({
     if (connectionId) {
       localStorage.removeItem(`publish-history-${connectionId}`);
     }
-    if (showFeedback) showFeedback('Publish history cleared', 'info');
   };
 
   // Format JSON payload
@@ -244,41 +273,6 @@ function PublishingPanel({
     if (showFeedback) showFeedback(feedbackMsg, 'success');
   };
 
-  // Get QoS badge CSS class
-  const getQoSBadgeClass = (qos) => {
-    switch (qos) {
-      case 0: return 'qos-0';
-      case 1: return 'qos-1';
-      case 2: return 'qos-2';
-      default: return 'qos-unknown';
-    }
-  };
-
-  // Get connection status indicator
-  const getConnectionStatusIndicator = () => {
-    if (!connectionId) {
-      return (
-        <span className="connection-indicator disconnected">
-          <i className="fas fa-times-circle"></i> No connection
-        </span>
-      );
-    }
-    
-    if (!isConnected) {
-      return (
-        <span className="connection-indicator disconnected">
-          <i className="fas fa-exclamation-triangle"></i> {connectionId} (Disconnected)
-        </span>
-      );
-    }
-    
-    return (
-      <span className="connection-indicator connected">
-        <i className="fas fa-check-circle"></i> {connectionId} (Connected)
-      </span>
-    );
-  };
-
   // Get selected template name for display
   const getSelectedTemplateName = () => {
     if (!selectedTemplate) return 'Select a template...';
@@ -288,267 +282,293 @@ function PublishingPanel({
 
   return (
     <div className="publishing-panel">
-      <div className="publishing-panel-header">
+      <div className="panel-header">
         <div className="header-left">
           <h2>Message Publishing</h2>
-          {getConnectionStatusIndicator()}
+          {!connectionId ? (
+            <span className="connection-indicator disconnected">
+              <i className="fas fa-times-circle"></i> No connection
+            </span>
+          ) : !isConnected ? (
+            <span className="connection-indicator disconnected">
+              <i className="fas fa-exclamation-triangle"></i> {connectionId} (Disconnected)
+            </span>
+          ) : (
+            <span className="connection-indicator connected">
+              <i className="fas fa-check-circle"></i> {connectionId} (Connected)
+            </span>
+          )}
         </div>
       </div>
 
       <div className="publishing-content">
-        <div className="publish-form">
-          {/* Message Templates Section */}
-          <div className="form-group">
-            <label htmlFor="templates">Message Templates:</label>
-            <div className="template-select-wrapper publish-custom-select-wrapper">
-              <button
-                type="button"
-                className="publish-custom-select-button"
-                onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
-                disabled={isPublishing}
-              >
-                <span className="select-value">
-                  {getSelectedTemplateName()}
-                </span>
-                <i className={`fas fa-chevron-down ${showTemplateDropdown ? 'rotated' : ''}`}></i>
-              </button>
-              
-              {showTemplateDropdown && (
-                <div className="publish-custom-select-dropdown">
-                  <button
-                    type="button"
-                    className={`publish-dropdown-option ${!selectedTemplate ? 'selected' : ''}`}
-                    onClick={() => {
-                      setSelectedTemplate(null);
-                      setShowTemplateDropdown(false);
-                    }}
-                  >
-                    Select a template...
-                  </button>
-                  {messageTemplates.map(template => (
-                    <button
-                      key={template.id}
-                      type="button"
-                      className={`publish-dropdown-option ${selectedTemplate === template.id ? 'selected' : ''}`}
-                      onClick={() => handleTemplateSelect(template.id)}
-                    >
-                      {template.name} ({template.category})
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="topic">Topic:</label>
-            <div className="topic-input-wrapper">
-              <input
-                id="topic"
-                type="text"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="Enter MQTT topic (e.g., sensors/temperature)"
-                className="topic-input"
-                disabled={isPublishing}
-              />
-              {topic && (
-                <button 
-                  className="copy-topic-btn"
-                  onClick={() => copyToClipboard(topic, 'Topic copied!')}
-                  title="Copy topic"
+        <div className="publish-form panel">
+          <div className="panel-content">
+            {/* Message Templates Section */}
+            <div className="form-group">
+              <label htmlFor="templates">Message Templates:</label>
+              <div className="template-select-wrapper custom-select-wrapper">
+                <button
                   type="button"
+                  className="custom-select-button"
+                  onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                  disabled={isPublishing}
                 >
-                  <i className="fas fa-copy"></i>
+                  <span className="select-value">
+                    {getSelectedTemplateName()}
+                  </span>
+                  <i className={`fas fa-chevron-down ${showTemplateDropdown ? 'rotated' : ''}`}></i>
                 </button>
-              )}
-            </div>
-          </div>
-
-          <div className="form-group">
-            <div className="payload-header">
-              <label htmlFor="payload">Payload:</label>
-              <div className="payload-tools">
-                {payload && isValidJson(payload) && (
-                  <button 
-                    type="button"
-                    onClick={formatJsonPayload}
-                    className="format-json-btn"
-                    title="Format JSON"
-                    disabled={isPublishing}
-                  >
-                    <i className="fas fa-code"></i> Format JSON
-                  </button>
+                
+                {showTemplateDropdown && (
+                  <div className="custom-select-dropdown">
+                    <button
+                      type="button"
+                      className={`dropdown-option ${!selectedTemplate ? 'selected' : ''}`}
+                      onClick={() => {
+                        setSelectedTemplate(null);
+                        setShowTemplateDropdown(false);
+                      }}
+                    >
+                      Select a template...
+                    </button>
+                    {messageTemplates.map(template => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        className={`dropdown-option ${selectedTemplate === template.id ? 'selected' : ''}`}
+                        onClick={() => handleTemplateSelect(template.id)}
+                      >
+                        {template.name} ({template.category})
+                      </button>
+                    ))}
+                  </div>
                 )}
-                {payload && (
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="topic">Topic:</label>
+              <div className="topic-input-wrapper">
+                <input
+                  id="topic"
+                  type="text"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="Enter MQTT topic (e.g., sensors/temperature)"
+                  className="topic-input"
+                  disabled={isPublishing}
+                />
+                {topic && (
                   <button 
+                    className="copy-topic-btn"
+                    onClick={() => copyToClipboard(topic, 'Topic copied!')}
+                    title="Copy topic"
                     type="button"
-                    onClick={() => copyToClipboard(payload, 'Payload copied!')}
-                    className="copy-payload-btn"
-                    title="Copy payload"
                   >
                     <i className="fas fa-copy"></i>
                   </button>
                 )}
               </div>
             </div>
-            <textarea
-              id="payload"
-              value={payload}
-              onChange={(e) => setPayload(e.target.value)}
-              placeholder="Enter message payload (JSON, text, etc.)"
-              className="payload-input"
-              rows={6}
-              disabled={isPublishing}
-            />
-            <div className="payload-info">
-              <span className="char-count">{payload.length} characters</span>
-              {payload && isValidJson(payload) && (
-                <span className="json-indicator">
-                  <i className="fas fa-check-circle"></i> Valid JSON
-                </span>
-              )}
-            </div>
-          </div>
 
-          <div className="form-options">
             <div className="form-group">
-              <label htmlFor="qos">Quality of Service:</label>
-              <div className="qos-select-wrapper publish-custom-select-wrapper">
-                <button
-                  type="button"
-                  className="publish-custom-select-button"
-                  onClick={() => setShowQosDropdown(!showQosDropdown)}
-                  disabled={isPublishing}
-                >
-                  <span className="select-value">
-                    QoS {qos} - {qos === 0 ? 'At most once' : 
-                               qos === 1 ? 'At least once' : 
-                               'Exactly once'}
+              <div className="payload-header">
+                <label htmlFor="payload">Payload:</label>
+                <div className="payload-tools">
+                  {payload && isValidJson(payload) && (
+                    <button 
+                      type="button"
+                      onClick={formatJsonPayload}
+                      className="format-json-btn"
+                      title="Format JSON"
+                      disabled={isPublishing}
+                    >
+                      <i className="fas fa-code"></i> Format JSON
+                    </button>
+                  )}
+                  {payload && (
+                    <button 
+                      type="button"
+                      onClick={() => copyToClipboard(payload, 'Payload copied!')}
+                      className="copy-payload-btn"
+                      title="Copy payload"
+                    >
+                      <i className="fas fa-copy"></i>
+                    </button>
+                  )}
+                </div>
+              </div>
+              <textarea
+                id="payload"
+                value={payload}
+                onChange={(e) => setPayload(e.target.value)}
+                placeholder="Enter message payload (JSON, text, etc.)"
+                className="payload-input"
+                rows={6}
+                disabled={isPublishing}
+              />
+              <div className="payload-info">
+                <span className="char-count">{payload.length} characters</span>
+                {payload && isValidJson(payload) && (
+                  <span className="json-indicator">
+                    <i className="fas fa-check-circle"></i> Valid JSON
                   </span>
-                  <i className={`fas fa-chevron-down ${showQosDropdown ? 'rotated' : ''}`}></i>
-                </button>
-                
-                {showQosDropdown && (
-                  <div className="publish-custom-select-dropdown">
-                    <button
-                      type="button"
-                      className={`publish-dropdown-option ${qos === 0 ? 'selected' : ''}`}
-                      onClick={() => {
-                        setQos(0);
-                        setShowQosDropdown(false);
-                      }}
-                    >
-                      QoS 0 - At most once
-                    </button>
-                    <button
-                      type="button"
-                      className={`publish-dropdown-option ${qos === 1 ? 'selected' : ''}`}
-                      onClick={() => {
-                        setQos(1);
-                        setShowQosDropdown(false);
-                      }}
-                    >
-                      QoS 1 - At least once
-                    </button>
-                    <button
-                      type="button"
-                      className={`publish-dropdown-option ${qos === 2 ? 'selected' : ''}`}
-                      onClick={() => {
-                        setQos(2);
-                        setShowQosDropdown(false);
-                      }}
-                    >
-                      QoS 2 - Exactly once
-                    </button>
-                  </div>
                 )}
               </div>
             </div>
 
-            <div className="form-group retain-group">
-              <label htmlFor="retain" className="retain-checkbox-label">
-                <input
-                  id="retain"
-                  type="checkbox"
-                  checked={retain}
-                  onChange={(e) => setRetain(e.target.checked)}
-                  disabled={isPublishing}
-                />
-                <span className="publish-checkbox-custom"></span>
-                Retain message
-                <span className="retain-info" title="Retained messages are stored by the broker and sent to new subscribers">
-                  <i className="fas fa-info-circle"></i>
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <div className="form-actions">
-            <button 
-              onClick={handlePublish} 
-              className="publish-btn"
-              disabled={!topic.trim() || isPublishing || !connectionId || !isConnected}
-            >
-              {isPublishing ? (
-                <>
-                  <i className="fas fa-spinner fa-spin"></i> Publishing...
-                </>
-              ) : !isConnected ? (
-                <>
-                  <i className="fas fa-times-circle"></i> Not Connected
-                </>
-              ) : (
-                <>
-                  <i className="fas fa-paper-plane"></i> Publish Message
-                </>
-              )}
-            </button>
-
-            <button 
-              type="button"
-              onClick={loadFromSelectedTopic}
-              className="load-topic-btn"
-              disabled={isPublishing || !selectedTopic}
-              title={selectedTopic ? `Load topic: ${selectedTopic.topicPath}` : 'No topic selected'}
-            >
-              <i className="fas fa-download"></i> Use Selected Topic
-            </button>
-
-            <button 
-              type="button"
-              onClick={clearForm}
-              className="clear-btn"
-              disabled={isPublishing}
-            >
-              <i className="fas fa-eraser"></i> Clear Message
-            </button>
-          </div>
-
-          {/* Message Preview */}
-          {topic && payload && (
-            <div className="message-preview">
-              <h4>Message Preview</h4>
-              <div className="preview-content">
-                <div className="preview-meta">
-                  <span className="preview-topic">
-                    <i className="fas fa-tag"></i> {topic}
-                  </span>
-                  <span className={`qos-badge ${getQoSBadgeClass(qos)}`}>
-                    QoS {qos}
-                  </span>
-                  {retain && (
-                    <span className="retain-badge">
-                      <i className="fas fa-save"></i> RETAIN
+            <div className="form-options">
+              <div className="form-group">
+                <label htmlFor="qos">Quality of Service:</label>
+                <div className="qos-select-wrapper custom-select-wrapper">
+                  <button
+                    type="button"
+                    className="custom-select-button"
+                    onClick={() => setShowQosDropdown(!showQosDropdown)}
+                    disabled={isPublishing}
+                  >
+                    <span className="select-value">
+                      QoS {qos} - {qos === 0 ? 'At most once' : 
+                                 qos === 1 ? 'At least once' : 
+                                 'Exactly once'}
                     </span>
+                    <i className={`fas fa-chevron-down ${showQosDropdown ? 'rotated' : ''}`}></i>
+                  </button>
+                  
+                  {showQosDropdown && (
+                    <div className="custom-select-dropdown">
+                      <button
+                        type="button"
+                        className={`dropdown-option ${qos === 0 ? 'selected' : ''}`}
+                        onClick={() => {
+                          setQos(0);
+                          setShowQosDropdown(false);
+                        }}
+                      >
+                        QoS 0 - At most once
+                      </button>
+                      <button
+                        type="button"
+                        className={`dropdown-option ${qos === 1 ? 'selected' : ''}`}
+                        onClick={() => {
+                          setQos(1);
+                          setShowQosDropdown(false);
+                        }}
+                      >
+                        QoS 1 - At least once
+                      </button>
+                      <button
+                        type="button"
+                        className={`dropdown-option ${qos === 2 ? 'selected' : ''}`}
+                        onClick={() => {
+                          setQos(2);
+                          setShowQosDropdown(false);
+                        }}
+                      >
+                        QoS 2 - Exactly once
+                      </button>
+                    </div>
                   )}
                 </div>
-                <div className="preview-payload">
-                  {payload.length > 200 ? payload.substring(0, 200) + '...' : payload}
-                </div>
+              </div>
+
+              <div className="form-group retain-group">
+                <label htmlFor="retain" className="retain-checkbox-label">
+                  <input
+                    id="retain"
+                    type="checkbox"
+                    checked={retain}
+                    onChange={(e) => setRetain(e.target.checked)}
+                    disabled={isPublishing}
+                  />
+                  <span className="publish-checkbox-custom"></span>
+                  Retain message
+                  <span className="retain-info" title="Retained messages are stored by the broker and sent to new subscribers">
+                    <i className="fas fa-info-circle"></i>
+                  </span>
+                </label>
               </div>
             </div>
-          )}
+
+            <div className="form-actions">
+              <button 
+                onClick={handlePublish} 
+                className="publish-form-publish-btn"
+                disabled={!topic.trim() || isPublishing || !connectionId || !isConnected}
+              >
+                {isPublishing ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin"></i> Publishing...
+                  </>
+                ) : !isConnected ? (
+                  <>
+                    <i className="fas fa-times-circle"></i> Not Connected
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-paper-plane"></i> Publish
+                  </>
+                )}
+              </button>
+
+              <button 
+                type="button"
+                onClick={loadFromSelectedTopic}
+                className="publish-form-load-topic-btn"
+                disabled={isPublishing || !selectedTopic}
+                title={selectedTopic ? `Load topic: ${selectedTopic.topicPath}` : 'No topic selected'}
+              >
+                <i className="fas fa-download"></i> Use Selected Topic
+              </button>
+              
+              {hasRetainedMessage() && (
+                <button 
+                  type="button"
+                  onClick={removeRetainedMessage}
+                  className="publish-form-remove-retained-btn"
+                  disabled={isPublishing || !topic.trim() || !connectionId || !isConnected}
+                  title="Remove retained message by publishing empty payload"
+                >
+                  <i className="fas fa-trash-alt"></i> Remove Retained
+                </button>
+              )}
+
+              <button 
+                type="button"
+                onClick={clearForm}
+                className="publish-form-clear-btn"
+                disabled={isPublishing}
+              >
+                <i className="fas fa-eraser"></i> Clear
+              </button>
+            </div>
+
+            {/* Message Preview */}
+            {topic && payload && (
+              <div className="message-preview">
+                <h4>Message Preview</h4>
+                <div className="preview-content">
+                  <div className="preview-meta">
+                    <span className="preview-topic">
+                      <i className="fas fa-tag"></i> {topic}
+                    </span>
+                    <span className={`badge badge-qos-${qos}`}>
+                      QoS {qos}
+                    </span>
+                    {retain && (
+                      <span className="badge badge-retain">
+                        <i className="fas fa-save"></i> RETAIN
+                      </span>
+                    )}
+                  </div>
+                  <div className="preview-payload">
+                    {payload.length > 200 ? payload.substring(0, 200) + '...' : payload}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {publishHistory.length > 0 && (
@@ -572,11 +592,11 @@ function PublishingPanel({
                         <i className="fas fa-tag"></i> {item.topic}
                       </span>
                       <div className="history-badges">
-                        <span className={`qos-badge ${getQoSBadgeClass(item.qos)}`}>
+                        <span className={`badge badge-qos-${item.qos}`}>
                           QoS {item.qos}
                         </span>
                         {item.retain && (
-                          <span className="retain-badge">
+                          <span className="badge badge-retain">
                             <i className="fas fa-save"></i> R
                           </span>
                         )}

@@ -5,7 +5,6 @@
   background: white;
   border-right: 1px solid #dee2e6;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  overflow: hidden; /* Prevent container overflow */
 }
 
 .topic-tree-header {
@@ -60,7 +59,7 @@
 
 .topic-tree-content {
   flex: 1;
-  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-y: hidden; /* Enable vertical scrolling */
   overflow-x: hidden; /* Hide horizontal scrollbar */
   padding: 4px 0;
   font-size: 13px;

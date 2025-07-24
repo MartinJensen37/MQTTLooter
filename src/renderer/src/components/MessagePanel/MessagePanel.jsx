@@ -167,18 +167,9 @@ function MessagePanel({
     return payload.substring(0, maxLength) + '...';
   };
 
-  const getQoSBadgeClass = (qos) => {
-    switch (qos) {
-      case 0: return 'qos-0';
-      case 1: return 'qos-1';
-      case 2: return 'qos-2';
-      default: return 'qos-unknown';
-    }
-  };
-
   return (
     <div className="message-panel">
-      <div className="message-panel-header">
+      <div className="panel-header">
         <div className="header-left">
           <h2>
             Message Details ({processedMessages.length})
@@ -205,7 +196,7 @@ function MessagePanel({
                 <div className="topic-path-with-copy">
                   <span className="topic-path">{selectedTopic.topicPath}</span>
                   <button 
-                    className="copy-topic-inline-btn"
+                    className="copy-btn"
                     onClick={copyTopicPath}
                     title="Copy topic path"
                   >
@@ -223,8 +214,8 @@ function MessagePanel({
               
               <div className="topic-info-item">
                 <label>QoS:</label>
-                <span className={`qos-badge ${getQoSBadgeClass(topicDetails.qos)}`}>
-                  {topicDetails.qos}
+                <span className={`badge badge-qos-${topicDetails.qos}`}>
+                  QoS {topicDetails.qos}
                 </span>
               </div>
               
@@ -239,17 +230,17 @@ function MessagePanel({
             <div className="topic-actions-section">
               <button 
                 onClick={clearTopicMessages}
-                className="clear-messages-btn"
+                className="btn btn-sm btn-danger"
                 title="Clear messages for this topic"
                 disabled={processedMessages.length === 0}
               >
                 <i className="fas fa-trash"></i> Clear Messages
               </button>
 
-              <div className="message-export-wrapper message-custom-select-wrapper">
+              <div className="message-export-wrapper custom-select-wrapper">
                 <button
                   type="button"
-                  className="message-custom-select-button"
+                  className="custom-select-button"
                   onClick={() => setShowTopicExportMenu(!showTopicExportMenu)}
                   disabled={processedMessages.length === 0}
                   title="Export topic data"
@@ -261,17 +252,17 @@ function MessagePanel({
                 </button>
                 
                 {showTopicExportMenu && (
-                  <div className="message-custom-select-dropdown">
+                  <div className="custom-select-dropdown">
                     <button
                       type="button"
-                      className="message-dropdown-option"
+                      className="dropdown-option"
                       onClick={exportTopicAsJSON}
                     >
                       <i className="fas fa-file-code"></i> Export as JSON
                     </button>
                     <button
                       type="button"
-                      className="message-dropdown-option"
+                      className="dropdown-option"
                       onClick={exportTopicAsCSV}
                     >
                       <i className="fas fa-file-csv"></i> Export as CSV
@@ -321,11 +312,11 @@ function MessagePanel({
                     <span className="topic" title={msg.topic}>
                       <i className="fas fa-tag"></i> {msg.topic}
                     </span>
-                    <span className={`qos-badge ${getQoSBadgeClass(msg.qos)}`}>
+                    <span className={`badge badge-qos-${msg.qos}`}>
                       QoS {msg.qos}
                     </span>
                     {msg.retain && (
-                      <span className="retain-badge">
+                      <span className="badge badge-retain">
                         <i className="fas fa-save"></i> RETAIN
                       </span>
                     )}
@@ -335,9 +326,10 @@ function MessagePanel({
                   </div>
                   <div className="message-actions">
                     <button 
-                      className="copy-payload-btn"
+                      className="copy-btn"
                       onClick={(e) => copyPayload(msg.message, e)}
                       title="Copy payload"
+                      style={{ borderRadius: '50%', minWidth: '24px', height: '24px' }}
                     >
                       <i className="fas fa-copy"></i>
                     </button>

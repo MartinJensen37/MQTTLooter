@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './SimulationPanel.css';
 
-// Data type configurations with appropriate generators
+// Data type configurations
 const DATA_TYPE_CONFIGS = {
   number: {
     label: 'Number',
@@ -54,7 +54,6 @@ function SimulationPanel({
   const [showEditOutput, setShowEditOutput] = useState(false);
   const [editingOutput, setEditingOutput] = useState(null);
   
-  // Active intervals for publishing
   const publishIntervalsRef = useRef({});
 
   // Clear selected device when connection changes
@@ -62,7 +61,7 @@ function SimulationPanel({
     setSelectedDevice(null);
   }, [connectionId]);
 
-  // Load devices from localStorage on mount
+  // Load devices from localStorage
   useEffect(() => {
     if (!connectionId) return;
     
@@ -75,7 +74,7 @@ function SimulationPanel({
           setSelectedDevice(devices[0].id);
         }
         
-        // Restore publishing intervals for devices that were publishing and connection is active
+        // Restore publishing intervals for active devices
         if (isConnected) {
           devices.forEach(device => {
             if (device.isPublishing) {
@@ -87,19 +86,18 @@ function SimulationPanel({
         console.error('Failed to load simulation devices:', error);
       }
     } else {
-      // No saved devices for this connection
       setSimulatedDevices([]);
     }
   }, [connectionId]);
 
-  // Save devices to localStorage whenever devices change
+  // Save devices to localStorage
   useEffect(() => {
     if (connectionId && simulatedDevices.length >= 0) {
       localStorage.setItem(`mqtt-simulation-devices-${connectionId}`, JSON.stringify(simulatedDevices));
     }
   }, [simulatedDevices, connectionId]);
 
-  // Handle connection state changes - restart publishing if connection comes back
+  // Handle connection state changes
   useEffect(() => {
     if (isConnected) {
       // Restart publishing for devices that should be publishing
@@ -109,7 +107,7 @@ function SimulationPanel({
         }
       });
     } else {
-      // Stop all publishing when disconnected but keep the publishing state
+      // Stop all publishing when disconnected
       Object.keys(publishIntervalsRef.current).forEach(deviceId => {
         if (publishIntervalsRef.current[deviceId]) {
           clearInterval(publishIntervalsRef.current[deviceId]);
@@ -128,40 +126,39 @@ function SimulationPanel({
     };
   }, []);
 
-    const createNewDevice = (deviceData) => {
+  const createNewDevice = (deviceData) => {
     const newDevice = {
-        id: Date.now(),
-        name: deviceData.name,
-        topic: deviceData.topic,
-        publishInterval: deviceData.publishInterval || 5000,
-        isPublishing: false,
-        outputs: [
+      id: Date.now(),
+      name: deviceData.name,
+      topic: deviceData.topic,
+      publishInterval: deviceData.publishInterval || 5000,
+      isPublishing: false,
+      outputs: [
         {
-            id: Date.now(),
-            name: 'temperature',
-            dataType: 'number',
-            generator: 'normal',
-            unit: '°C',
-            decimalPrecision: 2,
-            includeTimestamp: true, // Move timestamp to output level
-            config: {
+          id: Date.now(),
+          name: 'temperature',
+          dataType: 'number',
+          generator: 'normal',
+          unit: '°C',
+          decimalPrecision: 2,
+          includeTimestamp: true,
+          config: {
             mean: 21.5,
             stdDev: 1.5,
             min: 18,
             max: 25
-            },
-            currentValue: 21.5
+          },
+          currentValue: 21.5
         }
-        ]
+      ]
     };
     
     setSimulatedDevices(prev => [...prev, newDevice]);
     setSelectedDevice(newDevice.id);
     setShowAddDevice(false);
-    };
+  };
 
   const deleteDevice = (deviceId) => {
-    // Stop publishing if active
     if (publishIntervalsRef.current[deviceId]) {
       clearInterval(publishIntervalsRef.current[deviceId]);
       delete publishIntervalsRef.current[deviceId];
@@ -216,13 +213,11 @@ function SimulationPanel({
         break;
         
       case 'normal':
-        // Box-Muller transform for normal distribution
         const u1 = Math.random();
         const u2 = Math.random();
         const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
         value = (config.mean || 0) + z0 * (config.stdDev || 1);
         
-        // Clamp to min/max if specified
         if (config.min !== undefined) value = Math.max(value, config.min);
         if (config.max !== undefined) value = Math.min(value, config.max);
         break;
@@ -246,7 +241,6 @@ function SimulationPanel({
         value = config.min || 0;
     }
     
-    // Apply decimal precision
     return Number(value.toFixed(decimalPrecision || 2));
   };
 
@@ -263,7 +257,6 @@ function SimulationPanel({
         if (!config.sequence || !Array.isArray(config.sequence) || config.sequence.length === 0) {
           return Math.random() > 0.5;
         }
-        // Use timestamp to cycle through pattern
         const index = Math.floor(Date.now() / (config.intervalMs || 5000)) % config.sequence.length;
         return Boolean(config.sequence[index]);
         
@@ -308,49 +301,47 @@ function SimulationPanel({
   };
 
   const generateEnumValue = (generator, config) => {
-    // Enum uses similar logic to string but with different semantic meaning
     return generateStringValue(generator, config);
   };
 
-    const generatePayload = (device) => {
-        const payload = {};
-        
-        device.outputs.forEach(output => {
-            const value = generateValue(output);
-            
-            // Update current value for display
-            updateDevice(device.id, {
-            outputs: device.outputs.map(o => 
-                o.id === output.id ? { ...o, currentValue: value } : o
-            )
-            });
-            
-            // Build clean payload
-            const outputPayload = {
-            value: value
-            };
-            
-            // Only add unit for numeric types and if it's not empty
-            if (output.dataType === 'number' && output.unit && output.unit.trim()) {
-            outputPayload.unit = output.unit.trim();
-            }
-            
-            // Add timestamp only if enabled for this output
-            if (output.includeTimestamp !== false) { // Default to true if undefined
-            outputPayload.timestamp = new Date().toISOString();
-            }
-            
-            payload[output.name] = outputPayload;
-        });
-        
-        // If there's only one output, flatten the payload
-        const outputNames = Object.keys(payload);
-        if (outputNames.length === 1) {
-            return JSON.stringify(payload[outputNames[0]]);
-        }
-        
-        return JSON.stringify(payload);
-    };
+  const generatePayload = (device) => {
+    const payload = {};
+    
+    device.outputs.forEach(output => {
+      const value = generateValue(output);
+      
+      // Update current value for display
+      updateDevice(device.id, {
+        outputs: device.outputs.map(o => 
+          o.id === output.id ? { ...o, currentValue: value } : o
+        )
+      });
+      
+      const outputPayload = {
+        value: value
+      };
+      
+      // Add unit for numeric types if specified
+      if (output.dataType === 'number' && output.unit && output.unit.trim()) {
+        outputPayload.unit = output.unit.trim();
+      }
+      
+      // Add timestamp if enabled
+      if (output.includeTimestamp !== false) {
+        outputPayload.timestamp = new Date().toISOString();
+      }
+      
+      payload[output.name] = outputPayload;
+    });
+    
+    // Flatten payload if only one output
+    const outputNames = Object.keys(payload);
+    if (outputNames.length === 1) {
+      return JSON.stringify(payload[outputNames[0]]);
+    }
+    
+    return JSON.stringify(payload);
+  };
 
   const startPublishing = (deviceId, interval) => {
     if (publishIntervalsRef.current[deviceId]) {
@@ -381,14 +372,12 @@ function SimulationPanel({
     if (!device) return;
     
     if (device.isPublishing) {
-      // Stop publishing
       if (publishIntervalsRef.current[deviceId]) {
         clearInterval(publishIntervalsRef.current[deviceId]);
         delete publishIntervalsRef.current[deviceId];
       }
       updateDevice(deviceId, { isPublishing: false });
     } else {
-      // Start publishing
       if (!isConnected) return;
       
       updateDevice(deviceId, { isPublishing: true });
@@ -396,31 +385,31 @@ function SimulationPanel({
     }
   };
 
-    const addOutput = (deviceId) => {
+  const addOutput = (deviceId) => {
     const newOutput = {
-        id: Date.now(),
-        name: 'new_sensor',
-        dataType: 'number',
-        generator: 'normal',
-        unit: '',
-        decimalPrecision: 2,
-        includeTimestamp: true, // Add timestamp to new outputs
-        config: {
+      id: Date.now(),
+      name: 'new_sensor',
+      dataType: 'number',
+      generator: 'normal',
+      unit: '',
+      decimalPrecision: 2,
+      includeTimestamp: true,
+      config: {
         mean: 50,
         stdDev: 10,
         min: 0,
         max: 100
-        },
-        currentValue: 50
+      },
+      currentValue: 50
     };
     
     const device = simulatedDevices.find(d => d.id === deviceId);
     if (device) {
-        updateDevice(deviceId, {
+      updateDevice(deviceId, {
         outputs: [...device.outputs, newOutput]
-        });
+      });
     }
-    };
+  };
 
   const removeOutput = (deviceId, outputId) => {
     const device = simulatedDevices.find(d => d.id === deviceId);
@@ -431,20 +420,19 @@ function SimulationPanel({
     }
   };
 
-  // Get selected device data and handle the case where it might be null
   const selectedDeviceData = getSelectedDeviceData();
 
   return (
     <div className="simulation-panel">
       <div className="simulation-content">
         
-        {/* Device List Sidebar */}
+        {/* Device Sidebar */}
         <div className="device-sidebar">
           <div className="device-sidebar-header">
             <h3>Simulated Devices</h3>
             <button 
               onClick={() => setShowAddDevice(true)}
-              className="add-device-btn"
+              className="btn btn-sm btn-primary add-device-btn"
               title="Add Simulated Device"
             >
               <i className="fas fa-plus"></i>
@@ -475,7 +463,7 @@ function SimulationPanel({
                         e.stopPropagation();
                         deleteDevice(device.id);
                       }}
-                      className="delete-device-btn"
+                      className="btn btn-sm delete-device-btn"
                       title="Delete device"
                     >
                       <i className="fas fa-trash"></i>
@@ -487,7 +475,7 @@ function SimulationPanel({
           </div>
         </div>
 
-        {/* Main Configuration Panel */}
+        {/* Device Configuration Panel */}
         <div className="device-config-panel">
           {selectedDeviceData ? (
             <DeviceConfigPanel 
@@ -515,7 +503,7 @@ function SimulationPanel({
         </div>
       </div>
 
-      {/* Add Device Modal */}
+      {/* Modals */}
       {showAddDevice && (
         <AddDeviceModal 
           onClose={() => setShowAddDevice(false)}
@@ -524,7 +512,6 @@ function SimulationPanel({
         />
       )}
 
-      {/* Edit Output Modal */}
       {showEditOutput && editingOutput && selectedDeviceData && (
         <EditOutputModal 
           output={editingOutput}
@@ -559,7 +546,6 @@ function DeviceConfigPanel({
   onEditOutput
 }) {
   const handleEditOutput = (output) => {
-    // Stop publishing if device is currently publishing
     if (device.isPublishing) {
       onTogglePublishing(device.id);
     }
@@ -567,7 +553,7 @@ function DeviceConfigPanel({
   };
 
   return (
-    <div className="device-config">
+    <div className="device-config panel">
       <div className="device-config-header">
         <h3>{device.name}</h3>
         <div className="device-status">
@@ -584,7 +570,7 @@ function DeviceConfigPanel({
           <h4><i className="fas fa-box"></i> Outputs</h4>
           <button 
             onClick={() => onAddOutput(device.id)}
-            className="add-output-btn"
+            className="btn btn-sm btn-success add-output-btn"
             title="Add Output"
           >
             <i className="fas fa-plus"></i>
@@ -609,14 +595,14 @@ function DeviceConfigPanel({
               <div className="output-actions">
                 <button 
                   onClick={() => handleEditOutput(output)}
-                  className="edit-output-btn"
+                  className="btn btn-sm edit-output-btn"
                   title="Edit output"
                 >
                   <i className="fas fa-edit"></i>
                 </button>
                 <button 
                   onClick={() => onRemoveOutput(device.id, output.id)}
-                  className="remove-output-btn"
+                  className="btn btn-sm remove-output-btn"
                   title="Remove output"
                   disabled={device.outputs.length <= 1}
                 >
@@ -635,6 +621,7 @@ function DeviceConfigPanel({
           <select 
             value={device.publishInterval}
             onChange={(e) => onUpdateDevice(device.id, { publishInterval: parseInt(e.target.value) })}
+            className="form-input"
           >
             <option value={1000}>1s</option>
             <option value={2000}>2s</option>
@@ -648,7 +635,7 @@ function DeviceConfigPanel({
         <div className="publishing-buttons">
           <button 
             onClick={() => onTogglePublishing(device.id)}
-            className={`toggle-publishing-btn ${device.isPublishing ? 'stop' : 'start'}`}
+            className={`btn btn-md toggle-publishing-btn ${device.isPublishing ? 'btn-danger stop' : 'btn-success start'}`}
             disabled={!isConnected}
           >
             <i className={`fas fa-${device.isPublishing ? 'stop' : 'play'}`}></i>
@@ -657,7 +644,7 @@ function DeviceConfigPanel({
           
           <button 
             onClick={() => onPublishOnce(device.id)}
-            className="publish-once-btn"
+            className="btn btn-md btn-primary publish-once-btn"
             disabled={!isConnected}
           >
             <i className="fas fa-paper-plane"></i>
@@ -667,19 +654,19 @@ function DeviceConfigPanel({
       </div>
 
       {/* Topic Configuration */}
-      <div className="topic-section">
+      <div className="form-group topic-section">
         <label><i className="fas fa-tag"></i> MQTT Topic:</label>
         <input 
           type="text"
           value={device.topic}
           onChange={(e) => onUpdateDevice(device.id, { topic: e.target.value })}
           placeholder="sensors/room/temperature"
-          className="topic-input"
+          className="form-input topic-input"
         />
       </div>
 
       {!isConnected && (
-        <div className="connection-warning">
+        <div className="badge badge-warning connection-warning">
           <i className="fas fa-exclamation-triangle"></i>
           Connection not active. Publishing is disabled.
         </div>
@@ -688,7 +675,7 @@ function DeviceConfigPanel({
   );
 }
 
-// Helper function to format output values for display
+// Helper function to format output values
 function formatOutputValue(output) {
   const value = output.currentValue;
   
@@ -725,12 +712,12 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }) {
       <div className="modal-content">
         <div className="modal-header">
           <h3>Add Simulated Device</h3>
-          <button onClick={onClose} className="modal-close-btn">
+          <button onClick={onClose} className="btn btn-sm modal-close-btn">
             <i className="fas fa-times"></i>
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="device-form">
+        <form onSubmit={handleSubmit} className="panel-content device-form">
           <div className="form-group">
             <label>Device Name:</label>
             <input 
@@ -738,6 +725,7 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }) {
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
               placeholder="Temperature Sensor"
+              className="form-input"
               required
               autoFocus
             />
@@ -750,15 +738,16 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }) {
               value={deviceTopic}
               onChange={(e) => setDeviceTopic(e.target.value)}
               placeholder="sensors/room/temperature"
+              className="form-input"
               required
             />
           </div>
           
           <div className="form-actions">
-            <button type="button" onClick={onClose} className="cancel-btn">
+            <button type="button" onClick={onClose} className="btn btn-md btn-secondary cancel-btn">
               Cancel
             </button>
-            <button type="submit" className="create-btn">
+            <button type="submit" className="btn btn-md btn-primary create-btn">
               Create Device
             </button>
           </div>
@@ -768,7 +757,7 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }) {
   );
 }
 
-// Enhanced Edit Output Modal with dynamic field rendering
+// Edit Output Modal
 function EditOutputModal({ output, onClose, onSave }) {
   const [formData, setFormData] = useState({
     name: output.name,
@@ -803,17 +792,14 @@ function EditOutputModal({ output, onClose, onSave }) {
             value = 'N/A';
         }
 
-        // Generate complete JSON payload preview
         const outputPayload = {
           value: value
         };
 
-        // Add unit for numeric types if specified
         if (formData.dataType === 'number' && formData.unit && formData.unit.trim()) {
           outputPayload.unit = formData.unit.trim();
         }
 
-        // Add timestamp if enabled
         if (formData.includeTimestamp) {
           outputPayload.timestamp = new Date().toISOString();
         }
@@ -825,8 +811,6 @@ function EditOutputModal({ output, onClose, onSave }) {
     };
 
     generatePreview();
-    
-    // Update preview every 2 seconds to show timestamp changes
     const interval = setInterval(generatePreview, 2000);
     return () => clearInterval(interval);
   }, [formData]);
@@ -843,7 +827,7 @@ function EditOutputModal({ output, onClose, onSave }) {
       case 'sine':
         return Number(((config.max || 100) + (config.min || 0)) / 2).toFixed(precision);
       case 'exponential':
-        return Number(((config.min || 0) + 5).toFixed(precision)); // Sample exponential value
+        return Number(((config.min || 0) + 5).toFixed(precision));
       default:
         return 0;
     }
@@ -892,12 +876,10 @@ function EditOutputModal({ output, onClose, onSave }) {
     }));
   };
 
-  // Handle data type change - reset generator and config
   const handleDataTypeChange = (newDataType) => {
     const availableGenerators = DATA_TYPE_CONFIGS[newDataType].generators;
     const defaultGenerator = availableGenerators[0];
     
-    // Set default config based on data type and generator
     let defaultConfig = {};
     
     switch (newDataType) {
@@ -937,7 +919,6 @@ function EditOutputModal({ output, onClose, onSave }) {
     }));
   };
 
-  // Handle generator change - reset config to appropriate defaults
   const handleGeneratorChange = (newGenerator) => {
     let defaultConfig = {};
     
@@ -1000,17 +981,17 @@ function EditOutputModal({ output, onClose, onSave }) {
 
   const availableGenerators = DATA_TYPE_CONFIGS[formData.dataType]?.generators || [];
 
-    return (
+  return (
     <div className="modal-overlay">
       <div className="modal-content modal-large">
         <div className="modal-header">
           <h3>Edit Output: {output.name}</h3>
-          <button onClick={onClose} className="modal-close-btn">
+          <button onClick={onClose} className="btn btn-sm modal-close-btn">
             <i className="fas fa-times"></i>
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="output-form">
+        <form onSubmit={handleSubmit} className="panel-content output-form">
           {/* Base Fields */}
           <div className="form-row">
             <div className="form-group">
@@ -1019,6 +1000,7 @@ function EditOutputModal({ output, onClose, onSave }) {
                 type="text"
                 value={formData.name}
                 onChange={(e) => updateFormData('name', e.target.value)}
+                className="form-input"
                 required
               />
             </div>
@@ -1028,6 +1010,7 @@ function EditOutputModal({ output, onClose, onSave }) {
               <select 
                 value={formData.dataType}
                 onChange={(e) => handleDataTypeChange(e.target.value)}
+                className="form-input"
               >
                 {Object.entries(DATA_TYPE_CONFIGS).map(([key, config]) => (
                   <option key={key} value={key}>{config.label}</option>
@@ -1044,6 +1027,7 @@ function EditOutputModal({ output, onClose, onSave }) {
                   value={formData.unit}
                   onChange={(e) => updateFormData('unit', e.target.value)}
                   placeholder="°C, W, %, etc."
+                  className="form-input"
                 />
               </div>
             )}
@@ -1058,6 +1042,7 @@ function EditOutputModal({ output, onClose, onSave }) {
                   max="10"
                   value={formData.decimalPrecision}
                   onChange={(e) => updateFormData('decimalPrecision', parseInt(e.target.value))}
+                  className="form-input"
                 />
               </div>
             )}
@@ -1081,6 +1066,7 @@ function EditOutputModal({ output, onClose, onSave }) {
             <select 
               value={formData.generator}
               onChange={(e) => handleGeneratorChange(e.target.value)}
+              className="form-input"
             >
               {availableGenerators.map(generator => (
                 <option key={generator} value={generator}>
@@ -1107,10 +1093,10 @@ function EditOutputModal({ output, onClose, onSave }) {
           </div>
           
           <div className="form-actions">
-            <button type="button" onClick={onClose} className="cancel-btn">
+            <button type="button" onClick={onClose} className="btn btn-md btn-secondary cancel-btn">
               Cancel
             </button>
-            <button type="submit" className="save-btn">
+            <button type="submit" className="btn btn-md btn-primary save-btn">
               Save Output
             </button>
           </div>
@@ -1133,6 +1119,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
               step="0.01"
               value={config.value || 0}
               onChange={(e) => onConfigChange('value', parseFloat(e.target.value) || 0)}
+              className="form-input"
             />
           </div>
         );
@@ -1147,6 +1134,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.01"
                 value={config.min || 0}
                 onChange={(e) => onConfigChange('min', parseFloat(e.target.value) || 0)}
+                className="form-input"
               />
             </div>
             <div className="form-group">
@@ -1156,6 +1144,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.01"
                 value={config.max || 100}
                 onChange={(e) => onConfigChange('max', parseFloat(e.target.value) || 100)}
+                className="form-input"
               />
             </div>
           </div>
@@ -1171,6 +1160,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.01"
                 value={config.mean || 0}
                 onChange={(e) => onConfigChange('mean', parseFloat(e.target.value) || 0)}
+                className="form-input"
               />
             </div>
             <div className="form-group">
@@ -1180,6 +1170,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.01"
                 value={config.stdDev || 1}
                 onChange={(e) => onConfigChange('stdDev', parseFloat(e.target.value) || 1)}
+                className="form-input"
               />
             </div>
             <div className="form-group">
@@ -1189,6 +1180,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.01"
                 value={config.min || 0}
                 onChange={(e) => onConfigChange('min', parseFloat(e.target.value) || 0)}
+                className="form-input"
               />
             </div>
             <div className="form-group">
@@ -1198,6 +1190,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.01"
                 value={config.max || 100}
                 onChange={(e) => onConfigChange('max', parseFloat(e.target.value) || 100)}
+                className="form-input"
               />
             </div>
           </div>
@@ -1213,6 +1206,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.01"
                 value={config.min || 0}
                 onChange={(e) => onConfigChange('min', parseFloat(e.target.value) || 0)}
+                className="form-input"
               />
             </div>
             <div className="form-group">
@@ -1222,6 +1216,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.01"
                 value={config.max || 100}
                 onChange={(e) => onConfigChange('max', parseFloat(e.target.value) || 100)}
+                className="form-input"
               />
             </div>
             <div className="form-group">
@@ -1231,6 +1226,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.001"
                 value={config.frequency || 0.1}
                 onChange={(e) => onConfigChange('frequency', parseFloat(e.target.value) || 0.1)}
+                className="form-input"
               />
             </div>
           </div>
@@ -1246,6 +1242,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.01"
                 value={config.lambda || 1}
                 onChange={(e) => onConfigChange('lambda', parseFloat(e.target.value) || 1)}
+                className="form-input"
               />
             </div>
             <div className="form-group">
@@ -1255,6 +1252,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.01"
                 value={config.min || 0}
                 onChange={(e) => onConfigChange('min', parseFloat(e.target.value) || 0)}
+                className="form-input"
               />
             </div>
             <div className="form-group">
@@ -1264,6 +1262,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                 step="0.01"
                 value={config.max || 100}
                 onChange={(e) => onConfigChange('max', parseFloat(e.target.value) || 100)}
+                className="form-input"
               />
             </div>
           </div>
@@ -1283,6 +1282,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
             <select 
               value={config.value ? 'true' : 'false'}
               onChange={(e) => onConfigChange('value', e.target.value === 'true')}
+              className="form-input"
             >
               <option value="true">True</option>
               <option value="false">False</option>
@@ -1301,6 +1301,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
               step="0.01"
               value={config.trueProbability || 0.5}
               onChange={(e) => onConfigChange('trueProbability', parseFloat(e.target.value) || 0.5)}
+              className="form-input"
             />
           </div>
         );
@@ -1319,6 +1320,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                       newSequence[index] = e.target.value === 'true';
                       onConfigChange('sequence', newSequence);
                     }}
+                    className="form-input"
                   >
                     <option value="true">True</option>
                     <option value="false">False</option>
@@ -1330,7 +1332,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                       newSequence.splice(index, 1);
                       onConfigChange('sequence', newSequence);
                     }}
-                    className="remove-pattern-btn"
+                    className="btn btn-sm btn-danger remove-pattern-btn"
                   >
                     ×
                   </button>
@@ -1342,7 +1344,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                   const newSequence = [...(config.sequence || []), true];
                   onConfigChange('sequence', newSequence);
                 }}
-                className="add-pattern-btn"
+                className="btn btn-sm btn-success add-pattern-btn"
               >
                 Add Step
               </button>
@@ -1365,6 +1367,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
               type="text"
               value={config.value || ''}
               onChange={(e) => onConfigChange('value', e.target.value)}
+              className="form-input"
             />
           </div>
         );
@@ -1385,6 +1388,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                       newValues[index] = e.target.value;
                       onConfigChange('values', newValues);
                     }}
+                    className="form-input"
                   />
                   <button 
                     type="button"
@@ -1393,7 +1397,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                       newValues.splice(index, 1);
                       onConfigChange('values', newValues);
                     }}
-                    className="remove-value-btn"
+                    className="btn btn-sm btn-danger remove-value-btn"
                   >
                     ×
                   </button>
@@ -1405,7 +1409,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                   const newValues = [...(config.values || []), ''];
                   onConfigChange('values', newValues);
                 }}
-                className="add-value-btn"
+                className="btn btn-sm btn-success add-value-btn"
               >
                 Add Value
               </button>
@@ -1429,6 +1433,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                       newValues[index] = { ...newValues[index], value: e.target.value };
                       onConfigChange('weightedValues', newValues);
                     }}
+                    className="form-input"
                   />
                   <input 
                     type="number"
@@ -1441,6 +1446,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                       newValues[index] = { ...newValues[index], weight: parseFloat(e.target.value) || 1 };
                       onConfigChange('weightedValues', newValues);
                     }}
+                    className="form-input"
                   />
                   <button 
                     type="button"
@@ -1449,7 +1455,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                       newValues.splice(index, 1);
                       onConfigChange('weightedValues', newValues);
                     }}
-                    className="remove-value-btn"
+                    className="btn btn-sm btn-danger remove-value-btn"
                   >
                     ×
                   </button>
@@ -1461,7 +1467,7 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                   const newValues = [...(config.weightedValues || []), { value: '', weight: 1 }];
                   onConfigChange('weightedValues', newValues);
                 }}
-                className="add-value-btn"
+                className="btn btn-sm btn-success add-value-btn"
               >
                 Add Weighted Value
               </button>
@@ -1490,7 +1496,6 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
 // Helper function to format preview values
 function formatPreviewValue(previewValue) {
   if (!previewValue) return 'N/A';
-  
   return JSON.stringify(previewValue, null, 2);
 }
 
