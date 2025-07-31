@@ -130,6 +130,12 @@
   font-size: 14px;
 }
 
+/* Override for checkbox labels to ensure they maintain flex layout */
+.mqtt-form-group .mqtt-connection-modal-checkbox-label {
+  display: flex !important;
+  margin-bottom: 0 !important;
+}
+
 .mqtt-form-group input,
 .mqtt-form-group select {
   width: 100%;
@@ -258,13 +264,13 @@
 
 /* Connection Modal Custom Checkbox Styling */
 .mqtt-connection-modal-checkbox-label {
-  display: flex;
-  align-items: flex-start; /* Changed from center to flex-start */
+  display: flex !important;
+  align-items: center !important;
   gap: 12px;
   cursor: pointer;
   font-weight: 500;
   color: #495057;
-  margin: 0;
+  margin: 0 !important;
   padding: 12px;
   background: #f8f9fa;
   border-radius: 6px;
@@ -272,6 +278,7 @@
   transition: all 0.2s ease;
   font-size: 14px;
   min-height: 42px;
+  flex-wrap: nowrap;
 }
 
 .mqtt-connection-modal-checkbox-label:hover {
@@ -293,7 +300,6 @@
   position: relative;
   transition: all 0.3s ease;
   flex-shrink: 0;
-  margin-top: 1px;
 }
 
 .mqtt-connection-modal-checkbox-label input[type="checkbox"]:checked + .mqtt-connection-modal-checkbox-custom {
@@ -321,23 +327,15 @@
   line-height: 1.4;
   font-size: 14px;
   color: #495057;
-  white-space: nowrap; /* Prevent text from wrapping */
-  overflow: hidden; /* Hide overflow if text is too long */
-  text-overflow: ellipsis; /* Add ellipsis for very long text */
-  display: flex;
-  align-items: center; /* Center the text vertically within its container */
-  min-height: 20px; /* Ensure minimum height for text container */
+  min-width: 0;
 }
 
 .mqtt-connection-modal-checkbox-text .mqtt5-note {
-  white-space: normal; /* Allow the note to wrap if needed */
-  display: inline;
-}
-
-/* Form row checkbox alignment */
-.mqtt-form-row .mqtt-form-group .mqtt-connection-modal-checkbox-label {
-  align-items: flex-start;
-  padding-top: 0px;
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6c757d;
+  font-style: italic;
 }
 
 /* Legacy checkbox class - kept for backwards compatibility */
