@@ -235,6 +235,15 @@
   z-index: 0;
 }
 
+/* Topic Tree Panel */
+.topic-tree-panel {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* Notifications */
 .notification-stack {
   position: fixed;

@@ -1,5 +1,6 @@
 .topic-tree-container {
   height: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   background: white;
@@ -8,14 +9,21 @@
 }
 
 .topic-tree-header {
-  padding: 12px 15px;
+  padding: 15px 20px;
   border-bottom: 1px solid #e9ecef;
   background: #f8f9fa;
   flex-shrink: 0; /* Prevent header from shrinking */
 }
 
+.topic-tree-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
 .topic-tree-header h3 {
-  margin: 0 0 8px 0;
+  margin: 0;
   color: #2c3e50;
   font-size: 16px;
   font-weight: 600;
@@ -24,46 +32,34 @@
 .topic-tree-controls {
   display: flex;
   gap: 6px;
-  margin-bottom: 8px;
 }
 
 .tree-control-btn {
-  padding: 4px 8px;
-  font-size: 11px;
-  border: 1px solid #dee2e6;
-  background: white;
-  border-radius: 3px;
+  border-radius: 15px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  border: none;
   cursor: pointer;
-  transition: all 0.2s;
-  color: #495057;
-}
-
-.tree-control-btn:hover {
-  background: #e9ecef;
-  border-color: #adb5bd;
-}
-
-.topic-tree-stats {
-  display: flex;
-  gap: 8px;
-  font-size: 11px;
-  color: #6c757d;
-}
-
-.topic-tree-stats span {
-  padding: 2px 6px;
-  background: #e9ecef;
-  border-radius: 10px;
-  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 28px;
 }
 
 .topic-tree-content {
   flex: 1;
-  overflow-y: hidden; /* Enable vertical scrolling */
+  overflow-y: auto; /* Enable vertical scrolling */
   overflow-x: hidden; /* Hide horizontal scrollbar */
   padding: 4px 0;
   font-size: 13px;
   min-height: 0; /* Allow flex item to shrink below content size */
+  max-height: 100%; /* Ensure container can't exceed parent height */
+  /* Firefox scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
 }
 
 .topic-tree-empty {
@@ -241,34 +237,6 @@
   font-size: 11px;
 }
 
-/* Responsive design */
-@media (max-width: 768px) {
-  .topic-tree-stats {
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  
-  .node-right {
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-  }
-  
-  .node-payload {
-    max-width: 200px;
-  }
-  
-  .node-message-info {
-    flex-direction: column;
-    gap: 4px;
-    align-items: flex-start;
-  }
-  
-  .node-name {
-    max-width: 120px;
-  }
-}
-
 /* Scrollbar styling */
 .topic-tree-content::-webkit-scrollbar {
   width: 8px;
@@ -286,19 +254,6 @@
 
 .topic-tree-content::-webkit-scrollbar-thumb:hover {
   background: #a1a1a1;
-}
-
-/* Firefox scrollbar */
-.topic-tree-content {
-  scrollbar-width: thin;
-  scrollbar-color: #c1c1c1 #f1f1f1;
-}
-
-.topic-tree-header {
-  padding: 15px 20px;
-  border-bottom: 1px solid #e9ecef;
-  background: #f8f9fa;
-  flex-shrink: 0;
 }
 
 .topic-tree-header-top {

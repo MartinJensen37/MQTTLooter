@@ -20,6 +20,9 @@ function PublishingPanel({
   const [messageTemplates, setMessageTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [templateService] = useState(new MessageTemplateService());
+  const [templateToDelete, setTemplateToDelete] = useState(null);
+  const [schemaValidation, setSchemaValidation] = useState(null);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   // Load form data from localStorage on mount
   useEffect(() => {
@@ -53,18 +56,144 @@ function PublishingPanel({
     setMessageTemplates(templateService.getAllTemplates());
   }, [templateService]);
 
+  // Validate payload against schema when template or payload changes
+  useEffect(() => {
+    if (selectedTemplate && payload) {
+      const validation = templateService.validatePayload(selectedTemplate, payload);
+      setSchemaValidation(validation);
+    } else {
+      setSchemaValidation(null);
+    }
+  }, [selectedTemplate, payload, templateService]);
+
+  // Clear schema validation when templates are hidden
+  useEffect(() => {
+    if (!showTemplates) {
+      setSchemaValidation(null);
+      setSelectedTemplate(null);
+    }
+  }, [showTemplates]);
+
   // Handle template selection
   const handleTemplateSelect = (templateId) => {
     const template = templateService.getTemplate(templateId);
     if (template) {
-      const processed = templateService.processTemplate(template);
-      setTopic(processed.topic);
-      setPayload(processed.payload);
-      setQos(processed.qos);
-      setRetain(processed.retain);
+      // Only update topic if current topic is empty
+      if (!topic.trim()) {
+        setTopic(template.topic);
+      }
+      
+      // Generate empty payload from schema, or use template payload with empty values
+      let emptyPayload = '';
+      if (template.schema) {
+        emptyPayload = templateService.generateSampleFromSchema(template.schema);
+        // Replace any generated values with empty strings/zeros for user to fill
+        emptyPayload = emptyPayload
+          .replace(/"sample_string"/g, '""')
+          .replace(/42\.5/g, '0')
+          .replace(/42/g, '0')
+          .replace(/true/g, 'false');
+      } else {
+        // Use template payload but strip out all template variables and functions
+        emptyPayload = template.payload
+          .replace(/{{[^}]+}}/g, '""') // Replace all template variables with empty strings
+          .replace(/:\s*""/g, ': ""') // Clean up spacing
+          .replace(/:\s*"",/g, ': "",'); // Clean up trailing commas
+      }
+      
+      setPayload(emptyPayload);
+      setQos(template.qos);
+      setRetain(template.retain);
       setSelectedTemplate(templateId);
       setShowTemplateDropdown(false);
     }
+  };
+
+  // Handle template import
+  const handleTemplateImport = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const result = await templateService.importTemplates(file);
+      
+      // Refresh template list
+      setMessageTemplates(templateService.getAllTemplates());
+      
+      if (result.imported > 0) {
+        let message = `Successfully imported ${result.imported} template(s)`;
+        if (result.errors.length > 0) {
+          message += ` with ${result.errors.length} error(s)`;
+        }
+        if (showFeedback) showFeedback(message, 'success');
+      }
+      
+      if (result.errors.length > 0 && result.imported === 0) {
+        if (showFeedback) showFeedback(`Import failed: ${result.errors[0]}`, 'error');
+      }
+    } catch (error) {
+      if (showFeedback) showFeedback(`Import failed: ${error.message}`, 'error');
+    }
+    
+    // Reset file input
+    event.target.value = '';
+  };
+
+  // Handle template export
+  const handleTemplateExport = () => {
+    try {
+      const exportData = templateService.exportTemplates();
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { 
+        type: 'application/json' 
+      });
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mqtt-templates-${new Date().toISOString().slice(0, 19)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      if (showFeedback) showFeedback('Templates exported successfully!', 'success');
+    } catch (error) {
+      if (showFeedback) showFeedback(`Export failed: ${error.message}`, 'error');
+    }
+  };
+
+  // Handle template deletion
+  const handleTemplateDelete = (templateId) => {
+    setTemplateToDelete(templateId);
+  };
+
+  const confirmTemplateDelete = () => {
+    if (templateToDelete) {
+      const template = templateService.getTemplate(templateToDelete);
+      const success = templateService.deleteTemplate(templateToDelete);
+      
+      if (success) {
+        // Refresh template list
+        setMessageTemplates(templateService.getAllTemplates());
+        
+        // Clear selection if deleted template was selected
+        if (selectedTemplate === templateToDelete) {
+          setSelectedTemplate(null);
+          setSchemaValidation(null);
+        }
+        
+        if (showFeedback) {
+          showFeedback(`Template "${template?.name}" deleted successfully!`, 'success');
+        }
+      } else {
+        if (showFeedback) showFeedback('Failed to delete template', 'error');
+      }
+    }
+    setTemplateToDelete(null);
+  };
+
+  const cancelTemplateDelete = () => {
+    setTemplateToDelete(null);
   };
 
   // Save form state to localStorage
@@ -304,49 +433,6 @@ function PublishingPanel({
       <div className="publishing-content">
         <div className="publish-form panel">
           <div className="panel-content">
-            {/* Message Templates Section */}
-            <div className="form-group">
-              <label htmlFor="templates">Message Templates:</label>
-              <div className="template-select-wrapper custom-select-wrapper">
-                <button
-                  type="button"
-                  className="custom-select-button"
-                  onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
-                  disabled={isPublishing}
-                >
-                  <span className="select-value">
-                    {getSelectedTemplateName()}
-                  </span>
-                  <i className={`fas fa-chevron-down ${showTemplateDropdown ? 'rotated' : ''}`}></i>
-                </button>
-                
-                {showTemplateDropdown && (
-                  <div className="custom-select-dropdown">
-                    <button
-                      type="button"
-                      className={`dropdown-option ${!selectedTemplate ? 'selected' : ''}`}
-                      onClick={() => {
-                        setSelectedTemplate(null);
-                        setShowTemplateDropdown(false);
-                      }}
-                    >
-                      Select a template...
-                    </button>
-                    {messageTemplates.map(template => (
-                      <button
-                        key={template.id}
-                        type="button"
-                        className={`dropdown-option ${selectedTemplate === template.id ? 'selected' : ''}`}
-                        onClick={() => handleTemplateSelect(template.id)}
-                      >
-                        {template.name} ({template.category})
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
             <div className="form-group">
               <label htmlFor="topic">Topic:</label>
               <div className="topic-input-wrapper">
@@ -410,12 +496,134 @@ function PublishingPanel({
               />
               <div className="payload-info">
                 <span className="char-count">{payload.length} characters</span>
-                {payload && isValidJson(payload) && (
-                  <span className="json-indicator">
-                    <i className="fas fa-check-circle"></i> Valid JSON
-                  </span>
+                <div className="validation-indicators">
+                  {payload && isValidJson(payload) && (
+                    <span className="json-indicator">
+                      <i className="fas fa-check-circle"></i> Valid JSON
+                    </span>
+                  )}
+                  {schemaValidation && (
+                    <span className={`schema-validation ${schemaValidation.valid ? 'valid' : 'invalid'}`}>
+                      <i className={`fas ${schemaValidation.valid ? 'fa-shield-alt' : 'fa-exclamation-triangle'}`}></i>
+                      {schemaValidation.valid ? 'Schema Valid' : `Schema Invalid (${schemaValidation.errors.length} errors)`}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {/* Schema validation errors */}
+              {schemaValidation && !schemaValidation.valid && (
+                <div className="schema-errors">
+                  <div className="schema-errors-header">
+                    <i className="fas fa-exclamation-triangle"></i>
+                    Schema Validation Errors:
+                  </div>
+                  <ul className="schema-error-list">
+                    {schemaValidation.errors.map((error, index) => (
+                      <li key={index} className="schema-error-item">{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Message Templates Section */}
+            <div className="form-group">
+              <div className="template-header">
+                <label className="template-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={showTemplates}
+                    onChange={(e) => setShowTemplates(e.target.checked)}
+                  />
+                  <span className="template-checkbox-custom"></span>
+                  <span className="template-checkbox-text">Message Templates</span>
+                </label>
+                {showTemplates && (
+                  <div className="template-actions">
+                    <label className="template-action-btn import-btn" title="Import Templates">
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleTemplateImport}
+                        style={{ display: 'none' }}
+                      />
+                      <i className="fas fa-upload"></i>
+                    </label>
+                    <button
+                      type="button"
+                      className="template-action-btn export-btn"
+                      onClick={handleTemplateExport}
+                      disabled={messageTemplates.length === 0}
+                      title="Export Templates"
+                    >
+                      <i className="fas fa-download"></i>
+                    </button>
+                  </div>
                 )}
               </div>
+              
+              {showTemplates && (
+                <div className="template-select-wrapper custom-select-wrapper">
+                  <button
+                    type="button"
+                    className="custom-select-button"
+                    onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                    disabled={isPublishing}
+                  >
+                    <span className="select-value">
+                      {getSelectedTemplateName()}
+                    </span>
+                    <i className={`fas fa-chevron-down ${showTemplateDropdown ? 'rotated' : ''}`}></i>
+                  </button>
+                  
+                  {showTemplateDropdown && (
+                    <div className="custom-select-dropdown">
+                      <button
+                        type="button"
+                        className={`dropdown-option ${!selectedTemplate ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedTemplate(null);
+                          setSchemaValidation(null);
+                          setShowTemplateDropdown(false);
+                        }}
+                      >
+                        Select a template...
+                      </button>
+                      {messageTemplates.map(template => (
+                        <div key={template.id} className="template-dropdown-item">
+                          <button
+                            type="button"
+                            className={`dropdown-option ${selectedTemplate === template.id ? 'selected' : ''}`}
+                            onClick={() => handleTemplateSelect(template.id)}
+                          >
+                            <div className="template-info">
+                              <span className="template-name">{template.name}</span>
+                              <span className="template-category">({template.category})</span>
+                              {template.schema && (
+                                <span className="schema-indicator" title="Has schema validation">
+                                  <i className="fas fa-shield-alt"></i>
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            className="template-delete-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTemplateDelete(template.id);
+                            }}
+                            title="Delete template"
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="form-options">
@@ -482,10 +690,12 @@ function PublishingPanel({
                     onChange={(e) => setRetain(e.target.checked)}
                     disabled={isPublishing}
                   />
-                  <span className="publish-checkbox-custom"></span>
-                  Retain message
-                  <span className="retain-info" title="Retained messages are stored by the broker and sent to new subscribers">
-                    <i className="fas fa-info-circle"></i>
+                  <span className="retain-checkbox-custom"></span>
+                  <span className="retain-checkbox-text">
+                    Retain message
+                    <span className="retain-info" title="Retained messages are stored by the broker and sent to new subscribers">
+                      <i className="fas fa-info-circle"></i>
+                    </span>
                   </span>
                 </label>
               </div>
@@ -626,6 +836,37 @@ function PublishingPanel({
           </div>
         )}
       </div>
+
+      {/* Template Delete Confirmation Dialog */}
+      {templateToDelete && (
+        <div className="modal-overlay">
+          <div className="confirmation-modal">
+            <div className="modal-header">
+              <h3>Delete Template</h3>
+            </div>
+            <div className="modal-content">
+              <p>
+                Are you sure you want to delete the template <strong>"{templateService.getTemplate(templateToDelete)?.name}"</strong>?
+              </p>
+              <p className="warning-text">This action cannot be undone.</p>
+            </div>
+            <div className="modal-actions">
+              <button 
+                onClick={cancelTemplateDelete}
+                className="btn btn-sm btn-secondary"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmTemplateDelete}
+                className="btn btn-sm btn-danger"
+              >
+                <i className="fas fa-trash"></i> Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

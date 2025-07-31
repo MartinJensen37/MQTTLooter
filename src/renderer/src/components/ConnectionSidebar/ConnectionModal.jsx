@@ -885,6 +885,7 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                     </div>
                     
                     <div className="mqtt-form-group">
+                      <label>&nbsp;</label>
                       <label className="mqtt-connection-modal-checkbox-label">
                         <input
                           type="checkbox"
@@ -897,21 +898,21 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                     </div>
                   </div>
 
-                  {formData.protocolVersion === 5 && (
-                    <div className="mqtt-form-row">
-                      <div className="mqtt-form-group">
-                        <label htmlFor="willDelayInterval">Will Delay Interval (s)</label>
-                        <input
-                          id="willDelayInterval"
-                          type="number"
-                          value={formData.willDelayInterval}
-                          onChange={(e) => handleInputChange('willDelayInterval', parseInt(e.target.value) || 0)}
-                          min="0"
-                          placeholder="0"
-                        />
-                        <div className="mqtt-field-hint">Delay before publishing the will message</div>
-                      </div>
-                      
+                  <div className="mqtt-form-row">
+                    <div className="mqtt-form-group">
+                      <label htmlFor="willDelayInterval">Will Delay Interval (s)</label>
+                      <input
+                        id="willDelayInterval"
+                        type="number"
+                        value={formData.willDelayInterval}
+                        onChange={(e) => handleInputChange('willDelayInterval', parseInt(e.target.value) || 0)}
+                        min="0"
+                        placeholder="0"
+                      />
+                      <div className="mqtt-field-hint">Delay before publishing the will message after disconnect</div>
+                    </div>
+                    
+                    {formData.protocolVersion === 5 && (
                       <div className="mqtt-form-group">
                         <label htmlFor="willMessageExpiryInterval">Will Message Expiry (s)</label>
                         <input
@@ -922,10 +923,10 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                           min="0"
                           placeholder="0"
                         />
-                        <div className="mqtt-field-hint">0 = Will message never expires</div>
+                        <div className="mqtt-field-hint">0 = Will message never expires (MQTT 5.0 only)</div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </>
               )}
             </div>

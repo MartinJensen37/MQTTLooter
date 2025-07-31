@@ -1,0 +1,188 @@
+{
+  "exportDate": "2025-01-31T12:00:00.000Z",
+  "version": "1.0",
+  "templates": [
+    {
+      "id": "weather-station",
+      "name": "Weather Station",
+      "topic": "weather/{{stationId}}/data",
+      "payload": "{\n  \"temperature\": {{randomFloat(-10, 40, 1)}},\n  \"humidity\": {{randomFloat(20, 90, 1)}},\n  \"pressure\": {{randomFloat(950, 1050, 1)}},\n  \"windSpeed\": {{randomFloat(0, 30, 1)}},\n  \"windDirection\": {{randomInt(0, 360)}},\n  \"timestamp\": {{timestamp}},\n  \"stationId\": \"{{stationId}}\"\n}",
+      "qos": 1,
+      "retain": true,
+      "category": "Weather",
+      "variables": {
+        "stationId": {
+          "type": "text",
+          "default": "WS001",
+          "description": "Weather station identifier"
+        }
+      },
+      "schema": {
+        "type": "object",
+        "properties": {
+          "temperature": {
+            "type": "number",
+            "minimum": -50,
+            "maximum": 60,
+            "description": "Temperature in Celsius"
+          },
+          "humidity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Relative humidity percentage"
+          },
+          "pressure": {
+            "type": "number",
+            "minimum": 800,
+            "maximum": 1200,
+            "description": "Atmospheric pressure in hPa"
+          },
+          "windSpeed": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Wind speed in m/s"
+          },
+          "windDirection": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 360,
+            "description": "Wind direction in degrees"
+          },
+          "timestamp": {
+            "type": "number",
+            "description": "Unix timestamp"
+          },
+          "stationId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Station identifier"
+          }
+        },
+        "required": ["temperature", "humidity", "pressure", "timestamp", "stationId"]
+      }
+    },
+    {
+      "id": "smart-home-thermostat",
+      "name": "Smart Home Thermostat",
+      "topic": "home/{{roomName}}/thermostat",
+      "payload": "{\n  \"currentTemp\": {{randomFloat(18, 26, 1)}},\n  \"targetTemp\": {{randomFloat(20, 24, 1)}},\n  \"mode\": \"{{randomChoice(\\\"heating\\\", \\\"cooling\\\", \\\"auto\\\", \\\"off\\\")}}\",\n  \"fanSpeed\": \"{{randomChoice(\\\"low\\\", \\\"medium\\\", \\\"high\\\", \\\"auto\\\")}}\",\n  \"humidity\": {{randomFloat(40, 60, 1)}},\n  \"energyUsage\": {{randomFloat(0.5, 3.5, 2)}},\n  \"timestamp\": {{timestamp}}\n}",
+      "qos": 1,
+      "retain": true,
+      "category": "Smart Home",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "currentTemp": {
+            "type": "number",
+            "minimum": -10,
+            "maximum": 40
+          },
+          "targetTemp": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 35
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["heating", "cooling", "auto", "off"]
+          },
+          "fanSpeed": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "auto"]
+          },
+          "humidity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "energyUsage": {
+            "type": "number",
+            "minimum": 0
+          },
+          "timestamp": {
+            "type": "number"
+          }
+        },
+        "required": ["currentTemp", "targetTemp", "mode", "timestamp"]
+      }
+    },
+    {
+      "id": "vehicle-telemetry",
+      "name": "Vehicle Telemetry",
+      "topic": "fleet/{{vehicleId}}/telemetry",
+      "payload": "{\n  \"vehicleId\": \"{{vehicleId}}\",\n  \"location\": {\n    \"latitude\": {{randomFloat(40.0, 41.0, 6)}},\n    \"longitude\": {{randomFloat(-74.0, -73.0, 6)}}\n  },\n  \"speed\": {{randomFloat(0, 80, 1)}},\n  \"heading\": {{randomInt(0, 360)}},\n  \"fuel\": {{randomFloat(0, 100, 1)}},\n  \"odometer\": {{randomInt(50000, 150000)}},\n  \"engine\": {\n    \"rpm\": {{randomInt(800, 6000)}},\n    \"temperature\": {{randomFloat(80, 110, 1)}},\n    \"oilPressure\": {{randomFloat(20, 80, 1)}}\n  },\n  \"timestamp\": {{timestamp}}\n}",
+      "qos": 0,
+      "retain": false,
+      "category": "Fleet Management",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180
+              }
+            },
+            "required": ["latitude", "longitude"]
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0
+          },
+          "heading": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 360
+          },
+          "fuel": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "odometer": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "engine": {
+            "type": "object",
+            "properties": {
+              "rpm": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "temperature": {
+                "type": "number",
+                "minimum": -20,
+                "maximum": 150
+              },
+              "oilPressure": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": ["rpm", "temperature", "oilPressure"]
+          },
+          "timestamp": {
+            "type": "number"
+          }
+        },
+        "required": ["vehicleId", "location", "speed", "timestamp"]
+      }
+    }
+  ]
+}
