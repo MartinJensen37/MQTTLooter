@@ -194,28 +194,91 @@ class MessageTemplateService {
     return Array.from(categories).sort();
   }
 
+  // Create a template from a standalone JSON Schema
+  createTemplateFromSchema(schema) {
+    // Extract metadata from schema
+    const title = schema.title || 'Imported Schema';
+    const id = this.generateIdFromTitle(title);
+    
+    // Generate a flexible default topic - can be easily changed by user
+    const topic = `${id}`;
+    
+    // Generate empty payload structure from schema
+    const payload = this.generateSampleFromSchema(schema);
+    
+    return {
+      id: id,
+      name: title,
+      topic: topic,
+      payload: payload,
+      qos: 0,
+      retain: false,
+      category: 'Imported Schemas',
+      schema: schema,
+      description: schema.description || `Template created from imported ${title} schema`
+    };
+  }
+
+  // Generate a valid ID from a title
+  generateIdFromTitle(title) {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+      .substring(0, 50) // Limit length
+      || 'imported-schema'; // Fallback
+  }
+
+  // Helper function to validate if a schema structure is valid
+  isValidSchema(schema) {
+    try {
+      if (!schema || typeof schema !== 'object') {
+        return false;
+      }
+
+      // Accept any object-type schema (including JSON Schema with metadata)
+      if (schema.type === 'object' || schema.$schema || schema.$id || schema.title) {
+        return true;
+      }
+
+      // Accept simple schemas with properties
+      if (schema.properties && typeof schema.properties === 'object') {
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      return false;
+    }
+  }
+
   // Import templates from file
   async importTemplates(file) {
     try {
       const text = await file.text();
       const importData = JSON.parse(text);
       
-      // Validate import format
-      if (!importData.templates || !Array.isArray(importData.templates)) {
-        throw new Error('Invalid template file format. Expected { templates: [...] }');
-      }
-
+      console.log('Import data received:', {
+        hasSchema: !!importData.$schema,
+        hasId: !!importData.$id, 
+        hasTitle: !!importData.title,
+        hasType: !!importData.type,
+        hasProperties: !!importData.properties,
+        hasTemplates: !!importData.templates
+      });
+      
       const imported = [];
       const errors = [];
 
-      for (const template of importData.templates) {
+      // Check if this is a standalone schema or a template collection
+      if (importData.$schema || importData.$id || importData.title || 
+          (importData.type && importData.properties)) {
+        // This is a standalone JSON Schema - create a template from it
+        console.log('Detected standalone schema:', importData.title || 'Untitled');
         try {
-          // Validate required fields
-          if (!template.id || !template.name || !template.topic || template.payload === undefined) {
-            errors.push(`Template "${template.name || 'Unknown'}" missing required fields`);
-            continue;
-          }
-
+          const template = this.createTemplateFromSchema(importData);
+          
           // Generate unique ID if conflicts exist
           let templateId = template.id;
           let counter = 1;
@@ -235,8 +298,49 @@ class MessageTemplateService {
           this.templates[templateId] = templateToSave;
           imported.push(templateToSave);
         } catch (error) {
-          errors.push(`Failed to import template "${template.name}": ${error.message}`);
+          console.error('Schema processing error:', error);
+          errors.push(`Failed to create template from schema: ${error.message}`);
         }
+      } else if (importData.templates && Array.isArray(importData.templates)) {
+        // This is a template collection file
+        for (const template of importData.templates) {
+          try {
+            // Validate required fields
+            if (!template.id || !template.name || !template.topic || template.payload === undefined) {
+              errors.push(`Template "${template.name || 'Unknown'}" missing required fields`);
+              continue;
+            }
+
+            // Validate schema if present
+            if (template.schema && !this.isValidSchema(template.schema)) {
+              console.warn(`Template "${template.name}" has invalid schema, but will still be imported`);
+            }
+
+            // Generate unique ID if conflicts exist
+            let templateId = template.id;
+            let counter = 1;
+            while (this.templates[templateId]) {
+              templateId = `${template.id}_${counter}`;
+              counter++;
+            }
+
+            const templateToSave = {
+              ...template,
+              id: templateId,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              imported: true
+            };
+
+            this.templates[templateId] = templateToSave;
+            imported.push(templateToSave);
+          } catch (error) {
+            errors.push(`Failed to import template "${template.name}": ${error.message}`);
+          }
+        }
+      } else {
+        console.log('File format not recognized. Data structure:', Object.keys(importData));
+        throw new Error('Invalid file format. Expected either a JSON Schema or a template collection with { templates: [...] }');
       }
 
       if (imported.length > 0) {
@@ -249,6 +353,7 @@ class MessageTemplateService {
         templates: imported
       };
     } catch (error) {
+      console.error('Import error:', error.message);
       throw new Error(`Failed to import templates: ${error.message}`);
     }
   }
@@ -294,14 +399,21 @@ class MessageTemplateService {
   validateAgainstSchema(data, schema) {
     const errors = [];
 
-    if (schema.type === 'object' && typeof data !== 'object') {
+    // Handle schema references and metadata - extract the actual validation schema
+    let validationSchema = schema;
+    if (schema.$schema || schema.$id || schema.title) {
+      // This is a full JSON Schema document, use it as-is but focus on validation rules
+      validationSchema = schema;
+    }
+
+    if (validationSchema.type === 'object' && typeof data !== 'object') {
       errors.push('Expected object type');
       return { valid: false, errors };
     }
 
-    if (schema.properties) {
-      for (const [key, propSchema] of Object.entries(schema.properties)) {
-        if (schema.required && schema.required.includes(key) && !(key in data)) {
+    if (validationSchema.properties) {
+      for (const [key, propSchema] of Object.entries(validationSchema.properties)) {
+        if (validationSchema.required && validationSchema.required.includes(key) && !(key in data)) {
           errors.push(`Missing required property: ${key}`);
           continue;
         }
@@ -368,13 +480,20 @@ class MessageTemplateService {
 
   // Generate sample payload from schema
   generateSampleFromSchema(schema) {
-    if (!schema || schema.type !== 'object' || !schema.properties) {
+    // Handle schema references and metadata
+    let validationSchema = schema;
+    if (schema.$schema || schema.$id || schema.title) {
+      // This is a full JSON Schema document, use it as-is
+      validationSchema = schema;
+    }
+
+    if (!validationSchema || validationSchema.type !== 'object' || !validationSchema.properties) {
       return '{}';
     }
 
     const sample = {};
     
-    for (const [key, propSchema] of Object.entries(schema.properties)) {
+    for (const [key, propSchema] of Object.entries(validationSchema.properties)) {
       sample[key] = this.generateSampleValue(propSchema);
     }
 
