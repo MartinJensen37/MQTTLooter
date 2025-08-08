@@ -23,6 +23,8 @@ function PublishingPanel({
   const [templateToDelete, setTemplateToDelete] = useState(null);
   const [schemaValidation, setSchemaValidation] = useState(null);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [autoLoadSelectedTopic, setAutoLoadSelectedTopic] = useState(true);
+  const [retainedMessageRemoved, setRetainedMessageRemoved] = useState(false);
 
   // Load form data from localStorage on mount
   useEffect(() => {
@@ -73,6 +75,22 @@ function PublishingPanel({
       setSelectedTemplate(null);
     }
   }, [showTemplates]);
+
+  // Auto-load selected topic when toggle is enabled
+  useEffect(() => {
+    if (autoLoadSelectedTopic && selectedTopic) {
+      setTopic(selectedTopic.topicPath || selectedTopic.topic || '');
+    }
+    // Reset the retained message removed flag when a new topic is selected
+    setRetainedMessageRemoved(false);
+  }, [autoLoadSelectedTopic, selectedTopic]);
+
+  // Reset retained message removed flag when connection changes or when a retained message is detected
+  useEffect(() => {
+    if (selectedTopic?.node?.lastMessage?.retain === true) {
+      setRetainedMessageRemoved(false);
+    }
+  }, [selectedTopic?.node?.lastMessage, connectionId, isConnected]);
 
   // Handle template selection
   const handleTemplateSelect = (templateId) => {
@@ -276,9 +294,16 @@ function PublishingPanel({
   };
 
   const removeRetainedMessage = async () => {
+    // Use the selected topic path if available, otherwise use the form input
+    const targetTopic = selectedTopic?.topicPath || selectedTopic?.topic || topic.trim();
+    
+    if (!targetTopic) {
+      if (showFeedback) showFeedback('No topic specified for retained message removal', 'error');
+      return;
+    }
 
     const messageData = {
-      topic: topic.trim(),
+      topic: targetTopic,
       payload: '', // Empty payload to remove retained message
       qos: 0,
       retain: true, // Must be retained to remove retained message
@@ -292,7 +317,10 @@ function PublishingPanel({
         await onPublishMessage(messageData);
       }
 
-      if (showFeedback) showFeedback('Retained message removed successfully!', 'success');
+      // Mark that retained message was removed for this topic
+      setRetainedMessageRemoved(true);
+      
+      if (showFeedback) showFeedback(`Retained message removed succesfully!`, 'success');
 
     } catch (error) {
       console.error('Remove retained message failed:', error);
@@ -303,7 +331,7 @@ function PublishingPanel({
   };
 
   const hasRetainedMessage = () => {
-    return selectedTopic?.node?.lastMessage?.retain === true;
+    return selectedTopic?.node?.lastMessage?.retain === true && !retainedMessageRemoved;
   };
 
 
@@ -434,7 +462,20 @@ function PublishingPanel({
         <div className="publish-form panel">
           <div className="panel-content">
             <div className="form-group">
-              <label htmlFor="topic">Topic:</label>
+              <div className="topic-label-wrapper">
+                <label htmlFor="topic">Topic:</label>
+                <div className="auto-load-toggle">
+                  <label className="toggle-switch">
+                    <span className="toggle-label">Auto-load selected topic</span>
+                    <input
+                      type="checkbox"
+                      checked={autoLoadSelectedTopic}
+                      onChange={(e) => setAutoLoadSelectedTopic(e.target.checked)}
+                    />
+                    <span className="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
               <div className="topic-input-wrapper">
                 <input
                   id="topic"
@@ -737,8 +778,8 @@ function PublishingPanel({
                   type="button"
                   onClick={removeRetainedMessage}
                   className="publish-form-remove-retained-btn"
-                  disabled={isPublishing || !topic.trim() || !connectionId || !isConnected}
-                  title="Remove retained message by publishing empty payload"
+                  disabled={isPublishing || (!selectedTopic?.topicPath && !selectedTopic?.topic && !topic.trim()) || !connectionId || !isConnected}
+                  title={`Remove retained message from: ${selectedTopic?.topicPath || selectedTopic?.topic || topic.trim() || 'No topic'}`}
                 >
                   <i className="fas fa-trash-alt"></i> Remove Retained
                 </button>
