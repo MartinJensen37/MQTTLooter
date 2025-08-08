@@ -49,7 +49,17 @@ function ConnectionModal({ connection, onSave, onCancel }) {
   });
 
   const [errors, setErrors] = useState({});
+  const [protocolVersionDropdownOpen, setProtocolVersionDropdownOpen] = useState(false);
+  const [willQosDropdownOpen, setWillQosDropdownOpen] = useState(false);
+  const [subscriptionQosDropdowns, setSubscriptionQosDropdowns] = useState({});
   const firstInputRef = useRef(null);
+
+  const toggleSubscriptionQosDropdown = (index) => {
+    setSubscriptionQosDropdowns(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
 
   const parseBrokerUrl = (url) => {
     try {
@@ -384,7 +394,9 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       <div className="mqtt-modal-container">
         <div className="mqtt-modal-header">
           <h2>{connection ? 'Edit Connection' : 'New Connection'}</h2>
-          <button className="mqtt-modal-close" onClick={onCancel} type="button">×</button>
+          <button className="modal-close-btn" onClick={onCancel} type="button">
+            <i className="fas fa-times"></i>
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="mqtt-modal-form">
@@ -412,10 +424,10 @@ function ConnectionModal({ connection, onSave, onCancel }) {
               <div className="mqtt-form-group">
                 <label>Broker Connection</label>
                 <div className={`mqtt-broker-url ${(errors.hostname || errors.port) ? 'error' : ''}`}>
-                  <select
-                    value={formData.protocol}
+                  <select 
+                    value={formData.protocol} 
                     onChange={(e) => handleProtocolChange(e.target.value)}
-                    className="mqtt-protocol"
+                    className="mqtt-protocol-select"
                   >
                     <option value="mqtt">mqtt://</option>
                     <option value="mqtts">mqtts://</option>
@@ -496,15 +508,42 @@ function ConnectionModal({ connection, onSave, onCancel }) {
 
               <div className="mqtt-form-group">
                 <label htmlFor="protocolVersion">MQTT Protocol Version</label>
-                <select
-                  id="protocolVersion"
-                  value={formData.protocolVersion}
-                  onChange={(e) => handleInputChange('protocolVersion', parseInt(e.target.value))}
-                  className="mqtt-protocol-version"
-                >
-                  <option value={4}>MQTT 3.1.1</option>
-                  <option value={5}>MQTT 5.0</option>
-                </select>
+                <div className="custom-select-wrapper">
+                  <button 
+                    type="button" 
+                    className="custom-select-button"
+                    onClick={() => setProtocolVersionDropdownOpen(!protocolVersionDropdownOpen)}
+                  >
+                    <span className="select-value">
+                      {formData.protocolVersion === 5 ? 'MQTT 5.0' : 'MQTT 3.1.1'}
+                    </span>
+                    <i className={`fas fa-chevron-down ${protocolVersionDropdownOpen ? 'rotated' : ''}`}></i>
+                  </button>
+                  {protocolVersionDropdownOpen && (
+                    <div className="custom-select-dropdown">
+                      <button 
+                        type="button"
+                        className={`dropdown-option ${formData.protocolVersion === 4 ? 'selected' : ''}`}
+                        onClick={() => {
+                          handleInputChange('protocolVersion', 4);
+                          setProtocolVersionDropdownOpen(false);
+                        }}
+                      >
+                        MQTT 3.1.1
+                      </button>
+                      <button 
+                        type="button"
+                        className={`dropdown-option ${formData.protocolVersion === 5 ? 'selected' : ''}`}
+                        onClick={() => {
+                          handleInputChange('protocolVersion', 5);
+                          setProtocolVersionDropdownOpen(false);
+                        }}
+                      >
+                        MQTT 5.0
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="mqtt-field-hint">
                   {formData.protocolVersion === 5 
                     ? 'MQTT 5.0 includes enhanced features like user properties, message expiry, and topic aliases'
@@ -873,15 +912,54 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                   <div className="mqtt-form-row">
                     <div className="mqtt-form-group">
                       <label htmlFor="willQos">Will QoS</label>
-                      <select
-                        id="willQos"
-                        value={formData.willQos}
-                        onChange={(e) => handleInputChange('willQos', parseInt(e.target.value))}
-                      >
-                        <option value={0}>0 - At most once</option>
-                        <option value={1}>1 - At least once</option>
-                        <option value={2}>2 - Exactly once</option>
-                      </select>
+                      <div className="custom-select-wrapper">
+                        <button 
+                          type="button" 
+                          className="custom-select-button"
+                          onClick={() => setWillQosDropdownOpen(!willQosDropdownOpen)}
+                        >
+                          <span className="select-value">
+                            {formData.willQos === 0 ? '0 - At most once' :
+                             formData.willQos === 1 ? '1 - At least once' :
+                             '2 - Exactly once'}
+                          </span>
+                          <i className={`fas fa-chevron-down ${willQosDropdownOpen ? 'rotated' : ''}`}></i>
+                        </button>
+                        {willQosDropdownOpen && (
+                          <div className="custom-select-dropdown">
+                            <button 
+                              type="button"
+                              className={`dropdown-option ${formData.willQos === 0 ? 'selected' : ''}`}
+                              onClick={() => {
+                                handleInputChange('willQos', 0);
+                                setWillQosDropdownOpen(false);
+                              }}
+                            >
+                              0 - At most once
+                            </button>
+                            <button 
+                              type="button"
+                              className={`dropdown-option ${formData.willQos === 1 ? 'selected' : ''}`}
+                              onClick={() => {
+                                handleInputChange('willQos', 1);
+                                setWillQosDropdownOpen(false);
+                              }}
+                            >
+                              1 - At least once
+                            </button>
+                            <button 
+                              type="button"
+                              className={`dropdown-option ${formData.willQos === 2 ? 'selected' : ''}`}
+                              onClick={() => {
+                                handleInputChange('willQos', 2);
+                                setWillQosDropdownOpen(false);
+                              }}
+                            >
+                              2 - Exactly once
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="mqtt-form-group">
@@ -982,15 +1060,52 @@ function ConnectionModal({ connection, onSave, onCancel }) {
                   
                   <div className="mqtt-form-group mqtt-qos-group">
                     <label htmlFor={`qos-${index}`}>QoS</label>
-                    <select
-                      id={`qos-${index}`}
-                      value={subscription.qos}
-                      onChange={(e) => handleSubscriptionChange(index, 'qos', e.target.value)}
-                    >
-                      <option value={0}>0</option>
-                      <option value={1}>1</option>
-                      <option value={2}>2</option>
-                    </select>
+                    <div className="custom-select-wrapper small qos-select-wrapper">
+                      <button 
+                        type="button" 
+                        className="custom-select-button"
+                        onClick={() => toggleSubscriptionQosDropdown(index)}
+                      >
+                        <span className="select-value">
+                          {subscription.qos}
+                        </span>
+                        <i className={`fas fa-chevron-down ${subscriptionQosDropdowns[index] ? 'rotated' : ''}`}></i>
+                      </button>
+                      {subscriptionQosDropdowns[index] && (
+                        <div className="custom-select-dropdown">
+                          <button 
+                            type="button"
+                            className={`dropdown-option ${subscription.qos == 0 ? 'selected' : ''}`}
+                            onClick={() => {
+                              handleSubscriptionChange(index, 'qos', 0);
+                              toggleSubscriptionQosDropdown(index);
+                            }}
+                          >
+                            0
+                          </button>
+                          <button 
+                            type="button"
+                            className={`dropdown-option ${subscription.qos == 1 ? 'selected' : ''}`}
+                            onClick={() => {
+                              handleSubscriptionChange(index, 'qos', 1);
+                              toggleSubscriptionQosDropdown(index);
+                            }}
+                          >
+                            1
+                          </button>
+                          <button 
+                            type="button"
+                            className={`dropdown-option ${subscription.qos == 2 ? 'selected' : ''}`}
+                            onClick={() => {
+                              handleSubscriptionChange(index, 'qos', 2);
+                              toggleSubscriptionQosDropdown(index);
+                            }}
+                          >
+                            2
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   
                   {formData.subscriptions.length > 1 && (

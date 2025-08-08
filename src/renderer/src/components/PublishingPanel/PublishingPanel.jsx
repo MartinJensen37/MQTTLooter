@@ -670,7 +670,7 @@ function PublishingPanel({
             <div className="form-options">
               <div className="form-group">
                 <label htmlFor="qos">Quality of Service:</label>
-                <div className="qos-select-wrapper custom-select-wrapper">
+                <div className="qos-select-wrapper custom-select-wrapper large">
                   <button
                     type="button"
                     className="custom-select-button"

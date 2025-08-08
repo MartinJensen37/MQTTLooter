@@ -188,7 +188,8 @@
   border-color: #dc3545;
 }
 
-.mqtt-protocol {
+.mqtt-protocol,
+.mqtt-protocol-select {
   border: none;
   border-right: 1px solid #ced4da;
   border-radius: 0;
@@ -204,7 +205,8 @@
   box-sizing: border-box; /* Ensure padding is included in width */
 }
 
-.mqtt-protocol:focus {
+.mqtt-protocol:focus,
+.mqtt-protocol-select:focus {
   outline: none;
   background: #e9ecef;
   box-shadow: none;
@@ -416,7 +418,7 @@
 .mqtt-subscription-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 6px;
   margin-bottom: 12px;
   padding: 16px;
   background: #f8f9fa;
@@ -430,7 +432,7 @@
 }
 
 .mqtt-qos-group {
-  width: 80px;
+  width: 60px;
   flex-shrink: 0;
   margin-bottom: 0;
 }
@@ -446,7 +448,7 @@
   color: white;
   border: none;
   padding: 8px 12px;
-  border-radius: 16px;
+  border-radius: var(--radius-pill);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -462,7 +464,7 @@
   background: #dc3545;
   color: white;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
   font-size: 12px;
   width: 32px;
@@ -473,6 +475,8 @@
   flex-shrink: 0;
   margin-top: 28px;
   transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
 }
 
 .mqtt-remove-btn:hover {
@@ -494,7 +498,7 @@
 .mqtt-cancel-btn,
 .mqtt-save-btn {
   padding: 10px 20px;
-  border-radius: 20px;
+  border-radius: var(--radius-pill);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;

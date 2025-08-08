@@ -547,8 +547,7 @@ function RecordingPanel({
                     <div className="recording-item-stats">
                       <span><i className="fas fa-envelope"></i> {recording.messageCount} messages</span>
                       <span><i className="fas fa-clock"></i> {Math.round((recording.endTime - recording.startTime) / 1000)}s</span>
-                      <span><i className="fas fa-tag"></i> {recording.topic}</span>
-                      <span><i className="fas fa-list"></i> {getUniqueTopics(recording.messages).length} topics</span>
+                      <span><i className="fas fa-tag"></i> {getUniqueTopics(recording.messages).length} {getUniqueTopics(recording.messages).length === 1 ? 'topic' : 'topics'}</span>
                     </div>
                     <div className="recording-item-time">
                       {recording.startTime.toLocaleString()} - {recording.endTime.toLocaleString()}
@@ -693,8 +692,8 @@ function RecordingPanel({
                               <option value={1}>1 msg</option>
                               <option value={5}>5 msgs</option>
                               <option value={10}>10 msgs</option>
-                              <option value={25}>25 msgs</option>
-                              <option value={50}>50 msgs</option>
+                              <option value={15}>15 msgs</option>
+                              <option value={20}>20 msgs</option>
                             </select>
                           </div>
                         </div>

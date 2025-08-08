@@ -432,8 +432,9 @@ function SimulationPanel({
             <h3>Simulated Devices</h3>
             <button 
               onClick={() => setShowAddDevice(true)}
-              className="btn btn-sm btn-primary add-device-btn"
+              className="btn btn-sm btn-primary"
               title="Add Simulated Device"
+              style={{ borderRadius: 'var(--radius-pill)' }}
             >
               <i className="fas fa-plus"></i>
             </button>
@@ -463,8 +464,9 @@ function SimulationPanel({
                         e.stopPropagation();
                         deleteDevice(device.id);
                       }}
-                      className="btn btn-sm delete-device-btn"
+                      className="btn btn-sm btn-danger"
                       title="Delete device"
+                      style={{ borderRadius: 'var(--radius-pill)' }}
                     >
                       <i className="fas fa-trash"></i>
                     </button>
@@ -545,6 +547,8 @@ function DeviceConfigPanel({
   isConnected,
   onEditOutput
 }) {
+  const [intervalDropdownOpen, setIntervalDropdownOpen] = useState(false);
+
   const handleEditOutput = (output) => {
     if (device.isPublishing) {
       onTogglePublishing(device.id);
@@ -570,8 +574,9 @@ function DeviceConfigPanel({
           <h4><i className="fas fa-box"></i> Outputs</h4>
           <button 
             onClick={() => onAddOutput(device.id)}
-            className="btn btn-sm btn-success add-output-btn"
+            className="btn btn-sm btn-success"
             title="Add Output"
+            style={{ borderRadius: 'var(--radius-pill)' }}
           >
             <i className="fas fa-plus"></i>
           </button>
@@ -595,16 +600,18 @@ function DeviceConfigPanel({
               <div className="output-actions">
                 <button 
                   onClick={() => handleEditOutput(output)}
-                  className="btn btn-sm edit-output-btn"
+                  className="btn btn-sm btn-secondary"
                   title="Edit output"
+                  style={{ borderRadius: 'var(--radius-pill)' }}
                 >
                   <i className="fas fa-edit"></i>
                 </button>
                 <button 
                   onClick={() => onRemoveOutput(device.id, output.id)}
-                  className="btn btn-sm remove-output-btn"
+                  className="btn btn-sm btn-danger"
                   title="Remove output"
                   disabled={device.outputs.length <= 1}
+                  style={{ borderRadius: 'var(--radius-pill)' }}
                 >
                   <i className="fas fa-trash"></i>
                 </button>
@@ -616,27 +623,95 @@ function DeviceConfigPanel({
 
       {/* Publishing Controls */}
       <div className="publishing-controls">
-        <div className="interval-control">
-          <label><i className="fas fa-clock"></i> Publish Interval:</label>
-          <select 
-            value={device.publishInterval}
-            onChange={(e) => onUpdateDevice(device.id, { publishInterval: parseInt(e.target.value) })}
-            className="form-input"
-          >
-            <option value={1000}>1s</option>
-            <option value={2000}>2s</option>
-            <option value={5000}>5s</option>
-            <option value={10000}>10s</option>
-            <option value={30000}>30s</option>
-            <option value={60000}>1m</option>
-          </select>
-        </div>
-
-        <div className="publishing-buttons">
+          <div className="interval-control">
+            <label><i className="fas fa-clock"></i> Publish Interval:</label>
+            <div className="custom-select-wrapper">
+              <button 
+                type="button" 
+                className="custom-select-button"
+                onClick={() => setIntervalDropdownOpen(!intervalDropdownOpen)}
+              >
+                <span className="select-value">
+                  {device.publishInterval === 1000 ? '1s' :
+                   device.publishInterval === 2000 ? '2s' :
+                   device.publishInterval === 5000 ? '5s' :
+                   device.publishInterval === 10000 ? '10s' :
+                   device.publishInterval === 30000 ? '30s' :
+                   device.publishInterval === 60000 ? '1m' : '5s'}
+                </span>
+                <i className={`fas fa-chevron-down ${intervalDropdownOpen ? 'rotated' : ''}`}></i>
+              </button>
+              {intervalDropdownOpen && (
+                <div className="custom-select-dropdown">
+                  <button 
+                    type="button"
+                    className={`dropdown-option ${device.publishInterval === 1000 ? 'selected' : ''}`}
+                    onClick={() => {
+                      onUpdateDevice(device.id, { publishInterval: 1000 });
+                      setIntervalDropdownOpen(false);
+                    }}
+                  >
+                    1s
+                  </button>
+                  <button 
+                    type="button"
+                    className={`dropdown-option ${device.publishInterval === 2000 ? 'selected' : ''}`}
+                    onClick={() => {
+                      onUpdateDevice(device.id, { publishInterval: 2000 });
+                      setIntervalDropdownOpen(false);
+                    }}
+                  >
+                    2s
+                  </button>
+                  <button 
+                    type="button"
+                    className={`dropdown-option ${device.publishInterval === 5000 ? 'selected' : ''}`}
+                    onClick={() => {
+                      onUpdateDevice(device.id, { publishInterval: 5000 });
+                      setIntervalDropdownOpen(false);
+                    }}
+                  >
+                    5s
+                  </button>
+                  <button 
+                    type="button"
+                    className={`dropdown-option ${device.publishInterval === 10000 ? 'selected' : ''}`}
+                    onClick={() => {
+                      onUpdateDevice(device.id, { publishInterval: 10000 });
+                      setIntervalDropdownOpen(false);
+                    }}
+                  >
+                    10s
+                  </button>
+                  <button 
+                    type="button"
+                    className={`dropdown-option ${device.publishInterval === 30000 ? 'selected' : ''}`}
+                    onClick={() => {
+                      onUpdateDevice(device.id, { publishInterval: 30000 });
+                      setIntervalDropdownOpen(false);
+                    }}
+                  >
+                    30s
+                  </button>
+                  <button 
+                    type="button"
+                    className={`dropdown-option ${device.publishInterval === 60000 ? 'selected' : ''}`}
+                    onClick={() => {
+                      onUpdateDevice(device.id, { publishInterval: 60000 });
+                      setIntervalDropdownOpen(false);
+                    }}
+                  >
+                    1m
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>        <div className="publishing-buttons">
           <button 
             onClick={() => onTogglePublishing(device.id)}
-            className={`btn btn-md toggle-publishing-btn ${device.isPublishing ? 'btn-danger stop' : 'btn-success start'}`}
+            className={`btn btn-md ${device.isPublishing ? 'btn-danger stop' : 'btn-success start'}`}
             disabled={!isConnected}
+            style={{ borderRadius: 'var(--radius-pill)' }}
           >
             <i className={`fas fa-${device.isPublishing ? 'stop' : 'play'}`}></i>
             {device.isPublishing ? 'Stop Loop' : 'Start Loop'}
@@ -644,8 +719,9 @@ function DeviceConfigPanel({
           
           <button 
             onClick={() => onPublishOnce(device.id)}
-            className="btn btn-md btn-primary publish-once-btn"
+            className="btn btn-md btn-primary"
             disabled={!isConnected}
+            style={{ borderRadius: 'var(--radius-pill)' }}
           >
             <i className="fas fa-paper-plane"></i>
             Publish Once
@@ -712,7 +788,10 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }) {
       <div className="modal-content">
         <div className="modal-header">
           <h3>Add Simulated Device</h3>
-          <button onClick={onClose} className="btn btn-sm modal-close-btn">
+          <button 
+            onClick={onClose} 
+            className="modal-close-btn"
+          >
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -744,10 +823,19 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }) {
           </div>
           
           <div className="form-actions">
-            <button type="button" onClick={onClose} className="btn btn-md btn-secondary cancel-btn">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="btn btn-md btn-secondary"
+              style={{ borderRadius: 'var(--radius-pill)' }}
+            >
               Cancel
             </button>
-            <button type="submit" className="btn btn-md btn-primary create-btn">
+            <button 
+              type="submit" 
+              className="btn btn-md btn-primary"
+              style={{ borderRadius: 'var(--radius-pill)' }}
+            >
               Create Device
             </button>
           </div>
@@ -770,6 +858,9 @@ function EditOutputModal({ output, onClose, onSave }) {
   });
 
   const [previewValue, setPreviewValue] = useState(null);
+  const [dataTypeDropdownOpen, setDataTypeDropdownOpen] = useState(false);
+  const [generatorDropdownOpen, setGeneratorDropdownOpen] = useState(false);
+  const [decimalDropdownOpen, setDecimalDropdownOpen] = useState(false);
 
   // Update preview when form data changes
   useEffect(() => {
@@ -986,7 +1077,10 @@ function EditOutputModal({ output, onClose, onSave }) {
       <div className="modal-content modal-large">
         <div className="modal-header">
           <h3>Edit Output: {output.name}</h3>
-          <button onClick={onClose} className="btn btn-sm modal-close-btn">
+          <button 
+            onClick={onClose} 
+            className="modal-close-btn"
+          >
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -1007,15 +1101,35 @@ function EditOutputModal({ output, onClose, onSave }) {
             
             <div className="form-group">
               <label>Data Type:</label>
-              <select 
-                value={formData.dataType}
-                onChange={(e) => handleDataTypeChange(e.target.value)}
-                className="form-input"
-              >
-                {Object.entries(DATA_TYPE_CONFIGS).map(([key, config]) => (
-                  <option key={key} value={key}>{config.label}</option>
-                ))}
-              </select>
+              <div className="custom-select-wrapper">
+                <button 
+                  type="button" 
+                  className="custom-select-button"
+                  onClick={() => setDataTypeDropdownOpen(!dataTypeDropdownOpen)}
+                >
+                  <span className="select-value">
+                    {DATA_TYPE_CONFIGS[formData.dataType]?.label || formData.dataType}
+                  </span>
+                  <i className={`fas fa-chevron-down ${dataTypeDropdownOpen ? 'rotated' : ''}`}></i>
+                </button>
+                {dataTypeDropdownOpen && (
+                  <div className="custom-select-dropdown">
+                    {Object.entries(DATA_TYPE_CONFIGS).map(([key, config]) => (
+                      <button 
+                        key={key}
+                        type="button"
+                        className={`dropdown-option ${formData.dataType === key ? 'selected' : ''}`}
+                        onClick={() => {
+                          handleDataTypeChange(key);
+                          setDataTypeDropdownOpen(false);
+                        }}
+                      >
+                        {config.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Unit field - only for number type */}
@@ -1036,14 +1150,35 @@ function EditOutputModal({ output, onClose, onSave }) {
             {DATA_TYPE_CONFIGS[formData.dataType]?.hasDecimalPrecision && (
               <div className="form-group">
                 <label>Decimal Places:</label>
-                <input 
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={formData.decimalPrecision}
-                  onChange={(e) => updateFormData('decimalPrecision', parseInt(e.target.value))}
-                  className="form-input"
-                />
+                <div className="custom-select-wrapper">
+                  <button 
+                    type="button" 
+                    className="custom-select-button"
+                    onClick={() => setDecimalDropdownOpen(!decimalDropdownOpen)}
+                  >
+                    <span className="select-value">
+                      {formData.decimalPrecision}
+                    </span>
+                    <i className={`fas fa-chevron-down ${decimalDropdownOpen ? 'rotated' : ''}`}></i>
+                  </button>
+                  {decimalDropdownOpen && (
+                    <div className="custom-select-dropdown">
+                      {[0, 1, 2, 3, 4, 5].map(precision => (
+                        <button 
+                          key={precision}
+                          type="button"
+                          className={`dropdown-option ${formData.decimalPrecision === precision ? 'selected' : ''}`}
+                          onClick={() => {
+                            updateFormData('decimalPrecision', precision);
+                            setDecimalDropdownOpen(false);
+                          }}
+                        >
+                          {precision}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1063,17 +1198,35 @@ function EditOutputModal({ output, onClose, onSave }) {
           {/* Generator Selection */}
           <div className="form-group">
             <label>Value Generator:</label>
-            <select 
-              value={formData.generator}
-              onChange={(e) => handleGeneratorChange(e.target.value)}
-              className="form-input"
-            >
-              {availableGenerators.map(generator => (
-                <option key={generator} value={generator}>
-                  {GENERATOR_CONFIGS[generator]?.label || generator}
-                </option>
-              ))}
-            </select>
+            <div className="custom-select-wrapper">
+              <button 
+                type="button" 
+                className="custom-select-button"
+                onClick={() => setGeneratorDropdownOpen(!generatorDropdownOpen)}
+              >
+                <span className="select-value">
+                  {GENERATOR_CONFIGS[formData.generator]?.label || formData.generator}
+                </span>
+                <i className={`fas fa-chevron-down ${generatorDropdownOpen ? 'rotated' : ''}`}></i>
+              </button>
+              {generatorDropdownOpen && (
+                <div className="custom-select-dropdown">
+                  {availableGenerators.map(generator => (
+                    <button 
+                      key={generator}
+                      type="button"
+                      className={`dropdown-option ${formData.generator === generator ? 'selected' : ''}`}
+                      onClick={() => {
+                        handleGeneratorChange(generator);
+                        setGeneratorDropdownOpen(false);
+                      }}
+                    >
+                      {GENERATOR_CONFIGS[generator]?.label || generator}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Dynamic Configuration Fields */}
@@ -1093,10 +1246,19 @@ function EditOutputModal({ output, onClose, onSave }) {
           </div>
           
           <div className="form-actions">
-            <button type="button" onClick={onClose} className="btn btn-md btn-secondary cancel-btn">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="btn btn-md btn-secondary"
+              style={{ borderRadius: 'var(--radius-pill)' }}
+            >
               Cancel
             </button>
-            <button type="submit" className="btn btn-md btn-primary save-btn">
+            <button 
+              type="submit" 
+              className="btn btn-md btn-primary"
+              style={{ borderRadius: 'var(--radius-pill)' }}
+            >
               Save Output
             </button>
           </div>
@@ -1108,6 +1270,15 @@ function EditOutputModal({ output, onClose, onSave }) {
 
 // Dynamic configuration fields component
 function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
+  const [booleanValueDropdownOpen, setBooleanValueDropdownOpen] = useState(false);
+  const [patternValueDropdowns, setPatternValueDropdowns] = useState({});
+
+  const togglePatternDropdown = (index) => {
+    setPatternValueDropdowns(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
   const renderNumberFields = () => {
     switch (generator) {
       case 'static':
@@ -1279,14 +1450,42 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
         return (
           <div className="form-group">
             <label>Value:</label>
-            <select 
-              value={config.value ? 'true' : 'false'}
-              onChange={(e) => onConfigChange('value', e.target.value === 'true')}
-              className="form-input"
-            >
-              <option value="true">True</option>
-              <option value="false">False</option>
-            </select>
+            <div className="custom-select-wrapper">
+              <button 
+                type="button" 
+                className="custom-select-button"
+                onClick={() => setBooleanValueDropdownOpen(!booleanValueDropdownOpen)}
+              >
+                <span className="select-value">
+                  {config.value ? 'True' : 'False'}
+                </span>
+                <i className={`fas fa-chevron-down ${booleanValueDropdownOpen ? 'rotated' : ''}`}></i>
+              </button>
+              {booleanValueDropdownOpen && (
+                <div className="custom-select-dropdown">
+                  <button 
+                    type="button"
+                    className={`dropdown-option ${config.value === true ? 'selected' : ''}`}
+                    onClick={() => {
+                      onConfigChange('value', true);
+                      setBooleanValueDropdownOpen(false);
+                    }}
+                  >
+                    True
+                  </button>
+                  <button 
+                    type="button"
+                    className={`dropdown-option ${config.value === false ? 'selected' : ''}`}
+                    onClick={() => {
+                      onConfigChange('value', false);
+                      setBooleanValueDropdownOpen(false);
+                    }}
+                  >
+                    False
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         );
       
@@ -1313,18 +1512,46 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
             <div className="pattern-editor">
               {(config.sequence || []).map((value, index) => (
                 <div key={index} className="pattern-item">
-                  <select 
-                    value={value ? 'true' : 'false'}
-                    onChange={(e) => {
-                      const newSequence = [...(config.sequence || [])];
-                      newSequence[index] = e.target.value === 'true';
-                      onConfigChange('sequence', newSequence);
-                    }}
-                    className="form-input"
-                  >
-                    <option value="true">True</option>
-                    <option value="false">False</option>
-                  </select>
+                  <div className="custom-select-wrapper">
+                    <button 
+                      type="button" 
+                      className="custom-select-button"
+                      onClick={() => togglePatternDropdown(index)}
+                    >
+                      <span className="select-value">
+                        {value ? 'True' : 'False'}
+                      </span>
+                      <i className={`fas fa-chevron-down ${patternValueDropdowns[index] ? 'rotated' : ''}`}></i>
+                    </button>
+                    {patternValueDropdowns[index] && (
+                      <div className="custom-select-dropdown">
+                        <button 
+                          type="button"
+                          className={`dropdown-option ${value === true ? 'selected' : ''}`}
+                          onClick={() => {
+                            const newSequence = [...(config.sequence || [])];
+                            newSequence[index] = true;
+                            onConfigChange('sequence', newSequence);
+                            togglePatternDropdown(index);
+                          }}
+                        >
+                          True
+                        </button>
+                        <button 
+                          type="button"
+                          className={`dropdown-option ${value === false ? 'selected' : ''}`}
+                          onClick={() => {
+                            const newSequence = [...(config.sequence || [])];
+                            newSequence[index] = false;
+                            onConfigChange('sequence', newSequence);
+                            togglePatternDropdown(index);
+                          }}
+                        >
+                          False
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button 
                     type="button"
                     onClick={() => {
@@ -1332,7 +1559,8 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                       newSequence.splice(index, 1);
                       onConfigChange('sequence', newSequence);
                     }}
-                    className="btn btn-sm btn-danger remove-pattern-btn"
+                    className="btn btn-sm btn-danger"
+                    style={{ borderRadius: 'var(--radius-pill)' }}
                   >
                     ×
                   </button>
@@ -1344,7 +1572,8 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                   const newSequence = [...(config.sequence || []), true];
                   onConfigChange('sequence', newSequence);
                 }}
-                className="btn btn-sm btn-success add-pattern-btn"
+                className="btn btn-sm btn-success"
+                style={{ borderRadius: 'var(--radius-pill)' }}
               >
                 Add Step
               </button>
@@ -1397,7 +1626,8 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                       newValues.splice(index, 1);
                       onConfigChange('values', newValues);
                     }}
-                    className="btn btn-sm btn-danger remove-value-btn"
+                    className="btn btn-sm btn-danger"
+                    style={{ borderRadius: 'var(--radius-pill)' }}
                   >
                     ×
                   </button>
@@ -1409,7 +1639,8 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                   const newValues = [...(config.values || []), ''];
                   onConfigChange('values', newValues);
                 }}
-                className="btn btn-sm btn-success add-value-btn"
+                className="btn btn-sm btn-success"
+                style={{ borderRadius: 'var(--radius-pill)' }}
               >
                 Add Value
               </button>
@@ -1455,7 +1686,8 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                       newValues.splice(index, 1);
                       onConfigChange('weightedValues', newValues);
                     }}
-                    className="btn btn-sm btn-danger remove-value-btn"
+                    className="btn btn-sm btn-danger"
+                    style={{ borderRadius: 'var(--radius-pill)' }}
                   >
                     ×
                   </button>
@@ -1467,7 +1699,8 @@ function DynamicConfigFields({ dataType, generator, config, onConfigChange }) {
                   const newValues = [...(config.weightedValues || []), { value: '', weight: 1 }];
                   onConfigChange('weightedValues', newValues);
                 }}
-                className="btn btn-sm btn-success add-value-btn"
+                className="btn btn-sm btn-success"
+                style={{ borderRadius: 'var(--radius-pill)' }}
               >
                 Add Weighted Value
               </button>

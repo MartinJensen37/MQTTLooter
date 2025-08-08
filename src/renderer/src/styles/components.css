@@ -98,6 +98,23 @@
   min-width: 140px;
 }
 
+/* Size variants for custom select wrapper */
+.custom-select-wrapper.small {
+  min-width: 60px;
+}
+
+.custom-select-wrapper.medium {
+  min-width: 100px;
+}
+
+.custom-select-wrapper.large {
+  min-width: 200px;
+}
+
+.custom-select-wrapper.extra-large {
+  min-width: 300px;
+}
+
 .custom-select-button {
   width: 100%;
   padding: 10px 12px;
@@ -116,6 +133,31 @@
   box-sizing: border-box;
   color: var(--gray-700);
   font-weight: 500;
+}
+
+/* Size variants for custom select button */
+.custom-select-wrapper.small .custom-select-button {
+  padding: 8px 10px;
+  font-size: 13px;
+  height: 36px;
+}
+
+.custom-select-wrapper.medium .custom-select-button {
+  padding: 9px 11px;
+  font-size: 13px;
+  height: 38px;
+}
+
+.custom-select-wrapper.large .custom-select-button {
+  padding: 12px 14px;
+  font-size: 15px;
+  height: 46px;
+}
+
+.custom-select-wrapper.extra-large .custom-select-button {
+  padding: 14px 16px;
+  font-size: 16px;
+  height: 50px;
 }
 
 .custom-select-button:hover:not(:disabled) {
@@ -368,6 +410,38 @@
   color: white;
   opacity: 1;
   transform: scale(1.1);
+}
+
+/* Modal Close Button */
+.modal-close-btn {
+  background: none;
+  border: none;
+  color: var(--gray-500);
+  cursor: pointer;
+  font-size: 28px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  border-radius: 0;
+  padding: 0;
+}
+
+.modal-close-btn:hover {
+  color: var(--gray-900);
+  background: none;
+  transform: scale(1.25);
+  font-weight: bold;
+}
+
+.modal-close-btn:focus {
+  outline: none;
+  color: var(--gray-900);
+  background: none;
+  transform: scale(1.25);
+  font-weight: bold;
 }
 
 /* Responsive utilities */
