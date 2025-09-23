@@ -1,21 +1,25 @@
 {
   "name": "mqttlooter",
   "productName": "MQTTLooter",
-  "version": "1.0.0",
+  "version": "0.3.0",
   "description": "An MQTT client for exploring topics and messages.",
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
-    "dev:renderer": "cd src/renderer && cross-env BROWSER=none npm start",
-    "dev:electron": "wait-on http://localhost:3000 ; cross-env NODE_ENV=development electron .",
+    "dev:renderer": "cd src/renderer && cross-env BROWSER=none GENERATE_SOURCEMAP=false FAST_REFRESH=false npm start",
+    "dev:electron": "wait-on http://localhost:3000 --timeout 30000 && cross-env NODE_ENV=development electron .",
+    "dev:fast": "concurrently \"npm run dev:renderer:fast\" \"npm run dev:electron:fast\"",
+    "dev:renderer:fast": "cd src/renderer && npm run start:fast",
+    "dev:electron:fast": "wait-on http://localhost:3000 --timeout 15000 && cross-env NODE_ENV=development electron .",
     "electron": "cross-env NODE_ENV=development electron .",
     "electron:powershell": "powershell -Command \"$env:NODE_ENV = 'development'; electron .\"",
     "electron:cmd": "cmd /c \"set NODE_ENV=development && electron .\"",
     "build:renderer": "cd src/renderer && npm run build",
     "dist": "npm run build:renderer && electron-builder",
     "pack": "electron-builder --dir",
-    "lint": "echo \"No linting configured\""
+    "lint": "echo \"No linting configured\"",
+    "start:prod": "npm run build:renderer && electron ."
   },
   "build": {
     "appId": "com.martinjensen37.mqttlooter",
@@ -29,8 +33,11 @@
       "src/preload/**/*",
       "src/renderer/build/**/*",
       "assets/**/*",
-      "package.json"
+      "package.json",
+      "!src/renderer/build/**/*.map",
+      "!**/*.md"
     ],
+    "compression": "maximum",
     "win": {
       "target": [
         {
@@ -38,8 +45,9 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/MQTTLooter_logo_tiny.ico",
-      "publisherName": "martinjensen37"
+      "icon": "assets/MQTTLooter_logo_small.ico",
+      "publisherName": "martinjensen37",
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
@@ -47,12 +55,13 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "MQTTLooter",
-      "installerIcon": "assets/MQTTLooter_logo_tiny.ico",
-      "uninstallerIcon": "assets/MQTTLooter_logo_tiny.ico",
-      "installerHeaderIcon": "assets/MQTTLooter_logo_tiny.ico",
+      "installerIcon": "assets/MQTTLooter_logo_small.ico",
+      "uninstallerIcon": "assets/MQTTLooter_logo_small.ico",
+      "installerHeaderIcon": "assets/MQTTLooter_logo_small.ico",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
-      "artifactName": "${productName} Setup ${version}.${ext}"
+      "artifactName": "${productName} Setup ${version}.${ext}",
+      "differentialPackage": false
     }
   },
   "dependencies": {
