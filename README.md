@@ -2,288 +2,340 @@
 
 An advanced MQTT client for exploring topics, analyzing message flows, and simulating IoT devices with a powerful graphical interface.
 
-## 🚀 Features
+## Features
 
 MQTTLooter is a comprehensive MQTT client designed for developers, IoT engineers, and system administrators who need to interact with MQTT brokers in sophisticated ways.
 
 ### Core MQTT Functionality
-- **Multi-connection Management**: Connect to multiple MQTT brokers simultaneously
-- **Protocol Support**: Full MQTT 3.1.1 and MQTT 5.0 support
-- **Secure Connections**: TLS/SSL support with certificate management
-- **Authentication**: Username/password and certificate-based authentication
-- **QoS Levels**: Support for all QoS levels (0, 1, 2)
-- **Retained Messages**: Full retained message support
+- Multi-connection management with simultaneous broker connections
+- Full MQTT 3.1.1 and MQTT 5.0 protocol support
+- TLS/SSL encryption with certificate management
+- Username/password and client certificate authentication
+- All QoS levels (0, 1, 2) with retained message support
 
-### 📊 Topic Tree & Message Exploration
-- **Interactive Topic Tree**: Hierarchical visualization of all MQTT topics
-- **Real-time Updates**: Live topic tree updates as messages arrive
-- **Message History**: Store and browse message history for each topic
-- **Search & Filter**: Advanced topic search and filtering capabilities
-- **Statistics**: Real-time message rate and connection statistics
-- **Expandable Tree**: Collapse/expand topic branches for better navigation
+### Topic Tree and Message Exploration
+- Hierarchical topic visualization with automatic organization
+- Real-time message rate statistics per topic
+- Message history storage (up to 300 messages per topic)
+- Topic search and filtering
+- Export topic messages as JSON or CSV
+- Expandable/collapsible tree navigation
 
-### ✉️ Message Publishing
-- **Manual Publishing**: Send messages to any topic with custom QoS and retain settings
-- **Message Templates**: Pre-built and custom message templates with variables
-- **Template Categories**: Organized templates for IoT sensors, smart home, vehicle tracking, etc.
-- **Schema Validation**: JSON schema validation for message templates
-- **Variable Substitution**: Dynamic variable replacement with functions like `{{timestamp}}`, `{{randomFloat()}}`, etc.
-- **Template Import/Export**: Share message templates across different installations
+### Message Publishing
+- Manual message publishing with QoS and retain configuration
+- Message template system with variable substitution
+- Built-in templates for common IoT scenarios (weather stations, smart home devices, vehicle tracking)
+- JSON schema validation for template payloads
+- Template variables: `{{timestamp}}`, `{{randomFloat(min, max, precision)}}`, `{{randomInt(min, max)}}`, `{{randomChoice("a", "b")}}`, `{{uuid}}`
+- Template import/export functionality
+- Publishing history tracking
 
-### 📹 Recording & Playback
-- **Message Recording**: Record all incoming messages for later analysis
-- **Session Management**: Save and load recording sessions
-- **Playback Control**: Play back recorded sessions with speed control
-- **Topic Filtering**: Filter playback by specific topics
-- **Re-publishing**: Option to republish recorded messages during playback
-- **Export/Import**: Save recordings as JSON files for sharing
+### Recording and Playback
+- Record MQTT message sessions with full metadata
+- Playback with variable speed control (0.5x - 4x)
+- Step-by-step message navigation
+- Topic filtering during playback
+- Optional message re-publishing during playback
+- Save/load recording sessions as JSON files
+- Session renaming and organization
 
-### 🤖 Device Simulation
-- **Virtual Devices**: Create simulated IoT devices that publish realistic data
-- **Multiple Data Types**: Support for numbers, strings, booleans, and objects
-- **Data Generators**: Various data generation methods:
+### Device Simulation
+- Create virtual IoT devices with multiple data outputs
+- Configurable publishing intervals per device
+- Multiple data types: number, boolean, string, enum
+- Data generation methods:
   - Static values
-  - Random ranges (uniform, normal distribution)
-  - Sine waves for periodic data
-  - Exponential distributions
-  - Pattern sequences
-  - Weighted random selections
-- **Real-time Publishing**: Continuous data publishing with configurable intervals
-- **Device Management**: Start/stop, configure, and monitor multiple simulated devices
+  - Uniform random distribution
+  - Normal (Gaussian) distribution with mean and standard deviation
+  - Sine wave patterns for periodic data
+  - Exponential distribution
+  - Pattern sequences with configurable intervals
+  - Weighted random selection
+  - List-based random selection
+- Decimal precision control for numeric values
+- Optional unit suffixes for measurements
+- Timestamp inclusion per output
+- Real-time value preview
+- Batch device control (start/stop all)
 
-### 🔧 Advanced Features
-- **Keyboard Shortcuts**: Quick access with F1-F4 keys for different panels
-- **Connection Profiles**: Save and reuse connection configurations
-- **Data Persistence**: Automatic saving of connections, templates, and recordings
-- **Multi-panel Interface**: Tabbed interface for different functionalities
-- **Responsive Design**: Adaptive UI that works on different screen sizes
-- **Theme Support**: Modern, clean interface with intuitive navigation
+### User Interface
+- Resizable panel layout with persistent sizing
+- Keyboard shortcuts: F1 (Topic Tree), F2 (Publishing), F3 (Recording), F4 (Simulation)
+- Tabbed interface for different functionality panels
+- Toast notifications for user feedback
+- Connection sidebar with connection management
+- Collapsible panels for workspace optimization
 
-## 📥 Downloads & Releases
+## Downloads and Releases
 
 ### Latest Release: v0.3.0
 
-**Windows Installer**: MQTTLooter Setup 0.3.0.exe
+**Windows Installer**: `MQTTLooter Setup 0.3.0.exe`
 
-The installer provides:
-- Easy installation with desktop and start menu shortcuts
-- Automatic updates support
-- Clean uninstallation option
-- Per-user installation (no admin rights required)
+Installer features:
+- Desktop and start menu shortcuts
+- Per-user installation (no administrator rights required)
+- Clean uninstallation support
+- Configurable installation directory
 
 ### Release Notes
-- Enhanced device simulation with multiple data generators
-- Improved message template system with schema validation
-- Better connection management and statistics
+- Enhanced device simulation with 8 different data generators
+- Message template system with JSON schema validation
+- Connection management improvements
 - Recording and playback functionality
-- Performance optimizations and bug fixes
+- Performance optimizations
 
-## 🛠️ Technologies & Dependencies
+## Technologies and Dependencies
 
 ### Core Framework
-- **Electron** `36.5.0` - Cross-platform desktop application framework
-- **React** `^18.2.0` - User interface framework
-- **Node.js** - Backend JavaScript runtime
+- **Electron** 36.5.0 - Desktop application framework
+- **React** 18.2.0 - UI framework
+- **Node.js** - JavaScript runtime
 
-### MQTT & Communication
-- **mqtt** `^5.13.1` - Full-featured MQTT client library with MQTT 5.0 support
-- Supports WebSocket, TCP, and TLS connections
-- Complete QoS and retained message handling
+### MQTT Communication
+- **mqtt** 5.13.1 - MQTT client library with full MQTT 5.0 support
 
-### UI & Styling
-- **@fortawesome/fontawesome-free** `^6.7.2` - Icon library
-- **react-split-pane** `^0.1.92` - Resizable panel layouts
-- **@emotion/react** & **@emotion/styled** `^11.11.x` - CSS-in-JS styling
-- **lucide-react** `^0.263.1` - Additional icon set
-- **react-toastify** `^9.1.3` - Toast notifications
+### UI Components
+- **@fortawesome/fontawesome-free** 6.7.2 - Icon library
+- **react-split-pane** 0.1.92 - Resizable panel layouts
+- **@emotion/react** & **@emotion/styled** 11.11.x - Component styling
+- **lucide-react** 0.263.1 - Additional icons
+- **react-toastify** 9.1.3 - Notification system
 
-### Build & Development
-- **electron-builder** `^24.13.3` - Application packaging and distribution
-- **concurrently** `^7.6.0` - Run multiple commands simultaneously
-- **cross-env** `^7.0.3` - Cross-platform environment variables
-- **wait-on** `^7.2.0` - Wait for resources before starting
-- **react-scripts** `5.0.1` - React build tools
+### Build Tools
+- **electron-builder** 24.13.3 - Application packaging
+- **concurrently** 7.6.0 - Parallel script execution
+- **cross-env** 7.0.3 - Cross-platform environment variables
+- **wait-on** 7.2.0 - Resource availability checking
+- **react-scripts** 5.0.1 - React build configuration
 
-### Security & Fuses
-- **@electron/fuses** `^1.8.0` - Electron security configuration
-- Hardened security settings for production builds
+### Security
+- **@electron/fuses** 1.8.0 - Electron security hardening
 
-## 🏗️ Architecture
-
-MQTTLooter follows a modern Electron architecture:
+## Architecture
 
 ```
-src/
-├── main/           # Electron main process
-│   ├── index.js    # Application entry point
-│   ├── mqtt-connection-manager.js  # MQTT connection handling
-│   ├── menu.js     # Application menu
-│   └── ipc-handlers.js  # Inter-process communication
-├── preload/        # Preload scripts for secure IPC
-├── renderer/       # React frontend application
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── services/       # Business logic services
-│   │   └── styles/         # CSS styles
-│   └── build/      # Production build output
-└── assets/         # Application icons and resources
+MQTTLooter/
+├── src/
+│   ├── main/                          # Electron main process
+│   │   ├── index.js                   # Application entry point
+│   │   ├── mqtt-connection-manager.js # MQTT connection handling
+│   │   ├── menu.js                    # Application menu
+│   │   └── ipc-handlers.js            # IPC communication
+│   ├── preload/                       # Secure IPC bridge
+│   ├── renderer/                      # React frontend
+│   │   ├── src/
+│   │   │   ├── components/            # React components
+│   │   │   │   ├── App/
+│   │   │   │   ├── ConnectionSidebar/
+│   │   │   │   ├── TopicTree/
+│   │   │   │   ├── MessagePanel/
+│   │   │   │   ├── PublishingPanel/
+│   │   │   │   ├── RecordingPanel/
+│   │   │   │   └── SimulationPanel/
+│   │   │   ├── services/              # Business logic
+│   │   │   │   ├── MQTTService.js
+│   │   │   │   ├── TopicTreeService.js
+│   │   │   │   └── MessageTemplateService.js
+│   │   │   └── styles/                # Global styles
+│   │   └── build/                     # Production build
+│   └── assets/                        # Application icons
+├── package.json                       # Main dependencies
+└── example-templates.json             # Template examples
 ```
 
-## 📋 Detailed Functionality Guide
+## Functionality Guide
 
-### 🌳 Topic Tree View (F1)
-The Topic Tree provides a hierarchical view of all MQTT topics:
+### Topic Tree View (F1)
+The topic tree organizes MQTT topics hierarchically based on the `/` separator:
 
-- **Automatic Organization**: Topics are automatically organized in a tree structure based on the `/` separator
-- **Message Counters**: Shows message count and latest values for each topic
-- **Expandable Nodes**: Click to expand/collapse topic branches
-- **Real-time Updates**: Tree updates automatically as new messages arrive
-- **Search Functionality**: Find topics quickly with the search feature
-- **Statistics Display**: Shows total topics, messages, and message rate
+- Automatic tree structure generation from incoming messages
+- Message count badges on each topic node
+- Real-time message rate calculation (messages per second)
+- Latest message value preview
+- Click any topic to view its message history in the message panel
+- Expand/collapse all buttons for navigation
+- Clear tree function to reset all data
+- Statistics bar showing total topics, messages, and overall message rate
 
-**Features:**
-- Click any topic to view its message history
-- Expand/collapse all buttons for quick navigation
-- Clear tree function to reset the view
-- Live statistics showing activity levels
-
-### ✉️ Message Publishing (F2)
-Advanced message publishing capabilities:
+### Message Publishing (F2)
+Publish messages to MQTT topics with advanced template support:
 
 **Basic Publishing:**
-- Enter topic, payload, QoS (0, 1, 2), and retain flag
-- Support for JSON, plain text, and binary payloads
-- Auto-formatting and validation for JSON messages
-- Publish history tracking
+- Topic input with autocomplete from existing topics
+- Payload editor with JSON validation
+- QoS selection (0, 1, 2)
+- Retain flag toggle
+- Publishing history list
 
 **Message Templates:**
-MQTTLooter includes a powerful template system with pre-built templates:
+Pre-configured templates for common scenarios:
+- Weather station data (temperature, humidity, pressure, wind)
+- Device status reports (online/offline, battery, firmware)
+- GPS location tracking
+- Smart home thermostat control
+- Generic IoT sensor data
 
-- **Weather Station**: Temperature, humidity, pressure data
-- **Smart Home**: Thermostat, lighting, security sensors
-- **Vehicle Tracking**: GPS coordinates, speed, fuel level
-- **Device Status**: Online/offline status, battery levels
-- **IoT Sensors**: Generic sensor data patterns
+**Template System:**
+- Create custom templates with JSON schema validation
+- Variable substitution using double curly braces
+- Function support: `{{timestamp}}`, `{{randomFloat(min, max, decimals)}}`, `{{randomInt(min, max)}}`, `{{randomChoice("a", "b", "c")}}`, `{{uuid}}`
+- Template categories for organization
+- Import/export templates as JSON
+- Schema validation with detailed error reporting
 
-**Template Features:**
-- **Variable Substitution**: Use `{{variableName}}` for dynamic values
-- **Built-in Functions**: 
-  - `{{timestamp}}` - Current Unix timestamp
-  - `{{randomFloat(min, max, precision)}}` - Random decimal number
-  - `{{randomInt(min, max)}}` - Random integer
-  - `{{randomChoice("option1", "option2")}}` - Random selection
-- **Schema Validation**: JSON schema validation for template payloads
-- **Import/Export**: Share templates between installations
-- **Custom Variables**: Define your own variables with default values
+### Recording and Playback (F3)
+Record and analyze MQTT message flows:
 
-### 📹 Recording & Playback (F3)
-Comprehensive message recording and analysis:
+**Recording:**
+- Start/stop recording with single button
+- Real-time message counter and duration display
+- Automatic session naming with timestamp
+- Records all message metadata (topic, payload, QoS, retain, timestamp)
+- Connection information tracking
 
-**Recording Features:**
-- **Session Recording**: Record all incoming messages during a session
-- **Topic Filtering**: Record only specific topics or patterns
-- **Metadata Capture**: Timestamp, QoS, retain flag, and payload size
-- **Real-time Statistics**: Message count, duration, unique topics
-
-**Playback Features:**
-- **Speed Control**: Play back at different speeds (0.5x to 4x)
-- **Step-by-Step**: Manual step through recorded messages
-- **Topic Filtering**: Play back only selected topics
-- **Re-publishing**: Option to republish messages during playback
-- **Visual Progress**: Timeline view of message flow
+**Playback:**
+- Load recorded sessions from list or file
+- Playback speed control (0.5x, 1x, 1.5x, 2x, 3x, 4x)
+- Play/pause/reset controls
+- Step forward/backward through messages
+- Configurable step size (1, 5, 10, 15, 20 messages)
+- Current message details display
+- Optional message re-publishing during playback
+- Visual progress bar
 
 **Session Management:**
 - Save recordings to JSON files
-- Load previous recordings
-- Rename and organize sessions
-- Export recordings for analysis in other tools
+- Rename sessions inline
+- Delete unwanted recordings
+- Load recordings from file system
+- Session metadata includes start/end time, message count, unique topics
 
-### 🤖 Device Simulation (F4)
-Create and manage virtual IoT devices:
+### Device Simulation (F4)
+Create virtual IoT devices that publish realistic data:
 
-**Device Creation:**
-- **Device Profiles**: Create devices with custom names and topics
-- **Multiple Outputs**: Each device can have multiple data outputs
-- **Publishing Intervals**: Configure how often devices publish data
+**Device Configuration:**
+- Device name and topic specification
+- Multiple outputs per device
+- Configurable publishing interval (100ms to 60s)
+- Start/stop individual or all devices
 
-**Data Generation Types:**
-- **Static Values**: Fixed values for testing
-- **Random Ranges**: Uniform distribution between min/max values
-- **Normal Distribution**: Gaussian distribution with mean and standard deviation
-- **Sine Waves**: Periodic data for sensor simulation
-- **Exponential**: Exponential distribution for event modeling
-- **Pattern Sequences**: Repeat predefined value sequences
-- **Weighted Random**: Random selection with custom probabilities
-- **List Selection**: Random choice from predefined options
+**Output Configuration:**
+Each device output can be configured with:
+- Name and data type (number, boolean, string, enum)
+- Unit suffix for numeric values (e.g., °C, W, %)
+- Decimal precision (0-6 places)
+- Optional timestamp inclusion
+- Generator type selection
 
-**Device Management:**
-- **Real-time Control**: Start/stop individual devices or all at once
-- **Live Preview**: See generated values before publishing
-- **Configuration**: Easy editing of device parameters
-- **Publishing Stats**: Monitor message publication rates
+**Data Generators:**
 
-**Use Cases:**
-- **Load Testing**: Generate high-volume message traffic
-- **Sensor Simulation**: Realistic temperature, humidity, pressure data
-- **Device Prototyping**: Test applications before hardware is ready
-- **Data Pipeline Testing**: Validate data processing systems
+*Number Generators:*
+- Static: Fixed value
+- Uniform: Random value between min and max
+- Normal: Gaussian distribution with mean and standard deviation
+- Sine: Periodic wave pattern with configurable frequency
+- Exponential: Exponential distribution with lambda parameter
 
-### 🔗 Connection Management
-Sophisticated connection handling:
+*Boolean Generators:*
+- Static: Fixed true/false
+- Probability: Random with configurable true probability
+- Pattern: Sequence of true/false values with timing
 
-**Connection Profiles:**
-- Save frequently used broker configurations
-- Support for multiple simultaneous connections
-- Connection-specific topic trees and message history
+*String/Enum Generators:*
+- Static: Fixed string value
+- List: Random selection from list of options
+- Weighted: Random selection with weighted probabilities
+- Pattern: Sequence rotation through values
 
-**Security:**
-- TLS/SSL encryption with certificate validation
-- Client certificate authentication
-- Username/password authentication
-- Custom CA certificates
+**Real-time Features:**
+- Live value preview in device configuration
+- Current value display for each output
+- Publishing status indicator
+- Message payload preview
+- Start/stop all devices functionality
+
+### Connection Management
+Sophisticated broker connection handling:
+
+**Connection Configuration:**
+- Broker URL (mqtt://, mqtts://, ws://, wss://)
+- Custom client ID or auto-generation
+- Username and password authentication
+- Keep-alive interval
+- Clean session configuration
+- Connection timeout
+- Reconnect settings
+- Will message configuration
 
 **MQTT 5.0 Features:**
-- Enhanced authentication
-- Message expiry intervals
-- Topic aliases
+- Session expiry interval
+- Receive maximum
+- Maximum packet size
+- Topic alias maximum
+- Request response information
+- Request problem information
 - User properties
-- Reason codes and detailed error information
 
-## 🎯 Use Cases
+**TLS/SSL Configuration:**
+- Certificate file upload (CA, client cert, client key)
+- Reject unauthorized option
+- Certificate content preview
+
+**Connection Profiles:**
+- Save connection configurations
+- Quick connect to saved brokers
+- Connection rename and delete
+- Active connection indicator
+- Per-connection topic trees and message histories
+
+## Use Cases
 
 **IoT Development:**
-- Test MQTT message flows during development
-- Simulate device behavior before hardware deployment
-- Debug message routing and topic structures
+- Test MQTT integrations before hardware availability
+- Simulate sensor data for application development
+- Debug message routing and topic hierarchies
+- Validate QoS behavior and retained messages
 
 **System Integration:**
-- Analyze existing MQTT deployments
-- Record and replay message patterns for testing
-- Validate message schemas and data formats
+- Analyze existing MQTT infrastructure
+- Record production message patterns
+- Test system behavior with recorded data
+- Validate message schemas and formats
 
-**Education & Learning:**
-- Understand MQTT protocol behavior
-- Experiment with different QoS levels and configurations
-- Learn about retained messages and topic structures
+**Performance Testing:**
+- Simulate multiple devices for load testing
+- Generate high-frequency message streams
+- Test broker capacity and latency
+- Analyze message rate and throughput
 
-**Operations & Monitoring:**
+**Education and Learning:**
+- Understand MQTT protocol mechanics
+- Experiment with QoS levels and behavior
+- Learn topic organization patterns
+- Explore retained message concepts
+
+**Operations and Monitoring:**
 - Monitor live MQTT traffic
-- Debug connectivity issues
-- Analyze message patterns and frequencies
+- Troubleshoot connectivity issues
+- Analyze message patterns and anomalies
+- Export data for external analysis
 
-## 🔧 Building from Source
+## Building from Source
 
 ### Prerequisites
-- Node.js 16+ with npm
+- Node.js 16 or higher
+- npm package manager
 - Git
 
 ### Build Instructions
+
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd MQTTLooter
 
-# Install dependencies
+# Install main dependencies
 npm install
 
 # Install renderer dependencies
@@ -291,37 +343,51 @@ cd src/renderer
 npm install
 cd ../..
 
-# Build the renderer (React app)
+# Build the React frontend
 npm run build:renderer
 
-# Create installer
+# Create Windows installer
 npm run dist
 ```
 
-The installer will be created in the `dist-builder` directory.
+The installer will be created in the `dist-builder` directory as `MQTTLooter Setup 0.3.0.exe`.
 
 ### Development Mode
+
 ```bash
-# Start development mode (hot reload)
+# Run in development mode with hot reload
 npm run dev
 
-# Or start components separately
-npm run dev:renderer  # Start React dev server
-npm run dev:electron  # Start Electron in development mode
+# This starts both the React dev server and Electron
+# The React app runs on http://localhost:3000
+# Electron loads the dev server automatically
+
+# Alternatively, run components separately:
+npm run dev:renderer  # Start React development server
+npm run dev:electron  # Start Electron pointing to dev server
 ```
 
-## 📝 License
+### Build Configuration
 
-This project is licensed under the MIT License. See the license terms in the application or contact the developer for more information.
+The `package.json` contains electron-builder configuration for Windows NSIS installer:
+- One-click installer option disabled for user control
+- Desktop and start menu shortcuts
+- Per-user installation directory
+- Uninstaller creation
+- Application compression set to maximum
 
-## 🤝 Contributing
+## License
 
-Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
+This project is licensed under the MIT License.
 
-## 📞 Support
+## Contributing
+
+Contributions are welcome. Please submit issues for bugs or feature requests, and pull requests for code contributions.
+
+## Support
 
 For support, bug reports, or feature requests, please visit the project repository or contact the development team.
 
 ---
 
-**MQTTLooter** - Making MQTT exploration and testing intuitive and powerful.
+**MQTTLooter** - Professional MQTT client for development, testing, and operations.
