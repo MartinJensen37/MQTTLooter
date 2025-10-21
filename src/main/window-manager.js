@@ -15,13 +15,21 @@ class WindowManager {
             icon: path.join(__dirname, '../../assets/MQTTLooter_logo_small.png'), 
             show: false,
             webPreferences: {
-                nodeIntegration: true,
-                contextIsolation: false,
+                nodeIntegration: false,
+                contextIsolation: true,
                 enableRemoteModule: false,
+                preload: path.join(__dirname, '../preload/preload.js')
             }
         });
 
-        await this.mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+        const isDev = process.env.NODE_ENV === 'development';
+        
+        if (isDev) {
+            await this.mainWindow.loadURL('http://localhost:3000');
+            this.mainWindow.webContents.openDevTools();
+        } else {
+            await this.mainWindow.loadFile(path.join(__dirname, '../renderer/build/index.html'));
+        }
         
         this.mainWindow.once('ready-to-show', () => {
             this.mainWindow.show();

@@ -1,0 +1,626 @@
+/* Base sidebar styles */
+.connection-sidebar {
+  min-width: 250px;
+  max-width: 450px;
+  background: white;
+  border-right: 1px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Sidebar header */
+.sidebar-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid #e9ecef;
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+/* Logo section - white background, clickable */
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  color: #333;
+  border-width: 2px;
+  border-style: solid;
+  border-color: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  padding: 10px;
+  margin: -8px;
+}
+
+.logo-section:hover {
+  border-color: #000000;
+  transition: all 0.2s ease;
+
+}
+
+.logo-section h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #000000;
+}
+
+.app-logo {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  transition: all 0.2s ease;
+}
+
+.app-subtitle {
+  color: #6c757d;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Connections section */
+.connections-section {
+  flex: 1;
+  padding: 12px 15px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.connection-stats {
+  font-size: 12px;
+}
+
+.active-count {
+  background: #28a745;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+/* Connections list */
+.connections-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* No connections state */
+.no-connections {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6c757d;
+  text-align: center;
+  padding: 20px 10px;
+}
+
+.no-connections-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  opacity: 0.7;
+}
+
+.no-connections p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.hint {
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Sidebar footer */
+.sidebar-footer {
+  padding: 15px;
+  border-top: 1px solid #e9ecef;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Add connection button - smaller and round */
+.add-connection-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  border: 2px  #28a745;
+  background:#28a745;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  transition: all 0.2s ease;
+}
+
+.add-connection-btn:hover {
+  background: #218838;
+  color: white;
+  border-color: #218838;
+  transform: scale(1.05);
+}
+
+.plus-icon {
+  display: block;
+  line-height: 1;
+}
+
+/* Collapsed sidebar styles */
+.connection-sidebar.collapsed {
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+}
+
+.connection-sidebar.collapsed .sidebar-header {
+  padding: 10px 8px;
+}
+
+.connection-sidebar.collapsed .logo-section {
+  justify-content: center;
+  margin: 0;
+  padding: 4px;
+}
+
+.connection-sidebar.collapsed .logo-section:hover {
+  background-color: rgba(0, 123, 255, 0.1);
+}
+
+.connection-sidebar.collapsed .app-logo {
+  width: 36px;
+  height: 36px;
+}
+
+.connection-sidebar.collapsed .connections-section {
+  padding: 8px 6px;
+}
+
+.connection-sidebar.collapsed .connections-list {
+  gap: 6px;
+  align-items: center;
+}
+
+.connection-sidebar.collapsed .sidebar-footer {
+  padding: 8px 6px;
+}
+
+.connection-sidebar.collapsed .add-connection-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  font-size: 16px;
+}
+
+/* Hide elements when collapsed */
+.connection-sidebar.collapsed .section-header,
+.connection-sidebar.collapsed .no-connections {
+  display: none;
+}
+
+/* Collapsed connection card styles */
+.connection-card.collapsed {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+  margin: 2px auto;
+}
+
+.connection-card.collapsed:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+}
+
+.connection-card.collapsed.selected {
+  border-color: #007bff;
+  border-width: 3px;
+}
+
+.connection-card.collapsed.active {
+  background: #d4edda;
+  border-color: #28a745;
+}
+
+.connection-card.collapsed.inactive {
+  background: #d8d8d8d3;
+  border-color: #868686;
+}
+
+.connection-card.collapsed .connection-status-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.connection-card.collapsed .connection-status-dot.connected {
+  background: #28a745;
+  box-shadow: 0 0 6px rgba(40, 167, 69, 0.5);
+}
+
+.connection-card.collapsed .connection-status-dot.disconnected {
+  background: #929292;
+}
+
+.connection-card.collapsed .connection-status-dot.connecting {
+  background: #ffc107;
+  animation: pulse 1.5s infinite;
+}
+
+.connection-card.collapsed .connection-status-dot.error {
+  background: #dc3545;
+  border: 2px solid #fff;
+}
+
+/* MQTT version indicator inside the dot */
+.connection-card.collapsed .mqtt-version-indicator {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid white;
+}
+
+.connection-card.collapsed .mqtt-version-indicator.mqtt5 {
+  background: #b331ff;
+}
+
+.connection-card.collapsed .mqtt-version-indicator.mqtt311 {
+  background: #6c757d;
+}
+
+/* Pulse animation for connecting state */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 193, 7, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+  }
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.connection-modal {
+  background: white;
+  border-radius: 8px;
+  width: 90vw;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  outline: none;
+}
+
+.modal-header {
+  padding: 20px;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f9fa;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 18px;
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6c757d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.close-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.modal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  pointer-events: auto;
+}
+
+/* Form styles */
+.form-section {
+  margin-bottom: 24px;
+}
+
+.form-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  color: #2c3e50;
+  border-bottom: 1px solid #e9ecef;
+  padding-bottom: 8px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  color: #495057;
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+  pointer-events: auto;
+  user-select: auto;
+  outline: none;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.form-group input.error {
+  border-color: #dc3545;
+}
+
+.error-text {
+  color: #dc3545;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  margin-bottom: 0 !important;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto !important;
+  margin: 0;
+}
+
+/* Subscription management */
+.add-subscription-btn {
+  padding: 4px 8px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.add-subscription-btn:hover {
+  background: #218838;
+}
+
+.subscription-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.flex-grow {
+  flex: 1;
+}
+
+.remove-subscription-btn {
+  width: 45px;
+  height: 45px;
+  border: none;
+  background: #dc3545;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-subscription-btn:hover {
+  background: #c82333;
+}
+
+/* Modal footer */
+.modal-footer {
+  padding: 20px;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer-left,
+.footer-right {
+  display: flex;
+  gap: 8px;
+}
+
+.modal-footer button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.test-btn {
+  background: #17a2b8;
+  color: white;
+}
+
+.test-btn:hover {
+  background: #138496;
+}
+
+.cancel-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.cancel-btn:hover {
+  background: #545b62;
+}
+
+.save-btn {
+  background: #007bff;
+  color: white;
+}
+
+.save-btn:hover {
+  background: #0056b3;
+}
+
+/* Scrollbar styling */
+.connections-list::-webkit-scrollbar,
+.modal-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.connections-list::-webkit-scrollbar-track,
+.modal-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.connections-list::-webkit-scrollbar-thumb,
+.modal-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.connections-list::-webkit-scrollbar-thumb:hover,
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .connection-sidebar.collapsed {
+    width: 55px;
+    min-width: 55px;
+    max-width: 55px;
+  }
+  
+  .connection-card.collapsed {
+    width: 32px;
+    height: 32px;
+    margin: 1px auto;
+  }
+  
+  .connection-sidebar.collapsed .add-connection-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+  
+  .connection-sidebar.collapsed .app-logo {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .connection-sidebar.collapsed .connections-section {
+    padding: 8px 5px;
+  }
+  
+  .connection-sidebar.collapsed .sidebar-footer {
+    padding: 8px 5px;
+  }
+}
