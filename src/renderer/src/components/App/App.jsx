@@ -284,7 +284,9 @@ useEffect(() => {
       message: data.message,
       qos: data.qos,
       retain: data.retain,
-      timestamp: data.timestamp || Date.now()
+      timestamp: data.timestamp || Date.now(),
+      correlationData: data.correlationData || null,
+      properties: data.properties || null
     };
     
     setMessages(prev => {
@@ -802,12 +804,23 @@ useEffect(() => {
         return;
       }
 
+      // Prepare MQTT 5.0 properties if correlation data is provided
+      const properties = {};
+      const isMqtt5 = MQTTService.supportsMqtt5(selectedConnection);
+      
+      if (messageData.correlationData && isMqtt5) {
+        // Convert string to Uint8Array (Buffer equivalent for browser)
+        const encoder = new TextEncoder();
+        properties.correlationData = encoder.encode(messageData.correlationData);
+      }
+
       // Use MQTTService to publish the message
       await MQTTService.publish(selectedConnection, {
         topic: messageData.topic,
         message: messageData.payload,  // Map payload to message
         qos: messageData.qos,
-        retain: messageData.retain
+        retain: messageData.retain,
+        properties: Object.keys(properties).length > 0 ? properties : undefined
       });
       
     } catch (error) {

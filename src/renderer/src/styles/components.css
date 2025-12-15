@@ -284,6 +284,48 @@
   font-size: 9px;
 }
 
+.badge-correlation {
+  background: var(--primary-blue-light);
+  color: var(--primary-blue);
+  border: 1px solid rgba(33, 123, 243, 0.3);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.badge-correlation:hover {
+  background: var(--primary-blue);
+  color: white;
+  transform: scale(1.05);
+}
+
+.badge-correlation.highlighted {
+  background: var(--primary-blue);
+  color: white;
+  box-shadow: 0 0 0 2px rgba(33, 123, 243, 0.3);
+}
+
+.badge-correlation.correlated {
+  border-color: var(--success-green);
+  background: var(--success-green-light);
+  color: var(--success-green);
+}
+
+.badge-correlation.correlated:hover {
+  background: var(--success-green);
+  color: white;
+}
+
+.badge-correlation.orphaned {
+  border-color: var(--warning-yellow);
+  background: var(--warning-yellow-light);
+  color: var(--warning-yellow-text);
+}
+
+.badge-correlation.orphaned:hover {
+  background: var(--warning-yellow);
+  color: var(--gray-900);
+}
+
 /* Shared Panel Styles */
 .panel {
   background: rgba(255, 255, 255, 0.8);

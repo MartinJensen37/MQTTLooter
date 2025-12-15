@@ -49,6 +49,30 @@
   gap: var(--spacing-sm);
 }
 
+.topic-info-item.correlation-summary {
+  border-left: 3px solid var(--primary-blue);
+  padding-left: var(--spacing-sm);
+  background: rgba(33, 123, 243, 0.05);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+}
+
+.correlation-count {
+  font-weight: 600;
+  color: var(--primary-blue);
+}
+
+/* Message item correlation highlighting */
+.message-item.correlation-highlighted {
+  border-left: 4px solid var(--primary-blue);
+  background: rgba(33, 123, 243, 0.05);
+  transition: all var(--transition-fast);
+}
+
+.message-item.correlation-highlighted .message-header {
+  background: rgba(33, 123, 243, 0.1);
+}
+
 .topic-info-item label {
   font-weight: 600;
   color: var(--gray-700);

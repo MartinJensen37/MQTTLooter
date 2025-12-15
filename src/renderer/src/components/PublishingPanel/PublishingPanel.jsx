@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MessageTemplateService from '../../services/MessageTemplateService';
+import MQTTService from '../../services/MQTTService';
 import './PublishingPanel.css';
 
 function PublishingPanel({ 
@@ -13,6 +14,7 @@ function PublishingPanel({
   const [payload, setPayload] = useState('');
   const [qos, setQos] = useState(0);
   const [retain, setRetain] = useState(false);
+  const [correlationData, setCorrelationData] = useState('');
   const [publishHistory, setPublishHistory] = useState([]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [showQosDropdown, setShowQosDropdown] = useState(false);
@@ -25,6 +27,23 @@ function PublishingPanel({
   const [showTemplates, setShowTemplates] = useState(false);
   const [autoLoadSelectedTopic, setAutoLoadSelectedTopic] = useState(true);
   const [retainedMessageRemoved, setRetainedMessageRemoved] = useState(false);
+  const [showAdvancedMenu, setShowAdvancedMenu] = useState(false);
+
+  // Clear correlation data when advanced menu is closed or connection changes
+  useEffect(() => {
+    if (!showAdvancedMenu) {
+      setCorrelationData('');
+    }
+  }, [showAdvancedMenu]);
+
+  // Clear correlation data when connection changes or if not MQTT v5
+  useEffect(() => {
+    if (connectionId) {
+      // This will be checked when we use the correlation data
+      // For now, just clear when connection changes
+      setCorrelationData('');
+    }
+  }, [connectionId]);
 
   // Load form data from localStorage on mount
   useEffect(() => {
@@ -36,6 +55,10 @@ function PublishingPanel({
         setPayload(formState.payload || '');
         setQos(formState.qos || 0);
         setRetain(formState.retain || false);
+        setCorrelationData(formState.correlationData || '');
+        // Only restore template state if advanced menu will be open
+        setShowTemplates(formState.showTemplates || false);
+        setSelectedTemplate(formState.selectedTemplate || null);
       } catch (error) {
         console.error('Failed to load form state:', error);
       }
@@ -60,21 +83,26 @@ function PublishingPanel({
 
   // Validate payload against schema when template or payload changes
   useEffect(() => {
-    if (selectedTemplate && payload) {
+    if (selectedTemplate && payload && showAdvancedMenu && showTemplates) {
       const validation = templateService.validatePayload(selectedTemplate, payload);
       setSchemaValidation(validation);
     } else {
       setSchemaValidation(null);
     }
-  }, [selectedTemplate, payload, templateService]);
+  }, [selectedTemplate, payload, templateService, showAdvancedMenu, showTemplates]);
 
-  // Clear schema validation when templates are hidden
+  // Clear schema validation and templates when advanced menu is closed or templates are hidden
   useEffect(() => {
-    if (!showTemplates) {
+    if (!showAdvancedMenu || !showTemplates) {
       setSchemaValidation(null);
-      setSelectedTemplate(null);
+      if (!showAdvancedMenu) {
+        setShowTemplates(false);
+        setSelectedTemplate(null);
+      } else if (!showTemplates) {
+        setSelectedTemplate(null);
+      }
     }
-  }, [showTemplates]);
+  }, [showAdvancedMenu, showTemplates]);
 
   // Auto-load selected topic when toggle is enabled
   useEffect(() => {
@@ -216,9 +244,19 @@ function PublishingPanel({
 
   // Save form state to localStorage
   useEffect(() => {
-    const formState = { topic, payload, qos, retain };
+    const formState = { 
+      topic, 
+      payload, 
+      qos, 
+      retain, 
+      // Only save correlation data if it should be available
+      correlationData: isCorrelationDataAvailable() ? correlationData : '',
+      // Only save template-related state if advanced menu is open
+      showTemplates: showAdvancedMenu ? showTemplates : false,
+      selectedTemplate: showAdvancedMenu && showTemplates ? selectedTemplate : null
+    };
     localStorage.setItem('publish-form-state', JSON.stringify(formState));
-  }, [topic, payload, qos, retain]);
+  }, [topic, payload, qos, retain, correlationData, showAdvancedMenu, connectionId, showTemplates, selectedTemplate]);
 
   // Save history to localStorage
   useEffect(() => {
@@ -227,6 +265,11 @@ function PublishingPanel({
     }
   }, [publishHistory, connectionId]);
 
+  // Helper function to check if correlation data should be available
+  const isCorrelationDataAvailable = () => {
+    return showAdvancedMenu && connectionId && MQTTService.supportsMqtt5(connectionId);
+  };
+
   // Publish message handler
   const handlePublish = async () => {
     const messageData = {
@@ -234,6 +277,8 @@ function PublishingPanel({
       payload,
       qos,
       retain,
+      // Only include correlation data if advanced menu is open and MQTT v5 is supported
+      correlationData: isCorrelationDataAvailable() && correlationData.trim() ? correlationData.trim() : null,
       timestamp: new Date().toISOString()
     };
 
@@ -250,7 +295,8 @@ function PublishingPanel({
           item.topic === messageData.topic &&
           item.payload === messageData.payload &&
           item.qos === messageData.qos &&
-          item.retain === messageData.retain
+          item.retain === messageData.retain &&
+          item.correlationData === messageData.correlationData
         );
 
         if (!isDuplicate) {
@@ -262,7 +308,8 @@ function PublishingPanel({
           item.topic === messageData.topic &&
           item.payload === messageData.payload &&
           item.qos === messageData.qos &&
-          item.retain === messageData.retain
+          item.retain === messageData.retain &&
+          item.correlationData === messageData.correlationData
         );
 
         if (existingIndex > 0) {
@@ -382,6 +429,7 @@ function PublishingPanel({
     setPayload(historyItem.payload);
     setQos(historyItem.qos);
     setRetain(historyItem.retain);
+    setCorrelationData(historyItem.correlationData || '');
   };
 
   // Clear form data
@@ -390,6 +438,7 @@ function PublishingPanel({
     setPayload('');
     setQos(0);
     setRetain(false);
+    setCorrelationData('');
     setSelectedTemplate(null);
     localStorage.removeItem('publish-form-state');
   };
@@ -568,101 +617,143 @@ function PublishingPanel({
               )}
             </div>
 
-            {/* Message Templates Section */}
+            {/* Advanced Options */}
             <div className="form-group">
-              <div className="template-header">
-                <label className="template-checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={showTemplates}
-                    onChange={(e) => setShowTemplates(e.target.checked)}
-                  />
-                  <span className="template-checkbox-custom"></span>
-                  <span className="template-checkbox-text">Message Templates</span>
-                </label>
-                {showTemplates && (
-                  <div className="template-actions">
-                    <label className="template-action-btn import-btn" title="Import Templates">
-                      <input
-                        type="file"
-                        accept=".json"
-                        onChange={handleTemplateImport}
-                        style={{ display: 'none' }}
-                      />
-                      <i className="fas fa-upload"></i>
-                    </label>
-                    <button
-                      type="button"
-                      className="template-action-btn export-btn"
-                      onClick={handleTemplateExport}
-                      disabled={messageTemplates.length === 0}
-                      title="Export Templates"
-                    >
-                      <i className="fas fa-download"></i>
-                    </button>
-                  </div>
-                )}
+              <div className="advanced-header">
+                <button
+                  type="button"
+                  className="advanced-toggle-btn"
+                  onClick={() => setShowAdvancedMenu(!showAdvancedMenu)}
+                >
+                  <i className={`fas fa-chevron-${showAdvancedMenu ? 'up' : 'down'}`}></i>
+                  Advanced Options
+                </button>
               </div>
               
-              {showTemplates && (
-                <div className="template-select-wrapper custom-select-wrapper">
-                  <button
-                    type="button"
-                    className="custom-select-button"
-                    onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
-                    disabled={isPublishing}
-                  >
-                    <span className="select-value">
-                      {getSelectedTemplateName()}
-                    </span>
-                    <i className={`fas fa-chevron-down ${showTemplateDropdown ? 'rotated' : ''}`}></i>
-                  </button>
-                  
-                  {showTemplateDropdown && (
-                    <div className="custom-select-dropdown">
-                      <button
-                        type="button"
-                        className={`dropdown-option ${!selectedTemplate ? 'selected' : ''}`}
-                        onClick={() => {
-                          setSelectedTemplate(null);
-                          setSchemaValidation(null);
-                          setShowTemplateDropdown(false);
-                        }}
-                      >
-                        Select a template...
-                      </button>
-                      {messageTemplates.map(template => (
-                        <div key={template.id} className="template-dropdown-item">
+              {showAdvancedMenu && (
+                <div className="advanced-content">
+                  {/* Correlation Data Section */}
+                  <div className="advanced-section">
+                    <label htmlFor="correlationData">
+                      Correlation Data:
+                      <span className="correlation-info" title="MQTT 5.0 correlation data for request-response patterns">
+                        <i className="fas fa-info-circle"></i>
+                      </span>
+                      {!isCorrelationDataAvailable() && (
+                        <span className="mqtt-requirement" title="Requires MQTT 5.0 connection">
+                          (MQTT 5.0 only)
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      id="correlationData"
+                      type="text"
+                      value={correlationData}
+                      onChange={(e) => setCorrelationData(e.target.value)}
+                      placeholder={isCorrelationDataAvailable() ? "Optional correlation identifier" : "MQTT 5.0 connection required"}
+                      className="correlation-input"
+                      disabled={isPublishing || !isCorrelationDataAvailable()}
+                    />
+                  </div>
+
+                  {/* Message Templates Section */}
+                  <div className="advanced-section">
+                    <div className="template-header">
+                      <label className="template-checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={showTemplates}
+                          onChange={(e) => setShowTemplates(e.target.checked)}
+                        />
+                        <span className="template-checkbox-custom"></span>
+                        <span className="template-checkbox-text">Message Templates</span>
+                      </label>
+                      {showTemplates && (
+                        <div className="template-actions">
+                          <label className="template-action-btn import-btn" title="Import Templates">
+                            <input
+                              type="file"
+                              accept=".json"
+                              onChange={handleTemplateImport}
+                              style={{ display: 'none' }}
+                            />
+                            <i className="fas fa-upload"></i>
+                          </label>
                           <button
                             type="button"
-                            className={`dropdown-option ${selectedTemplate === template.id ? 'selected' : ''}`}
-                            onClick={() => handleTemplateSelect(template.id)}
+                            className="template-action-btn export-btn"
+                            onClick={handleTemplateExport}
+                            disabled={messageTemplates.length === 0}
+                            title="Export Templates"
                           >
-                            <div className="template-info">
-                              <span className="template-name">{template.name}</span>
-                              <span className="template-category">({template.category})</span>
-                              {template.schema && (
-                                <span className="schema-indicator" title="Has schema validation">
-                                  <i className="fas fa-shield-alt"></i>
-                                </span>
-                              )}
-                            </div>
-                          </button>
-                          <button
-                            type="button"
-                            className="template-delete-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleTemplateDelete(template.id);
-                            }}
-                            title="Delete template"
-                          >
-                            <i className="fas fa-trash"></i>
+                            <i className="fas fa-download"></i>
                           </button>
                         </div>
-                      ))}
+                      )}
                     </div>
-                  )}
+                    
+                    {showTemplates && (
+                      <div className="template-select-wrapper custom-select-wrapper">
+                        <button
+                          type="button"
+                          className="custom-select-button"
+                          onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                          disabled={isPublishing}
+                        >
+                          <span className="select-value">
+                            {getSelectedTemplateName()}
+                          </span>
+                          <i className={`fas fa-chevron-down ${showTemplateDropdown ? 'rotated' : ''}`}></i>
+                        </button>
+                        
+                        {showTemplateDropdown && (
+                          <div className="custom-select-dropdown">
+                            <button
+                              type="button"
+                              className={`dropdown-option ${!selectedTemplate ? 'selected' : ''}`}
+                              onClick={() => {
+                                setSelectedTemplate(null);
+                                setSchemaValidation(null);
+                                setShowTemplateDropdown(false);
+                              }}
+                            >
+                              Select a template...
+                            </button>
+                            {messageTemplates.map(template => (
+                              <div key={template.id} className="template-dropdown-item">
+                                <button
+                                  type="button"
+                                  className={`dropdown-option ${selectedTemplate === template.id ? 'selected' : ''}`}
+                                  onClick={() => handleTemplateSelect(template.id)}
+                                >
+                                  <div className="template-info">
+                                    <span className="template-name">{template.name}</span>
+                                    <span className="template-category">({template.category})</span>
+                                    {template.schema && (
+                                      <span className="schema-indicator" title="Has schema validation">
+                                        <i className="fas fa-shield-alt"></i>
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="template-delete-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTemplateDelete(template.id);
+                                  }}
+                                  title="Delete template"
+                                >
+                                  <i className="fas fa-trash"></i>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -812,6 +903,11 @@ function PublishingPanel({
                         <i className="fas fa-save"></i> RETAIN
                       </span>
                     )}
+                    {correlationData && isCorrelationDataAvailable() && (
+                      <span className="badge badge-correlation">
+                        <i className="fas fa-link"></i> {correlationData}
+                      </span>
+                    )}
                   </div>
                   <div className="preview-payload">
                     {payload.length > 200 ? payload.substring(0, 200) + '...' : payload}
@@ -849,6 +945,11 @@ function PublishingPanel({
                         {item.retain && (
                           <span className="badge badge-retain">
                             <i className="fas fa-save"></i> R
+                          </span>
+                        )}
+                        {item.correlationData && (
+                          <span className="badge badge-correlation">
+                            <i className="fas fa-link"></i> {item.correlationData}
                           </span>
                         )}
                       </div>

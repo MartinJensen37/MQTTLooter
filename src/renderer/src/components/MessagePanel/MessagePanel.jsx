@@ -12,6 +12,7 @@ function MessagePanel({
   const [sortOrder, setSortOrder] = useState('desc');
   const [showRetainedOnly, setShowRetainedOnly] = useState(false);
   const [showTopicExportMenu, setShowTopicExportMenu] = useState(false);
+  const [highlightedCorrelationId, setHighlightedCorrelationId] = useState(null);
 
   // Filter and sort messages
   const processedMessages = React.useMemo(() => {
@@ -30,6 +31,36 @@ function MessagePanel({
     
     return sorted;
   }, [messages, showRetainedOnly, sortBy, sortOrder]);
+
+  // Get correlation data analysis
+  const correlationAnalysis = React.useMemo(() => {
+    const correlationMap = new Map();
+    const analysis = {
+      correlatedMessages: [],
+      orphanedMessages: [],
+      correlationGroups: new Map()
+    };
+
+    processedMessages.forEach(msg => {
+      if (msg.correlationData) {
+        if (!correlationMap.has(msg.correlationData)) {
+          correlationMap.set(msg.correlationData, []);
+        }
+        correlationMap.get(msg.correlationData).push(msg);
+      }
+    });
+
+    correlationMap.forEach((msgs, correlationId) => {
+      if (msgs.length > 1) {
+        analysis.correlationGroups.set(correlationId, msgs);
+        analysis.correlatedMessages.push(...msgs);
+      } else {
+        analysis.orphanedMessages.push(...msgs);
+      }
+    });
+
+    return analysis;
+  }, [processedMessages]);
 
   // Get most recent message for topic details
   const topicDetails = React.useMemo(() => {
@@ -155,6 +186,16 @@ function MessagePanel({
     navigator.clipboard.writeText(payload);
     if (showFeedback) {
       showFeedback('Payload copied!', 'success');
+    }
+  };
+
+  const copyCorrelationData = (correlationData, event) => {
+    if (event) {
+      event.stopPropagation();
+    }
+    navigator.clipboard.writeText(correlationData);
+    if (showFeedback) {
+      showFeedback('Correlation data copied!', 'success');
     }
   };
 
@@ -300,7 +341,11 @@ function MessagePanel({
             {processedMessages.map(msg => (
               <div 
                 key={msg.id} 
-                className="message-item"
+                className={`message-item ${
+                  msg.correlationData && highlightedCorrelationId === msg.correlationData 
+                    ? 'correlation-highlighted' 
+                    : ''
+                }`}
                 onDoubleClick={(e) => copyPayload(msg.message, e)}
                 title="Double-click to copy payload"
               >
@@ -318,6 +363,30 @@ function MessagePanel({
                     {msg.retain && (
                       <span className="badge badge-retain">
                         <i className="fas fa-save"></i> RETAIN
+                      </span>
+                    )}
+                    {msg.correlationData && (
+                      <span 
+                        className={`badge badge-correlation ${
+                          highlightedCorrelationId === msg.correlationData ? 'highlighted' : ''
+                        } ${
+                          correlationAnalysis.correlationGroups.has(msg.correlationData) ? 'correlated' : 'orphaned'
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyCorrelationData(msg.correlationData);
+                          setHighlightedCorrelationId(
+                            highlightedCorrelationId === msg.correlationData ? null : msg.correlationData
+                          );
+                        }}
+                        title={`Click to copy correlation ID: ${msg.correlationData}${
+                          correlationAnalysis.correlationGroups.has(msg.correlationData) 
+                            ? ` (${correlationAnalysis.correlationGroups.get(msg.correlationData).length} related messages)`
+                            : ' (no related messages)'
+                        }`}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <i className="fas fa-link"></i> {msg.correlationData}
                       </span>
                     )}
                     <span className="connection-id" title={`Connection: ${msg.connectionId}`}>
