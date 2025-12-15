@@ -254,6 +254,22 @@ connect() {
           this.connectionStats.lastMessageTime = Date.now();
           this.connectionStats.bytesReceived += message.length;
 
+          // Extract correlation data from MQTT 5.0 properties
+          let correlationData = null;
+          if (this.config.protocolVersion === 5 && packet.properties) {
+            correlationData = packet.properties.correlationData;
+            if (correlationData) {
+              if (Buffer.isBuffer(correlationData)) {
+                correlationData = correlationData.toString();
+              } else if (correlationData instanceof Uint8Array) {
+                correlationData = new TextDecoder().decode(correlationData);
+              } else if (typeof correlationData === 'string') {
+                // Already a string, keep as is
+                correlationData = correlationData;
+              }
+            }
+          }
+
           this.emit('message', {
             id: this.id,
             topic,
@@ -262,7 +278,9 @@ connect() {
             timestamp: Date.now(),
             qos: packet.qos,
             retain: packet.retain,
-            protocolVersion: this.config.protocolVersion || 4
+            protocolVersion: this.config.protocolVersion || 4,
+            correlationData,
+            properties: packet.properties || null
           });
         };
 
