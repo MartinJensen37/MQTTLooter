@@ -3,7 +3,48 @@ const path = require('path');
 const { MQTTConnectionManager } = require('./mqtt-connection-manager');
 
 let mainWindow;
+let splashWindow;
 let mqttManager = new MQTTConnectionManager();
+
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 400,
+    height: 300,
+    frame: false,
+    alwaysOnTop: true,
+    transparent: true,
+    resizable: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+
+  // Create a simple HTML splash screen
+  splashWindow.loadURL(`data:text/html;charset=utf-8,
+    <html>
+      <body style="margin:0; padding:0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                   color: white; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; 
+                   text-align: center; display: flex; flex-direction: column; justify-content: center; 
+                   align-items: center; height: 100vh; border-radius: 8px;">
+        <div style="background: rgba(255,255,255,0.1); padding: 40px; border-radius: 12px; backdrop-filter: blur(10px);">
+          <h1 style="margin: 0 0 20px 0; font-weight: 300; font-size: 28px;">MQTTLooter</h1>
+          <p style="margin: 0 0 30px 0; opacity: 0.9;">Loading application...</p>
+          <div style="width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.3); 
+                      border-radius: 50%; border-top: 3px solid white; 
+                      animation: spin 1s linear infinite; margin: 0 auto;"></div>
+        </div>
+        <style>
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        </style>
+      </body>
+    </html>
+  `);
+
+  splashWindow.on('closed', () => {
+    splashWindow = null;
+  });
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -12,12 +53,14 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     icon: path.join(__dirname, '../../assets/MQTTLooter_logo_small.png'),
-    show: false,
+    show: false, // Don't show until ready
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
-      preload: path.join(__dirname, '../preload/preload.js')
+      preload: path.join(__dirname, '../preload/preload.js'),
+      webSecurity: true,
+      backgroundThrottling: false // Prevent throttling for better performance
     }
   });
 
@@ -30,8 +73,17 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../renderer/build/index.html'));
   }
   
+  // Show main window when ready and close splash
   mainWindow.once('ready-to-show', () => {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.close();
+    }
     mainWindow.show();
+    
+    // Focus the window
+    if (isDev) {
+      mainWindow.focus();
+    }
   });
 
   mainWindow.on('closed', () => {
@@ -117,7 +169,15 @@ ipcMain.handle('mqtt-get-connections', async (event) => {
   }
 });
 
-app.on('ready', createWindow);
+app.on('ready', () => {
+  // Show splash immediately
+  createSplashWindow();
+  
+  // Create main window with a small delay to let splash show
+  setTimeout(() => {
+    createWindow();
+  }, 100);
+});
 
 app.on('window-all-closed', () => {
   mqttManager.disconnectAll();
@@ -128,6 +188,9 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (mainWindow === null) {
-    createWindow();
+    createSplashWindow();
+    setTimeout(() => {
+      createWindow();
+    }, 100);
   }
 });
