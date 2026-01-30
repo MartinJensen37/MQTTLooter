@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MessageTemplateService from '../../services/MessageTemplateService';
 import MQTTService from '../../services/MQTTService';
+import ConfirmationModal from '../ConnectionSidebar/ConfirmationModal';
 import './PublishingPanel.css';
 
 function PublishingPanel({ 
@@ -980,35 +981,23 @@ function PublishingPanel({
       </div>
 
       {/* Template Delete Confirmation Dialog */}
-      {templateToDelete && (
-        <div className="modal-overlay">
-          <div className="confirmation-modal">
-            <div className="modal-header">
-              <h3>Delete Template</h3>
-            </div>
-            <div className="modal-content">
-              <p>
-                Are you sure you want to delete the template <strong>"{templateService.getTemplate(templateToDelete)?.name}"</strong>?
-              </p>
-              <p className="warning-text">This action cannot be undone.</p>
-            </div>
-            <div className="modal-actions">
-              <button 
-                onClick={cancelTemplateDelete}
-                className="btn btn-sm btn-secondary"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={confirmTemplateDelete}
-                className="btn btn-sm btn-danger"
-              >
-                <i className="fas fa-trash"></i> Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal
+        isOpen={!!templateToDelete}
+        title="Delete Template"
+        message={
+          <>
+            <p>
+              Are you sure you want to delete the template <strong>"{templateService.getTemplate(templateToDelete)?.name}"</strong>?
+            </p>
+            <p className="warning-text">This action cannot be undone.</p>
+          </>
+        }
+        onConfirm={confirmTemplateDelete}
+        onCancel={cancelTemplateDelete}
+        confirmText="Delete"
+        confirmIcon="fa-trash"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

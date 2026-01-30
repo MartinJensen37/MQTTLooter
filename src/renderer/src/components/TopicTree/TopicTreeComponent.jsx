@@ -167,13 +167,13 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
         <div className="topic-tree-header-top">
           <h3>Topic Tree</h3>
           <div className="topic-tree-controls">
-            <button onClick={handleExpandAll} className="tree-control-btn expand-btn" title="Expand all topics">
+            <button onClick={handleExpandAll} className="btn btn-sm btn-success" title="Expand all topics">
               <i className="fas fa-expand-arrows-alt"></i>
             </button>
-            <button onClick={handleCollapseAll} className="tree-control-btn collapse-btn" title="Collapse all topics">
+            <button onClick={handleCollapseAll} className="btn btn-sm btn-warning" title="Collapse all topics">
               <i className="fas fa-compress-arrows-alt"></i>
             </button>
-            <button onClick={handleClearTree} className="tree-control-btn clear-btn" title="Clear topic tree">
+            <button onClick={handleClearTree} className="btn btn-sm btn-danger" title="Clear topic tree">
               <i className="fas fa-trash"></i>
             </button>
           </div>

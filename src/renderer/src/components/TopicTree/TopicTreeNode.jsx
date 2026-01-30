@@ -59,12 +59,12 @@ function TopicTreeNode({ node, onClick, isSelected }) {
           
           <div className="node-bubbles">
             {hasRetainedMessage && (
-              <span className="retained-bubble" title="Has retained message">
-                <i className="fas fa-save"></i> Retained
+              <span className="badge badge-retain" title="Has retained message">
+                <i className="fas fa-save"></i> RETAIN
               </span>
             )}
             {subtopicCount > 0 && (
-              <span className="subtopic-bubble" title={`${subtopicCount} subtopic${subtopicCount > 1 ? 's' : ''}`}>
+              <span className="badge badge-success-light" title={`${subtopicCount} subtopic${subtopicCount > 1 ? 's' : ''}`}>
                 <i className="fas fa-sitemap"></i> {subtopicCount} Subtopic{subtopicCount > 1 ? 's' : ''}
               </span>
             )}
@@ -79,12 +79,12 @@ function TopicTreeNode({ node, onClick, isSelected }) {
               {hasStats && (
                 <div className="node-stats">
                   {node.messageCount > 0 && (
-                    <span className="message-count">
+                    <span className="badge-count">
                       {node.messageCount}
                     </span>
                   )}
                   {node.messageRate > 0 && (
-                    <span className="message-rate">
+                    <span className="badge-rate">
                       {formatRate(node.messageRate)}
                     </span>
                   )}

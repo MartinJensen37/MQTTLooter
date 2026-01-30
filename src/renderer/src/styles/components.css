@@ -326,6 +326,41 @@
   color: var(--gray-900);
 }
 
+/* Light badge variants for TopicTree and other uses */
+.badge-success-light {
+  background: var(--success-green-light);
+  color: #155724;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.badge-success-light i {
+  font-size: 8px;
+}
+
+/* Compact count badge (solid blue) */
+.badge-count {
+  background: var(--primary-blue);
+  color: white;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 16px;
+  text-align: center;
+  border: none;
+}
+
+/* Compact rate badge (solid green) */
+.badge-rate {
+  background: var(--success-green);
+  color: white;
+  padding: 1px 4px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 500;
+  border: none;
+}
+
 /* Shared Panel Styles */
 .panel {
   background: rgba(255, 255, 255, 0.8);
@@ -484,6 +519,168 @@
   background: none;
   transform: scale(1.25);
   font-weight: bold;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  width: auto;
+  height: 12px;
+  margin-bottom: 10px;
+}
+
+.toggle-label {
+  font-size: 12px;
+  color: var(--gray-700);
+  font-weight: 500;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-slider {
+  position: relative;
+  cursor: pointer;
+  width: 25px;
+  height: 12px;
+  background-color: var(--gray-300);
+  transition: var(--transition-normal);
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 9px;
+  width: 9px;
+  left: 2px;
+  bottom: 1.5px;
+  background-color: white;
+  transition: var(--transition-normal);
+  border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: var(--primary-blue);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(12px);
+}
+
+.toggle-switch input:focus + .toggle-slider {
+  box-shadow: 0 0 0 2px var(--primary-blue-light);
+}
+
+/* Custom Checkbox */
+.custom-checkbox {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: white;
+  user-select: none;
+}
+
+.custom-checkbox:hover {
+  background: var(--gray-200);
+  color: var(--primary-blue);
+  border-color: var(--primary-blue);
+}
+
+.custom-checkbox input[type="checkbox"] {
+  display: none;
+}
+
+.custom-checkbox-box {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--gray-400);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  background: white;
+}
+
+.custom-checkbox input[type="checkbox"]:checked + .custom-checkbox-box {
+  background: var(--primary-blue);
+  border-color: var(--primary-blue);
+}
+
+.custom-checkbox input[type="checkbox"]:checked + .custom-checkbox-box::after {
+  content: '\2713';
+  position: absolute;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.custom-checkbox:hover .custom-checkbox-box {
+  border-color: var(--primary-blue);
+}
+
+.custom-checkbox-text {
+  flex: 1;
+  line-height: 1.4;
+  font-size: 13px;
+  color: var(--gray-700);
+}
+
+.custom-checkbox-text .note {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--gray-500);
+  font-style: italic;
+}
+
+/* Simple checkbox row (native checkbox with label) */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.checkbox-row:hover {
+  background: var(--gray-100);
+}
+
+.checkbox-row input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--primary-blue);
+}
+
+.checkbox-row label {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--gray-700);
 }
 
 /* Responsive utilities */

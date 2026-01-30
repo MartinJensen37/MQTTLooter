@@ -4,14 +4,14 @@
   display: flex;
   flex-direction: column;
   background: white;
-  border-right: 1px solid #dee2e6;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  border-right: 1px solid var(--gray-300);
+  font-family: var(--font-family);
 }
 
 .topic-tree-header {
   padding: 15px 20px;
-  border-bottom: 1px solid #e9ecef;
-  background: #f8f9fa;
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--gray-100);
   flex-shrink: 0; /* Prevent header from shrinking */
 }
 
@@ -24,7 +24,7 @@
 
 .topic-tree-header h3 {
   margin: 0;
-  color: #2c3e50;
+  color: var(--gray-800);
   font-size: 16px;
   font-weight: 600;
 }
@@ -34,20 +34,6 @@
   gap: 6px;
 }
 
-.tree-control-btn {
-  border-radius: 15px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  border: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 28px;
-}
 
 .topic-tree-content {
   flex: 1;
@@ -64,7 +50,7 @@
 .topic-tree-empty {
   padding: 30px 20px;
   text-align: center;
-  color: #6c757d;
+  color: var(--gray-600);
   font-style: italic;
 }
 
@@ -81,7 +67,7 @@
 }
 
 .topic-tree-node:hover {
-  background: #f8f9fa;
+  background: var(--gray-100);
 }
 
 .topic-tree-node.selected {
@@ -122,7 +108,7 @@
 .node-expand-icon {
   width: 12px;
   text-align: center;
-  color: #6c757d;
+  color: var(--gray-600);
   font-size: 10px;
   flex-shrink: 0;
 }
@@ -134,7 +120,7 @@
 
 .node-name {
   font-weight: 500;
-  color: #2c3e50;
+  color: var(--gray-800);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -159,41 +145,21 @@
   flex-shrink: 0;
 }
 
-.message-count {
-  background: #007bff;
-  color: white;
-  padding: 1px 6px;
-  border-radius: 8px;
-  font-size: 10px;
-  font-weight: 600;
-  min-width: 16px;
-  text-align: center;
-}
-
-.message-rate {
-  background: #28a745;
-  color: white;
-  padding: 1px 4px;
-  border-radius: 6px;
-  font-size: 9px;
-  font-weight: 500;
-}
-
 .stats-separator {
-  color: #6c757d;
+  color: var(--gray-600);
   font-weight: bold;
   margin: 0 4px;
 }
 
 .node-payload {
-  color: #2c3e50;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  color: var(--gray-800);
+  font-family: var(--font-mono);
   font-size: 12px;
   font-weight: bold;
-  background: #f8f9fa;
+  background: var(--gray-100);
   padding: 2px 6px;
   border-radius: 3px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--gray-200);
   max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -202,16 +168,16 @@
 }
 
 .node-details {
-  background: #f8f9fa;
-  border-top: 1px solid #e9ecef;
+  background: var(--gray-100);
+  border-top: 1px solid var(--gray-200);
   padding: 8px;
   font-size: 12px;
-  color: #495057;
+  color: var(--gray-700);
 }
 
 .node-topic-path {
   margin-bottom: 4px;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-family: var(--font-mono);
   word-break: break-all;
 }
 
@@ -227,12 +193,12 @@
 }
 
 .retain-info {
-  color: #ffc107;
+  color: var(--warning-yellow);
   font-weight: 500;
 }
 
 .timestamp-info {
-  color: #6c757d;
+  color: var(--gray-600);
   font-size: 11px;
 }
 
@@ -255,72 +221,6 @@
   background: #a1a1a1;
 }
 
-.topic-tree-header-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.topic-tree-header h3 {
-  margin: 0;
-  color: #2c3e50;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.topic-tree-controls {
-  display: flex;
-  gap: 6px;
-}
-
-.tree-control-btn {
-  border-radius: 15px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  border: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 32px;
-  height: 28px;
-}
-
-.tree-control-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-}
-
-.expand-btn {
-  background: #28a745;
-  color: white;
-}
-
-.expand-btn:hover {
-  background: #218838;
-}
-
-.collapse-btn {
-  background: #ffc107;
-  color: #212529;
-}
-
-.collapse-btn:hover {
-  background: #e0a800;
-}
-
-.clear-btn {
-  background: #dc3545;
-  color: white;
-}
-
-.clear-btn:hover {
-  background: #c82333;
-}
-
 .topic-tree-stats {
   display: flex;
   gap: 8px;
@@ -329,12 +229,12 @@
 
 .stat-item {
   background: white;
-  color: #495057;
+  color: var(--gray-700);
   padding: 4px 12px;
   border-radius: 15px;
   font-size: 12px;
   font-weight: 500;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--gray-300);
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -356,14 +256,7 @@
   .topic-tree-controls {
     justify-content: center;
   }
-  
-  .tree-control-btn {
-    min-width: 28px;
-    height: 24px;
-    font-size: 10px;
-    padding: 4px 8px;
-  }
-  
+
   .stat-item {
     font-size: 11px;
     padding: 3px 8px;
@@ -374,59 +267,4 @@
   gap: 4px;
   margin-left: 8px;
   align-items: center;
-}
-
-.retained-bubble,
-.subtopic-bubble {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.retained-bubble {
-  background-color: rgba(255, 193, 7, 0.2);
-  color: #856404;
-  border: 1px solid rgba(255, 193, 7, 0.4);
-}
-
-.retained-bubble i {
-  font-size: 8px;
-}
-
-.subtopic-bubble {
-  background-color: rgba(40, 167, 69, 0.15);
-  color: #155724;
-  border: 1px solid rgba(40, 167, 69, 0.3);
-}
-
-.subtopic-bubble i {
-  font-size: 8px;
-}
-
-/* Hover effects for bubbles */
-.topic-tree-node:hover .retained-bubble {
-  background-color: rgba(255, 193, 7, 0.3);
-  border-color: rgba(255, 193, 7, 0.6);
-}
-
-.topic-tree-node:hover .subtopic-bubble {
-  background-color: rgba(40, 167, 69, 0.25);
-  border-color: rgba(40, 167, 69, 0.5);
-}
-
-/* Ensure bubbles don't interfere with selection styling */
-.topic-tree-node.selected .retained-bubble {
-  background-color: rgba(255, 193, 7, 0.4);
-  color: #664d03;
-}
-
-.topic-tree-node.selected .subtopic-bubble {
-  background-color: rgba(40, 167, 69, 0.3);
-  color: #0f5132;
 }

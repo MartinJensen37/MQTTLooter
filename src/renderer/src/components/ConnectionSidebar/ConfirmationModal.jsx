@@ -1,7 +1,16 @@
 import React from 'react';
 import './ConfirmationModal.css';
 
-function ConfirmationModal({ isOpen, title, message, onConfirm, onCancel }) {
+function ConfirmationModal({
+  isOpen,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  confirmText = 'Delete',
+  confirmIcon = 'fa-trash',
+  confirmVariant = 'danger'
+}) {
   if (!isOpen) return null;
 
   const handleOverlayClick = (e) => {
@@ -18,14 +27,14 @@ function ConfirmationModal({ isOpen, title, message, onConfirm, onCancel }) {
           onCancel();
         }
       };
-      
+
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
     }
   }, [isOpen, onCancel]);
 
   return (
-    <div className="confirmation-overlay">
+    <div className="confirmation-overlay" onClick={handleOverlayClick}>
       <div className="confirmation-modal">
         <div className="confirmation-header">
           <h3>
@@ -34,16 +43,16 @@ function ConfirmationModal({ isOpen, title, message, onConfirm, onCancel }) {
           </h3>
         </div>
         <div className="confirmation-content">
-          <p>{message}</p>
+          {typeof message === 'string' ? <p>{message}</p> : message}
         </div>
         <div className="confirmation-footer">
-          <button className="cancel-btn" onClick={onCancel}>
+          <button className="btn btn-sm btn-secondary" onClick={onCancel}>
             <i className="fas fa-times"></i>
             Cancel
           </button>
-          <button className="confirm-btn danger" onClick={onConfirm}>
-            <i className="fas fa-trash"></i>
-            Delete
+          <button className={`btn btn-sm btn-${confirmVariant}`} onClick={onConfirm}>
+            <i className={`fas ${confirmIcon}`}></i>
+            {confirmText}
           </button>
         </div>
       </div>
