@@ -91,7 +91,7 @@ Installer features:
 - **Electron** 36.5.0 - Desktop application framework
 - **React** 18.2.0 - UI framework
 - **Node.js** - JavaScript runtime
-test
+
 ### MQTT Communication
 - **mqtt** 5.13.1 - MQTT client library with full MQTT 5.0 support
 
