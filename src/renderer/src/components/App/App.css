@@ -55,7 +55,7 @@
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--gray-800);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -85,7 +85,7 @@
   font-size: 11px;
   color: var(--success-green);
   font-weight: 500;
-  background: #d4edda;
+  background: var(--success-green-light);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   align-self: flex-start;
@@ -211,6 +211,7 @@
 .tab-content-container {
   height: 100%;
   width: 100%;
+  min-width: 300px;
   position: relative;
   overflow: hidden;
 }

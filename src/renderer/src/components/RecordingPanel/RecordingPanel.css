@@ -28,7 +28,7 @@
 
 .recording-header-left h2 {
   margin: 0;
-  color: #2c3e50;
+  color: var(--gray-800);
   font-size: 18px;
   font-weight: 600;
 }
@@ -202,7 +202,7 @@
 }
 
 .recording-stop-btn:hover {
-  background: #5a6268;
+  background: var(--gray-700);
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
 }
@@ -235,7 +235,7 @@
 
 .recording-saved-list h3 {
   margin: 0;
-  color: #2c3e50;
+  color: var(--gray-800);
   font-size: 18px;
   font-weight: 600;
   display: flex;
@@ -336,7 +336,7 @@
   align-items: center;
   gap: var(--spacing-md);
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--gray-800);
   font-size: 16px;
   flex: 1;
   min-width: 0;
@@ -365,7 +365,7 @@
   border: 1px solid var(--primary-blue);
   font-size: 16px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--gray-800);
   min-width: 0;
   flex: 1;
 }
@@ -610,7 +610,7 @@
 
 .recording-step-btn:hover:not(:disabled),
 .recording-reset-btn:hover {
-  background: #5a6268;
+  background: var(--gray-700);
   transform: scale(1.1);
 }
 

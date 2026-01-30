@@ -7,6 +7,7 @@
   flex-direction: column;
   background: white;
   overflow: hidden;
+  min-width: 300px;
 }
 
 /* Topic Details Box */
@@ -22,13 +23,17 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .topic-details-header h3 {
   margin: 0;
-  color: #2c3e50;
+  color: var(--gray-800);
   font-size: 16px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .topic-details-content {
@@ -121,6 +126,7 @@
   margin-top: 15px;
   padding-top: 15px;
   border-top: 1px solid var(--gray-200);
+  flex-wrap: wrap;
 }
 
 /* Message List */
@@ -134,8 +140,8 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
+  background: var(--warning-yellow-light);
+  border: 1px solid var(--warning-yellow);
   color: var(--warning-yellow-text);
   padding: 10px 16px;
   border-radius: var(--radius-xl);
@@ -251,6 +257,7 @@
   display: flex;
   gap: 4px;
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .message-content {
@@ -260,7 +267,7 @@
 .payload-preview {
   font-family: var(--font-mono);
   font-size: 13px;
-  color: #2c3e50;
+  color: var(--gray-800);
   line-height: 1.4;
   word-break: break-word;
 }
@@ -349,15 +356,15 @@
 }
 
 .message-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--gray-200);
   border-radius: var(--radius-sm);
 }
 
 .message-list::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--gray-400);
   border-radius: var(--radius-sm);
 }
 
 .message-list::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: var(--gray-500);
 }

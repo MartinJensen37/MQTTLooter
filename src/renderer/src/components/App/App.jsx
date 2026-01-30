@@ -968,7 +968,7 @@ useEffect(() => {
     return (
       <SplitPane
         split="vertical"
-        minSize={50}
+        minSize={250}
         // Remove maxSize completely to allow unlimited expansion
         defaultSize={topicTreeWidth}
         onChange={(size) => setTopicTreeWidth(size)}

@@ -1,11 +1,13 @@
 .topic-tree-container {
   height: 100%;
   min-height: 0;
+  min-width: 200px;
   display: flex;
   flex-direction: column;
   background: white;
   border-right: 1px solid var(--gray-300);
   font-family: var(--font-family);
+  overflow: hidden;
 }
 
 .topic-tree-header {
@@ -20,6 +22,8 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .topic-tree-header h3 {
@@ -27,11 +31,14 @@
   color: var(--gray-800);
   font-size: 16px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .topic-tree-controls {
   display: flex;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 
@@ -44,7 +51,7 @@
   font-size: 13px;
   /* Firefox scrollbar */
   scrollbar-width: thin;
-  scrollbar-color: #c1c1c1 #f1f1f1;
+  scrollbar-color: var(--gray-400) var(--gray-200);
 }
 
 .topic-tree-empty {
@@ -71,21 +78,21 @@
 }
 
 .topic-tree-node.selected {
-  background: #e3f2fd;
-  border-color: #2196f3;
+  background: var(--primary-blue-light);
+  border-color: var(--primary-blue);
 }
 
 .topic-tree-node.has-messages {
-  background: #fffbf0;
+  background: var(--warning-yellow-light);
 }
 
 .topic-tree-node.has-messages:hover {
-  background: #fff8e1;
+  background: rgba(255, 193, 7, 0.2);
 }
 
 .topic-tree-node.selected.has-messages {
-  background: #e8f5e8;
-  border-color: #4caf50;
+  background: var(--success-green-light);
+  border-color: var(--success-green);
 }
 
 .node-content {
@@ -188,7 +195,7 @@
 }
 
 .qos-info {
-  color: #17a2b8;
+  color: var(--primary-blue);
   font-weight: 500;
 }
 
@@ -208,17 +215,17 @@
 }
 
 .topic-tree-content::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--gray-200);
   border-radius: 4px;
 }
 
 .topic-tree-content::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--gray-400);
   border-radius: 4px;
 }
 
 .topic-tree-content::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: var(--gray-500);
 }
 
 .topic-tree-stats {
