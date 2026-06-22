@@ -130,59 +130,51 @@ class MQTTService {
   }
 
   async disconnect(connectionId) {
-    try {
-      const result = await window.electronAPI.mqtt.disconnect(connectionId);
-      
-      if (result.success) {
-        const connection = this.connections.get(connectionId);
-        if (connection) {
-          connection.isConnected = false;
-          connection.status = 'disconnected';
-          this.connections.set(connectionId, connection);
-        }
-        
-        const keysToDelete = [];
-        this.eventHandlers.forEach((_, key) => {
-          if (key.startsWith(`${connectionId}:`) && !key.startsWith('*:')) {
-            keysToDelete.push(key);
-          }
-        });
-        keysToDelete.forEach(key => {
-          this.eventHandlers.delete(key);
-        });
-      } else {
-        throw new Error(result.error);
-      }
-      
-      return result;
-    } catch (error) {
-      throw error;
-    }
-  }
+    const result = await window.electronAPI.mqtt.disconnect(connectionId);
 
-  async deleteConnection(connectionId) {
-    try {
+    if (result.success) {
       const connection = this.connections.get(connectionId);
-      if (connection?.isConnected) {
-        await this.disconnect(connectionId);
+      if (connection) {
+        connection.isConnected = false;
+        connection.status = 'disconnected';
+        this.connections.set(connectionId, connection);
       }
-      
-      this.connections.delete(connectionId);
-      
+
       const keysToDelete = [];
       this.eventHandlers.forEach((_, key) => {
-        if (key.startsWith(`${connectionId}:`)) {
+        if (key.startsWith(`${connectionId}:`) && !key.startsWith('*:')) {
           keysToDelete.push(key);
         }
       });
-      keysToDelete.forEach(key => {
+      keysToDelete.forEach((key) => {
         this.eventHandlers.delete(key);
       });
-      
-      return { success: true };
-    } catch (error) {
-      throw error;
+    } else {
+      throw new Error(result.error);
     }
+
+    return result;
+  }
+
+  async deleteConnection(connectionId) {
+    const connection = this.connections.get(connectionId);
+    if (connection?.isConnected) {
+      await this.disconnect(connectionId);
+    }
+
+    this.connections.delete(connectionId);
+
+    const keysToDelete = [];
+    this.eventHandlers.forEach((_, key) => {
+      if (key.startsWith(`${connectionId}:`)) {
+        keysToDelete.push(key);
+      }
+    });
+    keysToDelete.forEach((key) => {
+      this.eventHandlers.delete(key);
+    });
+
+    return { success: true };
   }
 
   async subscribe(connectionId, topic, qos = 0, properties = {}) {

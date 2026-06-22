@@ -3,23 +3,16 @@
   "productName": "MQTTLooter",
   "version": "0.3.0",
   "description": "An MQTT client for exploring topics and messages.",
-  "main": "src/main/index.js",
+  "main": "./out/main/index.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
-    "dev:renderer": "cd src/renderer && cross-env BROWSER=none GENERATE_SOURCEMAP=false FAST_REFRESH=false npm start",
-    "dev:electron": "wait-on http://localhost:3000 --timeout 30000 && cross-env NODE_ENV=development electron .",
-    "dev:fast": "concurrently \"npm run dev:renderer:fast\" \"npm run dev:electron:fast\"",
-    "dev:renderer:fast": "cd src/renderer && npm run start:fast",
-    "dev:electron:fast": "wait-on http://localhost:3000 --timeout 15000 && cross-env NODE_ENV=development electron .",
-    "electron": "cross-env NODE_ENV=development electron .",
-    "electron:powershell": "powershell -Command \"$env:NODE_ENV = 'development'; electron .\"",
-    "electron:cmd": "cmd /c \"set NODE_ENV=development && electron .\"",
-    "build:renderer": "cd src/renderer && npm run build",
-    "dist": "npm run build:renderer && electron-builder",
-    "pack": "electron-builder --dir",
-    "lint": "echo \"No linting configured\"",
-    "start:prod": "npm run build:renderer && electron ."
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "build": "electron-vite build",
+    "dist": "electron-vite build && electron-builder",
+    "pack": "electron-vite build && electron-builder --dir",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css}\""
   },
   "build": {
     "appId": "com.martinjensen37.mqttlooter",
@@ -29,12 +22,10 @@
       "output": "dist-builder"
     },
     "files": [
-      "src/main/**/*",
-      "src/preload/**/*",
-      "src/renderer/build/**/*",
+      "out/**/*",
       "assets/**/*",
       "package.json",
-      "!src/renderer/build/**/*.map",
+      "!**/*.map",
       "!**/*.md"
     ],
     "compression": "maximum",
@@ -68,15 +59,30 @@
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.7.2",
+    "@tanstack/react-virtual": "^3.14.3",
     "mqtt": "^5.13.1",
-    "react-split-pane": "^0.1.92"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-split-pane": "^3.2.0"
   },
   "devDependencies": {
     "@electron/fuses": "^1.8.0",
-    "concurrently": "^7.6.0",
-    "cross-env": "^7.0.3",
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.4",
     "electron": "^36.5.0",
     "electron-builder": "^24.13.3",
-    "wait-on": "^7.2.0"
+    "electron-vite": "^2.3.0",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
+    "prettier": "^3.8.4",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.62.0",
+    "vite": "^5.4.0"
   }
 }
