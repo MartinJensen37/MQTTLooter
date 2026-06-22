@@ -128,10 +128,6 @@ function ConnectionCard({
       onClick={handleCardClick}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
-      style={{
-        transform: isSelected ? 'translateX(12px)' : 'translateX(0)',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-      }}
     >
       <div className="card-content">
         {/* Status dot and MQTT version bubble in top right corner */}
