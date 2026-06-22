@@ -10,6 +10,15 @@
   overflow: hidden;
 }
 
+/* Fixed sidebar + scrollable main area — no resizing */
+.app-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  min-height: 0;
+}
+
 .main-content {
   flex: 1;
   display: flex;
@@ -30,15 +39,14 @@
 
 .main-panels {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: white;
   border: 1px solid var(--gray-300);
   border-top: 1px solid var(--primary-blue);
   border-radius: 0 0 var(--radius-md) var(--radius-md);
-  min-height: 600px;
   position: relative;
-  margin-top: 0;
   overflow: hidden;
   min-width: 0;
 }
@@ -53,9 +61,9 @@
 
 .header-left h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  color: #2c3e50;
+  color: var(--text-heading);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -83,9 +91,9 @@
 
 .multi-connection-indicator {
   font-size: 11px;
-  color: var(--success-green);
+  color: var(--success);
   font-weight: 500;
-  background: #d4edda;
+  background: var(--bg-connected);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   align-self: flex-start;
@@ -209,8 +217,8 @@
 }
 
 .tab-content-container {
-  height: 100%;
-  width: 100%;
+  flex: 1;
+  min-height: 0;
   position: relative;
   overflow: hidden;
 }
@@ -426,49 +434,22 @@
   }
 }
 
-/* Custom resizer styling */
-.Resizer {
+/* SplitPane resizer divider — topic tree only */
+.resizer-divider {
   background: var(--gray-300);
   opacity: 0.7;
   z-index: 1;
-  box-sizing: border-box;
-  background-clip: padding-box;
-  transition: all var(--transition-fast);
+  transition: background var(--transition-fast), opacity var(--transition-fast);
 }
 
-.Resizer.horizontal {
-  height: 4px;
-  margin: -2px 0;
-  border-top: 2px solid rgba(255, 255, 255, 0);
-  border-bottom: 2px solid rgba(255, 255, 255, 0);
-  cursor: row-resize;
+.resizer-divider:hover {
+  background: var(--primary);
+  opacity: 1;
 }
 
-.Resizer.vertical {
-  width: 4px;
-  margin: 0 -2px;
-  border-left: 2px solid rgba(255, 255, 255, 0);
-  border-right: 2px solid rgba(255, 255, 255, 0);
-  cursor: col-resize;
-}
-
-.Resizer.disabled {
-  cursor: not-allowed;
-  opacity: 0.3;
-}
-
-.Resizer.disabled:hover {
-  border-color: transparent;
-}
-
-/* SplitPane overrides */
-.Pane {
+/* SplitPane pane overrides */
+.split-pane-pane {
   overflow: hidden !important;
-}
-
-.Pane1,
-.Pane2 {
-  height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
 }
