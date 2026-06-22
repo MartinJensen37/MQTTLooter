@@ -1,11 +1,19 @@
 import React from 'react';
 import './ConfirmationModal.css';
 
-function ConfirmationModal({ isOpen, title, message, onConfirm, onCancel }) {
+interface Props {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmationModal({ isOpen, title, message, onConfirm, onCancel }: Props) {
   // Close on Escape while open. Hook stays above the early return to keep call order stable.
   React.useEffect(() => {
     if (!isOpen) return;
-    const handleEscape = (e) => {
+    const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCancel();
     };
     document.addEventListener('keydown', handleEscape);
@@ -15,7 +23,7 @@ function ConfirmationModal({ isOpen, title, message, onConfirm, onCancel }) {
   if (!isOpen) return null;
 
   // Click on the backdrop (but not the modal itself) cancels.
-  const handleOverlayClick = (e) => {
+  const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onCancel();
   };
 

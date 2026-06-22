@@ -1,16 +1,35 @@
 import React, { useState } from 'react';
 import './ConnectionCard.css';
 
-function ConnectionCard({ 
-  connection, 
-  isActive, 
-  isSelected, 
+interface CardConnection {
+  id: string;
+  config?: any;
+  status?: string;
+  isConnected?: boolean;
+  protocolVersion?: number;
+}
+
+interface Props {
+  connection: CardConnection;
+  isActive: boolean;
+  isSelected: boolean;
+  isCollapsed?: boolean;
+  onSelect: () => void;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+function ConnectionCard({
+  connection,
+  isActive,
+  isSelected,
   isCollapsed = false,
-  onSelect, 
-  onToggle, 
-  onEdit, 
-  onDelete 
-}) {
+  onSelect,
+  onToggle,
+  onEdit,
+  onDelete,
+}: Props) {
   const [showActions, setShowActions] = useState(false);
 
   const getStatusColor = () => {
@@ -21,10 +40,14 @@ function ConnectionCard({
 
   const getStatusDot = () => {
     switch (connection.status) {
-      case 'connected': return 'status-dot connected';
-      case 'connecting': return 'status-dot connecting';
-      case 'disconnected': return 'status-dot disconnected';
-      default: return 'status-dot unknown';
+      case 'connected':
+        return 'status-dot connected';
+      case 'connecting':
+        return 'status-dot connecting';
+      case 'disconnected':
+        return 'status-dot disconnected';
+      default:
+        return 'status-dot unknown';
     }
   };
 
@@ -50,7 +73,7 @@ function ConnectionCard({
     return version === 5 ? 'mqtt5' : 'mqtt311';
   };
 
-  // Helper functions for status styling and text (for collapsed mode)
+  // Status styling/text used in collapsed mode.
   const getStatusClass = () => {
     if (connection.status === 'connecting' || connection.status === 'disconnecting') {
       return 'connecting';
@@ -65,44 +88,34 @@ function ConnectionCard({
   };
 
   const getStatusText = () => {
-    if (connection.status === 'connecting') {
-      return 'Connecting...';
-    }
-    if (connection.status === 'disconnecting') {
-      return 'Disconnecting...';
-    }
-    if (isActive || connection.status === 'connected') {
-      return 'Connected';
-    }
-    if (connection.status === 'error') {
-      return 'Error';
-    }
+    if (connection.status === 'connecting') return 'Connecting...';
+    if (connection.status === 'disconnecting') return 'Disconnecting...';
+    if (isActive || connection.status === 'connected') return 'Connected';
+    if (connection.status === 'error') return 'Error';
     return 'Disconnected';
   };
 
-  const handleCardClick = () => {
-    onSelect();
-  };
+  const handleCardClick = () => onSelect();
 
-  const handleToggleClick = (e) => {
+  const handleToggleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onToggle();
   };
 
-  const handleEditClick = (e) => {
+  const handleEditClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onEdit();
   };
 
-  const handleDeleteClick = async (e) => {
+  const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDelete();
   };
 
-  // Collapsed version - render minimal dot
+  // Collapsed version — minimal status dot.
   if (isCollapsed) {
     return (
-      <div 
+      <div
         className={`connection-card collapsed ${isActive ? 'active' : 'inactive'} ${isSelected ? 'selected' : ''}`}
         onClick={handleCardClick}
         title={`${connection.config?.name || 'Unnamed'}\n${getBrokerInfo()}\nStatus: ${getStatusText()}\nMQTT: ${getMqttVersion()}\nClient: ${connection.config?.clientId || 'Auto'}`}
@@ -114,50 +127,42 @@ function ConnectionCard({
     );
   }
 
-  // Regular expanded version
+  // Expanded version.
   const cardClassName = [
     'connection-card',
     getStatusColor(),
     isSelected ? 'selected' : '',
-    isActive ? 'active' : ''
-  ].filter(Boolean).join(' ');
+    isActive ? 'active' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div 
+    <div
       className={cardClassName}
       onClick={handleCardClick}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
       <div className="card-content">
-        {/* Status dot and MQTT version bubble in top right corner */}
+        {/* Status dot and MQTT version bubble (top-right). */}
         <div className="connection-status">
           <div className={getStatusDot()}></div>
-          <div className={`mqtt-version-bubble ${getMqttVersionClass()}`}>
-            {getMqttVersion()}
-          </div>
+          <div className={`mqtt-version-bubble ${getMqttVersionClass()}`}>{getMqttVersion()}</div>
         </div>
-        
+
         <div className="connection-info">
           <div className="connection-header">
-            <span className="connection-name">
-              {connection.config?.name || connection.id}
-            </span>
+            <span className="connection-name">{connection.config?.name || connection.id}</span>
           </div>
-          
+
           <div className="connection-details">
             <div className="connection-meta">
-              <span className="connection-status-text">
-                {connection.status}
-              </span>
+              <span className="connection-status-text">{connection.status}</span>
             </div>
-            <span className="connection-broker">
-              {getBrokerInfo()}
-            </span>
+            <span className="connection-broker">{getBrokerInfo()}</span>
             {connection.config?.clientId && (
-              <span className="connection-client-id">
-                {connection.config.clientId}
-              </span>
+              <span className="connection-client-id">{connection.config.clientId}</span>
             )}
           </div>
         </div>
@@ -171,11 +176,7 @@ function ConnectionCard({
             >
               <i className={connection.isConnected ? 'fas fa-stop' : 'fas fa-play'}></i>
             </button>
-            <button
-              className="action-btn edit-btn"
-              onClick={handleEditClick}
-              title="Edit connection"
-            >
+            <button className="action-btn edit-btn" onClick={handleEditClick} title="Edit connection">
               <i className="fas fa-edit"></i>
             </button>
             <button
