@@ -1,9 +1,22 @@
+export interface ConnectionProfile {
+  id: string;
+  name: string;
+  brokerUrl?: string;
+  protocolVersion?: number;
+  description?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  [key: string]: unknown;
+}
+
 class ConnectionProfileService {
+  private profiles: Record<string, ConnectionProfile>;
+
   constructor() {
     this.profiles = this.loadProfiles();
   }
 
-  loadProfiles() {
+  loadProfiles(): Record<string, ConnectionProfile> {
     try {
       const saved = localStorage.getItem('mqtt-connection-profiles');
       return saved ? JSON.parse(saved) : this.getDefaultProfiles();
@@ -13,11 +26,11 @@ class ConnectionProfileService {
     }
   }
 
-  saveProfiles() {
+  saveProfiles(): void {
     localStorage.setItem('mqtt-connection-profiles', JSON.stringify(this.profiles));
   }
 
-  getDefaultProfiles() {
+  getDefaultProfiles(): Record<string, ConnectionProfile> {
     return {
       'local-mosquitto': {
         id: 'local-mosquitto',
@@ -27,7 +40,7 @@ class ConnectionProfileService {
         clean: true,
         keepalive: 60,
         connectTimeout: 30000,
-        description: 'Local Mosquitto broker with default settings'
+        description: 'Local Mosquitto broker with default settings',
       },
       'local-mosquitto-v5': {
         id: 'local-mosquitto-v5',
@@ -39,9 +52,9 @@ class ConnectionProfileService {
         connectTimeout: 30000,
         properties: {
           sessionExpiryInterval: 0,
-          receiveMaximum: 65535
+          receiveMaximum: 65535,
         },
-        description: 'Local Mosquitto broker with MQTT 5.0'
+        description: 'Local Mosquitto broker with MQTT 5.0',
       },
       'hivemq-public': {
         id: 'hivemq-public',
@@ -50,7 +63,7 @@ class ConnectionProfileService {
         protocolVersion: 4,
         clean: true,
         keepalive: 60,
-        description: 'HiveMQ public test broker'
+        description: 'HiveMQ public test broker',
       },
       'eclipse-public': {
         id: 'eclipse-public',
@@ -59,30 +72,30 @@ class ConnectionProfileService {
         protocolVersion: 4,
         clean: true,
         keepalive: 60,
-        description: 'Eclipse IoT public broker'
-      }
+        description: 'Eclipse IoT public broker',
+      },
     };
   }
 
-  getAllProfiles() {
+  getAllProfiles(): ConnectionProfile[] {
     return Object.values(this.profiles);
   }
 
-  getProfile(id) {
+  getProfile(id: string): ConnectionProfile | undefined {
     return this.profiles[id];
   }
 
-  saveProfile(profile) {
+  saveProfile(profile: ConnectionProfile): ConnectionProfile {
     this.profiles[profile.id] = {
       ...profile,
       createdAt: profile.createdAt || Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
     this.saveProfiles();
     return this.profiles[profile.id];
   }
 
-  deleteProfile(id) {
+  deleteProfile(id: string): boolean {
     if (this.profiles[id]) {
       delete this.profiles[id];
       this.saveProfiles();
@@ -91,12 +104,12 @@ class ConnectionProfileService {
     return false;
   }
 
-  createFromConnection(connection) {
-    const profile = {
+  createFromConnection(connection: { name: string; [key: string]: unknown }): ConnectionProfile {
+    const profile: ConnectionProfile = {
+      ...connection,
       id: `profile-${Date.now()}`,
       name: `${connection.name} Profile`,
-      ...connection,
-      description: `Profile created from connection: ${connection.name}`
+      description: `Profile created from connection: ${connection.name}`,
     };
     return this.saveProfile(profile);
   }
