@@ -56,7 +56,7 @@ function MessagePanel({
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
     const a = Object.assign(document.createElement('a'), {
       href: url,
-      download: `mqtt-topic-${selectedTopic.topicPath.replace(/[\/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 19)}.json`
+      download: `mqtt-topic-${selectedTopic.topicPath.replace(/[/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 19)}.json`
     });
     document.body.appendChild(a);
     a.click();
@@ -79,7 +79,7 @@ function MessagePanel({
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const a = Object.assign(document.createElement('a'), {
       href: url,
-      download: `mqtt-topic-${selectedTopic.topicPath.replace(/[\/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 19)}.csv`
+      download: `mqtt-topic-${selectedTopic.topicPath.replace(/[/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 19)}.csv`
     });
     document.body.appendChild(a);
     a.click();

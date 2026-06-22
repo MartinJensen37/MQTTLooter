@@ -1,6 +1,5 @@
-const mqtt = require('mqtt');
-const fs = require('fs');
-const { EventEmitter } = require('events');
+import mqtt from 'mqtt';
+import { EventEmitter } from 'events';
 
 class MQTTConnection extends EventEmitter {
   constructor(id, config) {
@@ -576,7 +575,4 @@ class MQTTConnectionManager extends EventEmitter {
   }
 }
 
-module.exports = {
-  MQTTConnectionManager,
-  MQTTConnection
-};
+export { MQTTConnectionManager, MQTTConnection };

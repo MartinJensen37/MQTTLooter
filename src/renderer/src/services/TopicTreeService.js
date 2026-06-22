@@ -213,8 +213,6 @@ class TopicTreeService {
     return msgs.reverse().map((m) => ({
       id: `${m.timestamp}`,
       connectionId,
-      connectionId,
-      connectionId,
       topic: m.topic || topicPath,
       message: m.payload || '',
       qos: m.qos || 0,
