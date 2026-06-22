@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SplitPane, Pane } from 'react-split-pane';
-import MQTTService from '../../services/MQTTService.js';
-import TopicTreeService from '../../services/TopicTreeService.js';
+import MQTTService from '../../services/MQTTService';
+import TopicTreeService from '../../services/TopicTreeService';
 import ConnectionSidebar from '../ConnectionSidebar/ConnectionSidebar';
 import TopicTreeComponent from '../TopicTree/TopicTreeComponent';
-import MessagePanel from '../MessagePanel/MessagePanel.jsx';
+import MessagePanel from '../MessagePanel/MessagePanel';
 import PublishingPanel from '../PublishingPanel/PublishingPanel';
 import RecordingPanel from '../RecordingPanel/RecordingPanel';
 import SimulationPanel from '../SimulationPanel/SimulationPanel';
-import { useConnections } from '../../hooks/useConnections.js';
-import { useMessages } from '../../hooks/useMessages.js';
-import { useUIState } from '../../hooks/useUIState.js';
+import { useConnections } from '../../hooks/useConnections';
+import { useMessages } from '../../hooks/useMessages';
+import { useUIState } from '../../hooks/useUIState';
 import './App.css';
 
 function App() {
