@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import './MessagePanel.css';
 
 function MessagePanel({
@@ -13,6 +12,7 @@ function MessagePanel({
   const [sortOrder, setSortOrder] = useState('desc');
   const [showRetainedOnly, setShowRetainedOnly] = useState(false);
   const [showTopicExportMenu, setShowTopicExportMenu] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
 
   const listRef = useRef(null);
 
@@ -31,14 +31,6 @@ function MessagePanel({
     if (processedMessages.length === 0) return { timestamp: null, qos: 0, retain: false, topic: selectedTopic.topicPath };
     return processedMessages.reduce((latest, cur) => cur.timestamp > latest.timestamp ? cur : latest, processedMessages[0]);
   }, [selectedTopic, processedMessages]);
-
-  const rowVirtualizer = useVirtualizer({
-    count: processedMessages.length,
-    getScrollElement: () => listRef.current,
-    estimateSize: () => 100,
-    overscan: 5,
-    measureElement: (el) => el?.getBoundingClientRect().height ?? 100,
-  });
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -173,6 +165,14 @@ function MessagePanel({
               >
                 <i className="fas fa-trash"></i> Clear Messages
               </button>
+              <button
+                className={`btn btn-sm ${autoScroll ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setAutoScroll(v => !v)}
+                title={autoScroll ? 'Auto-scroll ON — click to pin' : 'Auto-scroll OFF — click to follow'}
+              >
+                <i className={`fas ${autoScroll ? 'fa-arrow-down' : 'fa-thumbtack'}`}></i>
+                {autoScroll ? ' Following' : ' Pinned'}
+              </button>
               <div className="message-export-wrapper custom-select-wrapper">
                 <button
                   type="button"
@@ -200,7 +200,7 @@ function MessagePanel({
         </div>
       )}
 
-      <div className="message-list" ref={listRef}>
+      <div className="message-list" ref={listRef} style={{ overflowAnchor: autoScroll ? 'auto' : 'none' }}>
         {processedMessages.length === 0 ? (
           <div className="no-messages">
             <div className="no-messages-icon"><i className="fas fa-inbox"></i></div>
@@ -212,75 +212,60 @@ function MessagePanel({
             </p>
           </div>
         ) : (
-          <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+          <>
             {selectedTopic && processedMessages.length >= 300 && (
               <div className="message-limit-notice">
                 <i className="fas fa-info-circle"></i> Showing up to 300 most recent messages for this topic.
               </div>
             )}
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const msg = processedMessages[virtualRow.index];
-              return (
-                <div
-                  key={msg.id}
-                  data-index={virtualRow.index}
-                  ref={rowVirtualizer.measureElement}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                >
-                  <div
-                    className="message-item"
-                    onDoubleClick={(e) => copyPayload(msg.message, e)}
-                    title="Double-click to copy payload"
-                  >
-                    <div className="message-header">
-                      <div className="message-meta">
-                        <span className="timestamp" title={formatTimestamp(msg.timestamp)}>
-                          <i className="fas fa-clock"></i> {new Date(msg.timestamp).toLocaleTimeString()}
-                        </span>
-                        <span className="topic" title={msg.topic}>
-                          <i className="fas fa-tag"></i> {msg.topic}
-                        </span>
-                        <span className={`badge badge-qos-${msg.qos}`}>QoS {msg.qos}</span>
-                        {msg.retain && (
-                          <span className="badge badge-retain"><i className="fas fa-save"></i> RETAIN</span>
-                        )}
-                        <span className="connection-id" title={`Connection: ${msg.connectionId}`}>
-                          <i className="fas fa-plug"></i> {msg.connectionId}
-                        </span>
-                      </div>
-                      <div className="message-actions">
-                        <button
-                          className="copy-btn"
-                          onClick={(e) => copyPayload(msg.message, e)}
-                          title="Copy payload"
-                          style={{ borderRadius: '50%', minWidth: '24px', height: '24px' }}
-                        >
-                          <i className="fas fa-copy"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div className="message-content">
-                      <div className="payload-preview">{getPayloadPreview(msg.message)}</div>
-                      {msg.message.length > 100 && (
-                        <details className="payload-full">
-                          <summary>
-                            <i className="fas fa-expand-alt"></i> Show full payload ({msg.message.length} chars)
-                          </summary>
-                          <pre className="payload-code">{msg.message}</pre>
-                        </details>
-                      )}
-                    </div>
+            {processedMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className="message-item"
+                onDoubleClick={(e) => copyPayload(msg.message, e)}
+                title="Double-click to copy payload"
+              >
+                <div className="message-header">
+                  <div className="message-meta">
+                    <span className="timestamp" title={formatTimestamp(msg.timestamp)}>
+                      <i className="fas fa-clock"></i> {new Date(msg.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span className="topic" title={msg.topic}>
+                      <i className="fas fa-tag"></i> {msg.topic}
+                    </span>
+                    <span className={`badge badge-qos-${msg.qos}`}>QoS {msg.qos}</span>
+                    {msg.retain && (
+                      <span className="badge badge-retain"><i className="fas fa-save"></i> RETAIN</span>
+                    )}
+                    <span className="connection-id" title={`Connection: ${msg.connectionId}`}>
+                      <i className="fas fa-plug"></i> {msg.connectionId}
+                    </span>
+                  </div>
+                  <div className="message-actions">
+                    <button
+                      className="copy-btn"
+                      onClick={(e) => copyPayload(msg.message, e)}
+                      title="Copy payload"
+                      style={{ borderRadius: '50%', minWidth: '24px', height: '24px' }}
+                    >
+                      <i className="fas fa-copy"></i>
+                    </button>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+                <div className="message-content">
+                  <div className="payload-preview">{getPayloadPreview(msg.message)}</div>
+                  {msg.message.length > 100 && (
+                    <details className="payload-full">
+                      <summary>
+                        <i className="fas fa-expand-alt"></i> Show full payload ({msg.message.length} chars)
+                      </summary>
+                      <pre className="payload-code">{msg.message}</pre>
+                    </details>
+                  )}
+                </div>
+              </div>
+            ))}
+          </>
         )}
       </div>
     </div>
