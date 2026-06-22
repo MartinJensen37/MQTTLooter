@@ -8,6 +8,10 @@ class TopicTreeService {
     this.eventHandlers = new Map();
     this.initialized = false;
     
+    // Throttle treeUpdated emissions per connection (ms)
+    this._pendingUpdates = new Map(); // connectionId → timeoutId
+    this._UPDATE_THROTTLE_MS = 150;
+    
     // Initialize when MQTTService is available
     this.initializeAsync();
   }
@@ -42,35 +46,37 @@ class TopicTreeService {
     if (!topicTree) {
       topicTree = new TopicTree(connectionId);
       this.topicTrees.set(connectionId, topicTree);
-      
-      // Emit tree created event only when first message arrives
       this.emitEvent('treeCreated', { connectionId, tree: topicTree });
     }
     
-    // Add message to topic tree
-    const node = topicTree.addMessage(topic, message, qos, retain, timestamp);
+    // Add message to topic tree (rate calc happens inside addMessage)
+    topicTree.addMessage(topic, message, qos, retain, timestamp);
     
-    // Immediately update rate for this specific node for faster response
-    node.calculateMessageRate();
-    
-    // Emit tree update event
-    this.emitEvent('treeUpdated', { 
-      connectionId, 
-      topic, 
-      node: node.toJSON(),
-      statistics: topicTree.getStatistics()
-    });
+    // Throttle treeUpdated: don't emit on every single message.
+    // Track which topics were updated so listeners can filter.
+    if (!this._pendingUpdates.has(connectionId)) {
+      this._pendingUpdates.set(connectionId, {
+        topics: new Set(),
+        timer: setTimeout(() => {
+          const pending = this._pendingUpdates.get(connectionId);
+          this._pendingUpdates.delete(connectionId);
+          this.emitEvent('treeUpdated', { 
+            connectionId,
+            topics: pending ? Array.from(pending.topics) : [],
+            statistics: topicTree.getStatistics()
+          });
+        }, this._UPDATE_THROTTLE_MS)
+      });
+    }
+    this._pendingUpdates.get(connectionId).topics.add(topic);
   }
 
+  /**
+   * Lightweight statistics refresh — only emits pre-calculated values.
+   * Does NOT iterate or recalculate all nodes.
+   */
   startRateCalculationTimer() {
-    setInterval(() => {
-      this.topicTrees.forEach(tree => {
-        tree.topicLookup.forEach(node => {
-          node.calculateMessageRate();
-        });
-      });
-    }, UI.RATE_UPDATE_INTERVAL_MS);
-
+    // Emit statistics at a moderate interval (no per-node iteration)
     setInterval(() => {
       this.emitEvent('ratesUpdated', {
         trees: this.getAllTreeStatistics()
@@ -189,6 +195,32 @@ class TopicTreeService {
   // Check if service is ready
   isReady() {
     return this.initialized && this.MQTTService !== null;
+  }
+
+  /**
+   * Get messages for a specific topic from its node's ring buffer.
+   * Returns newest-first sorted array suitable for MessagePanel.
+   * Maps ring buffer format to MessagePanel-compatible shape.
+   * @returns {Array} Array of message objects or empty array
+   */
+  getTopicMessages(connectionId, topicPath) {
+    const tree = this.topicTrees.get(connectionId);
+    if (!tree) return [];
+    const node = tree.getNode(topicPath);
+    if (!node || !node.messageHistory) return [];
+    // Return newest first (MessagePanel expects this order)
+    const msgs = node.messageHistory.toArray();
+    return msgs.reverse().map((m) => ({
+      id: `${m.timestamp}`,
+      connectionId,
+      connectionId,
+      connectionId,
+      topic: m.topic || topicPath,
+      message: m.payload || '',
+      qos: m.qos || 0,
+      retain: m.retain || false,
+      timestamp: m.timestamp,
+    }));
   }
 
   // Export all trees
