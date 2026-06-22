@@ -1,3 +1,6 @@
+import RingBuffer from '../../utils/RingBuffer.js';
+import { MESSAGE_HISTORY } from '../../config.js';
+
 class TopicNode {
   constructor(name, fullPath = '') {
     this.name = name;
@@ -9,7 +12,14 @@ class TopicNode {
     this.messageCount = 0;
     this.lastMessage = null;
     this.lastMessageTime = null;
-    this.messageTimestamps = []; // Array to store message timestamps for rate calculation
+
+    // Bounded ring buffer for message history (item count + byte limits)
+    this.messageHistory = new RingBuffer(
+      MESSAGE_HISTORY.MAX_ITEMS_PER_TOPIC,
+      MESSAGE_HISTORY.MAX_BYTES_PER_TOPIC,
+      MESSAGE_HISTORY.COMPACTION_FACTOR
+    );
+
     this.messageRate = 0; // Messages per second
     this.lastRateCalculation = Date.now();
 
@@ -50,12 +60,17 @@ class TopicNode {
     this.lastMessageTime = timestamp;
     this.hasDirectMessages = true; // Mark this node as having direct messages
 
-    // Add timestamp for rate calculation
-    this.messageTimestamps.push(timestamp);
-
-    // Keep only recent timestamps within the adaptive window + buffer
-    const cutoff = timestamp - (this.adaptiveTimeWindow * 2); // Increased buffer
-    this.messageTimestamps = this.messageTimestamps.filter(ts => ts > cutoff);
+    // Store full message in bounded ring buffer
+    // payload length is estimated from the message string for byte tracking
+    const payloadLen = (message && message.payload) ? message.payload.length : 0;
+    this.messageHistory.add({
+      payload: message ? message.payload : null,
+      qos: message ? message.qos : 0,
+      retain: message ? message.retain : false,
+      timestamp,
+      topic: message ? message.topic : null,
+      length: payloadLen,
+    });
 
     // Calculate rate immediately for instant feedback
     this.calculateMessageRate(timestamp);
@@ -103,18 +118,19 @@ class TopicNode {
       return;
     }
 
-    if (this.messageTimestamps.length === 0) {
-      this.messageRate = 0;
-      this.lastRateCalculation = currentTime;
-      return;
+    // Get timestamps from ring buffer entries within the adaptive window
+    const cutoff = currentTime - this.adaptiveTimeWindow;
+    const allMessages = this.messageHistory.toArray();
+    let recentCount = 0;
+    for (let i = allMessages.length - 1; i >= 0; i--) {
+      if (allMessages[i].timestamp >= cutoff) {
+        recentCount++;
+      } else {
+        break; // Messages are ordered oldest→newest, stop at first too-old
+      }
     }
 
-    // Remove old timestamps based on adaptive window
-    this.messageTimestamps = this.messageTimestamps.filter(timestamp =>
-      currentTime - timestamp <= this.adaptiveTimeWindow
-    );
-
-    if (this.messageTimestamps.length === 0) {
+    if (recentCount === 0) {
       this.messageRate = 0;
       this.lastRateCalculation = currentTime;
       return;
@@ -122,7 +138,7 @@ class TopicNode {
 
     // Calculate rate: messages in window / window duration in seconds
     const windowDurationSeconds = this.adaptiveTimeWindow / 1000;
-    const currentRate = this.messageTimestamps.length / windowDurationSeconds;
+    const currentRate = recentCount / windowDurationSeconds;
 
     // More relaxed minimum display rate: 0.01 msg/min = 0.000167 msg/sec
     const minDisplayRate = 0.01 / 60;
@@ -228,7 +244,7 @@ class TopicNode {
       // Debug info (can be removed in production)
       adaptiveWindow: Math.round(this.adaptiveTimeWindow / 1000 * 10) / 10, // Window in seconds
       averageInterval: Math.round(this.averageInterval),
-      timestampCount: this.messageTimestamps.length
+      bufferCount: this.messageHistory ? this.messageHistory.count : 0
     };
   }
   clearMessages() {
@@ -239,7 +255,7 @@ class TopicNode {
     this.messageCount = 0;
     this.lastMessage = null;
     this.lastMessageTime = null;
-    this.messageTimestamps = [];
+    this.messageHistory.clear();
     this.messageRate = 0;
     this.lastRateCalculation = Date.now();
     this.hasDirectMessages = false;
