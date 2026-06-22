@@ -105,22 +105,7 @@ class TopicTree {
     }
     return false;
   }
-    findNodeByPath(targetPath) {
-    const parts = targetPath.split('/').filter(part => part !== '');
-    let currentNode = this.root;
-
-    for (const part of parts) {
-      if (currentNode.children.has(part)) {
-        currentNode = currentNode.children.get(part);
-      } else {
-        return null;
-      }
-    }
-
-    return currentNode;
-  }
-
-    findNodeByPath(targetPath) {
+  findNodeByPath(targetPath) {
     const parts = targetPath.split('/').filter(part => part !== '');
     let currentNode = this.root;
 

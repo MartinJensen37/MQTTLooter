@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { toast } from 'react-toastify';
 import './ConnectionModal.css';
 
 function ConnectionModal({ connection, onSave, onCancel }) {
@@ -375,7 +374,7 @@ function ConnectionModal({ connection, onSave, onCancel }) {
       }));
     } catch (error) {
       console.error(`Error reading ${fileType} file:`, error);
-      toast.error(`Failed to read ${fileType} file`);
+      alert(`Failed to read ${fileType} file`);
     }
   };
 
