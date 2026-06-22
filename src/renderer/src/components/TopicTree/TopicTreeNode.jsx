@@ -1,62 +1,44 @@
 import React from 'react';
 
 function TopicTreeNode({ node, onClick, isSelected }) {
-  const indentStyle = {
-    paddingLeft: `${node.depth * 20 + 10}px`
-  };
+  const indentStyle = { paddingLeft: `${node.depth * 20 + 10}px` };
 
   const formatRate = (rate) => {
-    if (rate >= 1) {
-      return `${rate.toFixed(1)}/s`;
-    } else if (rate > 0) {
-      return `${(rate * 60).toFixed(1)}/min`;
-    }
+    if (rate >= 1) return `${rate.toFixed(1)}/s`;
+    if (rate > 0)  return `${(rate * 60).toFixed(1)}/min`;
     return '';
   };
 
   const formatMessage = (message) => {
     if (!message || !message.payload) return '';
     let payload = message.payload.toString();
-    
-    // Try to parse JSON for better display
     try {
-      const parsed = JSON.parse(payload);
-      payload = JSON.stringify(parsed);
-    } catch (e) {
-      // Not JSON, keep as is
-    }
-    
+      payload = JSON.stringify(JSON.parse(payload));
+    } catch (_) {}
     return payload;
   };
 
   const getExpandIcon = () => {
-    if (node.hasChildren) {
-      return node.isExpanded ? '▼' : '▶';
-    }
-    return '';
+    if (!node.hasChildren) return '';
+    return node.isExpanded ? '▼' : '▶';
   };
 
-  const hasStats = node.messageCount > 0 || node.messageRate > 0;
-  const hasPayload = node.lastMessage;
+  const hasStats          = node.messageCount > 0 || node.messageRate > 0;
+  const hasPayload        = !!node.lastMessage;
   const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
-  const hasRetainedMessage = node.lastMessage && node.lastMessage.retain;
-
-  // Calculate subtopic count (direct children count)
-  const subtopicCount = node.hasChildren ? (node.childCount || 0) : 0;
+  const hasRetainedMessage = node.lastMessage?.retain;
+  const subtopicCount     = node.hasChildren ? (node.childCount || 0) : 0;
 
   return (
     <div
       className={`topic-tree-node ${node.hasChildren ? 'has-children' : 'is-leaf'} ${hasDirectMessages ? 'has-messages' : ''} ${isSelected ? 'selected' : ''}`}
       style={indentStyle}
-      onClick={onClick}
+      onClick={() => onClick(node)}
     >
       <div className="node-content">
         <div className="node-left">
-          <span className="node-expand-icon">
-            {getExpandIcon()}
-          </span>
+          <span className="node-expand-icon">{getExpandIcon()}</span>
           <span className="node-name">{node.name}</span>
-          
           <div className="node-bubbles">
             {hasRetainedMessage && (
               <span className="retained-bubble" title="Has retained message">
@@ -70,37 +52,19 @@ function TopicTreeNode({ node, onClick, isSelected }) {
             )}
           </div>
         </div>
-        
+
         <div className="node-right">
-          {/* Stats and payload in one line */}
           {(hasStats || hasPayload) && (
             <>
-              {/* Message count and rate */}
               {hasStats && (
                 <div className="node-stats">
-                  {node.messageCount > 0 && (
-                    <span className="message-count">
-                      {node.messageCount}
-                    </span>
-                  )}
-                  {node.messageRate > 0 && (
-                    <span className="message-rate">
-                      {formatRate(node.messageRate)}
-                    </span>
-                  )}
+                  {node.messageCount > 0 && <span className="message-count">{node.messageCount}</span>}
+                  {node.messageRate > 0  && <span className="message-rate">{formatRate(node.messageRate)}</span>}
                 </div>
               )}
-              
-              {/* Separator between stats and payload */}
-              {hasStats && hasPayload && (
-                <span className="stats-separator">|</span>
-              )}
-              
-              {/* Payload preview for direct messages only */}
+              {hasStats && hasPayload && <span className="stats-separator">|</span>}
               {hasPayload && hasDirectMessages && (
-                <div className="node-payload">
-                  {formatMessage(node.lastMessage)}
-                </div>
+                <div className="node-payload">{formatMessage(node.lastMessage)}</div>
               )}
             </>
           )}
@@ -110,4 +74,4 @@ function TopicTreeNode({ node, onClick, isSelected }) {
   );
 }
 
-export default TopicTreeNode;
+export default React.memo(TopicTreeNode);
