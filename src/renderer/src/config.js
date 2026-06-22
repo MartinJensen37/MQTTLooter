@@ -1,0 +1,24 @@
+export const MQTT_DEFAULTS = {
+  HOSTNAME: 'localhost',
+  PORTS: {
+    mqtt: 1883,
+    mqtts: 8883,
+    ws: 80,
+    wss: 443,
+  },
+  KEEPALIVE: 60,
+  CONNECT_TIMEOUT: 30000,
+  RECONNECT_PERIOD: 1000,
+  PROTOCOL_VERSION: 4,
+};
+
+export const MESSAGES = {
+  MAX_PER_TOPIC: 300,
+};
+
+export const UI = {
+  RATE_UPDATE_INTERVAL_MS: 100,
+  RATE_EMIT_INTERVAL_MS: 250,
+  CONNECTION_SWITCH_DELAY_MS: 246,
+  DEV_SERVER_URL: 'http://localhost:3000',
+};
