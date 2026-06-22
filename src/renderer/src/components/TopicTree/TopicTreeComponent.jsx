@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import TopicTreeNode from './TopicTreeNode';
 import './TopicTree.css';
 
@@ -8,7 +9,7 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
   const [selectedNode, setSelectedNode] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // RAF gate: batch all tree-update events into one render per frame
+  const scrollRef = useRef(null);
   const pendingRaf = useRef(null);
 
   const loadNodes = useCallback(() => {
@@ -99,6 +100,15 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
   const handleCollapseAll = useCallback(() => topicTreeService.expandTopicTreeToDepth(connectionId, 0),  [connectionId, topicTreeService]);
   const handleClearTree  = useCallback(() => topicTreeService.clearTopicTree(connectionId), [connectionId, topicTreeService]);
 
+  // Virtualize: only render visible topic rows (massive DOM savings)
+  const rowVirtualizer = useVirtualizer({
+    count: nodes.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 38,
+    overscan: 15,
+  });
+
+
   if (isLoading) {
     return (
       <div className="topic-tree-container">
@@ -145,15 +155,31 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
         )}
       </div>
 
-      <div className="topic-tree-content">
-        {nodes.map((node) => (
-          <TopicTreeNode
-            key={node.fullPath}
-            node={node}
-            onClick={handleNodeClick}
-            isSelected={selectedNode === node.fullPath}
-          />
-        ))}
+      <div className="topic-tree-content" ref={scrollRef}>
+        <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const node = nodes[virtualRow.index];
+            return (
+              <div
+                key={node.fullPath}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <TopicTreeNode
+                  node={node}
+                  onClick={handleNodeClick}
+                  isSelected={selectedNode === node.fullPath}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

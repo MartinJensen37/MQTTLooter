@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SplitPane, Pane } from 'react-split-pane';
-import { MESSAGES } from '../../config.js';
 import MQTTService from '../../services/MQTTService.js';
 import TopicTreeService from '../../services/TopicTreeService.js';
 import ConnectionSidebar from '../ConnectionSidebar/ConnectionSidebar';
@@ -43,8 +42,6 @@ function App() {
   } = useConnections(showFeedback, selectedTopic, setSelectedTopic);
 
   const {
-    messages, setMessages,
-    messageBuffer, rafFlushId,
     connectionMessages, allConnectionMessages,
     handleClearMessages,
   } = useMessages(selectedConnection, selectedTopic, connections, showFeedback);
@@ -88,7 +85,6 @@ function App() {
         c.id === data.id ? { ...c, status: 'disconnected', isConnected: false } : c
       ));
       TopicTreeService.removeTopicTree(data.id);
-      setMessages(prev => prev.filter(m => m.connectionId !== data.id));
       setSelectedTopic(cur => (cur?.connectionId === data.id ? null : cur));
       setLastSelectedTopics(prev => {
         const next = { ...prev };
@@ -117,39 +113,10 @@ function App() {
       });
     };
 
-    const handleMessage = (data) => {
-      messageBuffer.current.push({
-        id: Date.now() + Math.random(),
-        connectionId: data.id,
-        topic: data.topic,
-        message: data.message,
-        qos: data.qos,
-        retain: data.retain,
-        timestamp: data.timestamp || Date.now(),
-      });
-      if (!rafFlushId.current) {
-        rafFlushId.current = requestAnimationFrame(() => {
-          rafFlushId.current = null;
-          const buffered = messageBuffer.current.splice(0);
-          if (buffered.length === 0) return;
-          setMessages(prev => {
-            const combined = [...buffered, ...prev];
-            const byTopic = {};
-            combined.forEach(m => {
-              const k = `${m.connectionId}::${m.topic}`;
-              if (!byTopic[k]) byTopic[k] = [];
-              byTopic[k].push(m);
-            });
-            Object.keys(byTopic).forEach(k => {
-              if (byTopic[k].length > MESSAGES.MAX_PER_TOPIC)
-                byTopic[k] = byTopic[k].slice(0, MESSAGES.MAX_PER_TOPIC);
-            });
-            const result = [];
-            Object.values(byTopic).forEach(msgs => result.push(...msgs));
-            return result.sort((a, b) => b.timestamp - a.timestamp);
-          });
-        });
-      }
+    const handleMessage = (_data) => {
+      // Messages are now stored in per-topic ring buffers (TopicTreeService).
+      // No flat array accumulation — the useMessages hook derives from the tree.
+      // This handler is kept as a listener for future use (e.g. notifications).
     };
 
     const handleError = (data) => {
@@ -163,7 +130,6 @@ function App() {
       });
       if (data.id) {
         TopicTreeService.removeTopicTree(data.id);
-        setMessages(prev => prev.filter(m => m.connectionId !== data.id));
         setSelectedTopic(cur => (cur?.connectionId === data.id ? null : cur));
       }
     };
@@ -175,8 +141,6 @@ function App() {
     MQTTService.onAny('error', handleError);
 
     return () => {
-      if (rafFlushId.current) { cancelAnimationFrame(rafFlushId.current); rafFlushId.current = null; }
-      messageBuffer.current = [];
       const { handleConnected, handleDisconnected, handleMessage, handleError } = handlersRef.current;
       MQTTService.off('*', 'connected', handleConnected);
       MQTTService.off('*', 'disconnected', handleDisconnected);
