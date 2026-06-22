@@ -1,4 +1,5 @@
 import TopicTree from './models/TopicTree.js';
+import { UI } from '../config.js';
 
 class TopicTreeService {
   constructor() {
@@ -62,21 +63,19 @@ class TopicTreeService {
   }
 
   startRateCalculationTimer() {
-    // Update message rates every 100ms for very responsive updates
     setInterval(() => {
       this.topicTrees.forEach(tree => {
         tree.topicLookup.forEach(node => {
           node.calculateMessageRate();
         });
       });
-    }, 100);
-    
-    // Emit rate updates every 250ms
+    }, UI.RATE_UPDATE_INTERVAL_MS);
+
     setInterval(() => {
       this.emitEvent('ratesUpdated', {
         trees: this.getAllTreeStatistics()
       });
-    }, 250);
+    }, UI.RATE_EMIT_INTERVAL_MS);
   }
 
   // Event system for the service
