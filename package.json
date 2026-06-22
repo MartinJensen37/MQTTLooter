@@ -42,7 +42,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/MQTTLooter_logo_small.ico",
@@ -73,7 +75,7 @@
     "@electron/fuses": "^1.8.0",
     "concurrently": "^7.6.0",
     "cross-env": "^7.0.3",
-    "electron": "36.5.0",
+    "electron": "^36.5.0",
     "electron-builder": "^24.13.3",
     "wait-on": "^7.2.0"
   }
