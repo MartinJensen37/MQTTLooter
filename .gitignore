@@ -20,11 +20,10 @@ pids
 # Build directories
 dist-builder
 build/
-src/renderer/build/
+out/
 
 # Dependency directories
 node_modules/
-src/renderer/node_modules/
 
 # TypeScript cache
 *.tsbuildinfo
