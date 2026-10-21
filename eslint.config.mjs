@@ -10,7 +10,7 @@ export default tseslint.config(
 
   // Main + preload run in Node.
   {
-    files: ['src/main/**/*.{js,ts}', 'src/preload/**/*.{js,ts}', 'electron.vite.config.ts'],
+    files: ['src/main/**/*.{js,ts}', 'src/preload/**/*.{js,ts}', 'electron.vite.config.ts', 'tests/**/*.cjs'],
     languageOptions: { globals: globals.node },
   },
 
@@ -47,4 +47,5 @@ export default tseslint.config(
   },
 
   prettier,
+  { files: ['tests/**/*.cjs'], rules: { '@typescript-eslint/no-require-imports': 'off' } },
 );
