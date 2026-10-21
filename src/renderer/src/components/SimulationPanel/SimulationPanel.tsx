@@ -8,7 +8,8 @@ import EditOutputModal from './simulationPanel/EditOutputModal';
 
 interface SimulationPanelProps {
   connectionId?: string | null;
-  onPublishMessage: (data: any) => void;
+  onPublishMessage: (data: any) => Promise<void> | void;
+  showFeedback?: (message: string, type?: string) => void;
   isConnected: boolean;
   selectedTopic?: any;
 }
@@ -18,8 +19,18 @@ function SimulationPanel({
   onPublishMessage,
   isConnected,
   selectedTopic,
+  showFeedback,
 }: SimulationPanelProps) {
-  const [simulatedDevices, setSimulatedDevices] = useState<SimulatedDevice[]>([]);
+  const [simulatedDevices, setSimulatedDevices] = useState<SimulatedDevice[]>(() => {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem(`mqtt-simulation-devices-${connectionId}`) || '[]',
+      );
+      return saved.map((device: SimulatedDevice) => ({ ...device, isPublishing: false }));
+    } catch {
+      return [];
+    }
+  });
   const [selectedDevice, setSelectedDevice] = useState<number | null>(null);
   const [showAddDevice, setShowAddDevice] = useState(false);
   const [showEditOutput, setShowEditOutput] = useState(false);
@@ -27,72 +38,35 @@ function SimulationPanel({
 
   const publishIntervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
-  // Clear the selected device when the connection changes.
-  useEffect(() => {
-    setSelectedDevice(null);
-  }, [connectionId]);
+  const publishOnceRef = useRef<(id: number) => void>(() => {});
+  const schedule = simulatedDevices
+    .filter((d) => d.isPublishing)
+    .map((d) => `${d.id}:${Math.max(100, d.publishInterval)}`)
+    .join(',');
 
-  // Load devices from localStorage and restore active publishing.
   useEffect(() => {
-    if (!connectionId) return;
-
-    const savedDevices = localStorage.getItem(`mqtt-simulation-devices-${connectionId}`);
-    if (savedDevices) {
-      try {
-        const devices: SimulatedDevice[] = JSON.parse(savedDevices);
-        setSimulatedDevices(devices);
-        if (devices.length > 0 && !selectedDevice) {
-          setSelectedDevice(devices[0].id);
-        }
-        if (isConnected) {
-          devices.forEach((device) => {
-            if (device.isPublishing) startPublishing(device.id, device.publishInterval);
-          });
-        }
-      } catch (error) {
-        console.error('Failed to load simulation devices:', error);
-      }
-    } else {
-      setSimulatedDevices([]);
-    }
-  }, [connectionId]);
-
-  // Persist devices.
-  useEffect(() => {
-    if (connectionId && simulatedDevices.length >= 0) {
+    try {
       localStorage.setItem(
         `mqtt-simulation-devices-${connectionId}`,
         JSON.stringify(simulatedDevices),
       );
+    } catch {
+      showFeedback?.('Simulation settings could not be saved locally.', 'error');
     }
-  }, [simulatedDevices, connectionId]);
+  }, [simulatedDevices, connectionId, showFeedback]);
 
-  // Start/stop publishing intervals as the connection state changes.
   useEffect(() => {
-    if (isConnected) {
-      simulatedDevices.forEach((device) => {
-        if (device.isPublishing && !publishIntervalsRef.current[device.id]) {
-          startPublishing(device.id, device.publishInterval);
-        }
-      });
-    } else {
-      Object.keys(publishIntervalsRef.current).forEach((deviceId) => {
-        if (publishIntervalsRef.current[deviceId]) {
-          clearInterval(publishIntervalsRef.current[deviceId]);
-          delete publishIntervalsRef.current[deviceId];
-        }
-      });
+    if (!isConnected || !schedule) return;
+    const intervals = publishIntervalsRef.current;
+    for (const entry of schedule.split(',')) {
+      const [id, interval] = entry.split(':').map(Number);
+      intervals[id] = setInterval(() => publishOnceRef.current(id), interval);
     }
-  }, [isConnected]);
-
-  // Clear intervals on unmount.
-  useEffect(() => {
     return () => {
-      Object.values(publishIntervalsRef.current).forEach((interval) => {
-        if (interval) clearInterval(interval);
-      });
+      Object.values(intervals).forEach(clearInterval);
+      Object.keys(intervals).forEach((id) => delete intervals[id]);
     };
-  }, []);
+  }, [isConnected, schedule]);
 
   const createNewDevice = (deviceData: {
     name: string;
@@ -150,13 +124,8 @@ function SimulationPanel({
   const generatePayload = (device: SimulatedDevice): string => {
     const payload: Record<string, any> = {};
 
-    device.outputs.forEach((output) => {
+    const outputs = device.outputs.map((output) => {
       const value = generateValue(output);
-
-      // Reflect the latest value in the UI.
-      updateDevice(device.id, {
-        outputs: device.outputs.map((o) => (o.id === output.id ? { ...o, currentValue: value } : o)),
-      });
 
       const outputPayload: any = { value };
       if (output.dataType === 'number' && output.unit && output.unit.trim()) {
@@ -166,7 +135,9 @@ function SimulationPanel({
         outputPayload.timestamp = new Date().toISOString();
       }
       payload[output.name] = outputPayload;
+      return { ...output, currentValue: value };
     });
+    updateDevice(device.id, { outputs });
 
     // Flatten when there's a single output.
     const outputNames = Object.keys(payload);
@@ -174,39 +145,30 @@ function SimulationPanel({
     return JSON.stringify(payload);
   };
 
-  const startPublishing = (deviceId: number, interval: number) => {
-    if (publishIntervalsRef.current[deviceId]) {
-      clearInterval(publishIntervalsRef.current[deviceId]);
-    }
-    publishIntervalsRef.current[deviceId] = setInterval(() => publishOnce(deviceId), interval);
-  };
-
-  const publishOnce = (deviceId: number) => {
+  const publishOnce = async (deviceId: number) => {
     const device = simulatedDevices.find((d) => d.id === deviceId);
     if (!device || !isConnected) return;
-
-    onPublishMessage({
-      topic: device.topic,
-      payload: generatePayload(device),
-      qos: 0,
-      retain: false,
-    });
+    try {
+      await onPublishMessage({
+        topic: device.topic,
+        payload: generatePayload(device),
+        qos: 0,
+        retain: false,
+      });
+    } catch (error) {
+      updateDevice(deviceId, { isPublishing: false });
+      showFeedback?.(`Simulation publish failed: ${(error as Error).message}`, 'error');
+    }
   };
+
+  useEffect(() => {
+    publishOnceRef.current = publishOnce;
+  });
 
   const togglePublishing = (deviceId: number) => {
     const device = simulatedDevices.find((d) => d.id === deviceId);
-    if (!device) return;
-
-    if (device.isPublishing) {
-      if (publishIntervalsRef.current[deviceId]) {
-        clearInterval(publishIntervalsRef.current[deviceId]);
-        delete publishIntervalsRef.current[deviceId];
-      }
-      updateDevice(deviceId, { isPublishing: false });
-    } else {
-      if (!isConnected) return;
-      updateDevice(deviceId, { isPublishing: true });
-      startPublishing(deviceId, device.publishInterval);
+    if (device && (device.isPublishing || isConnected)) {
+      updateDevice(deviceId, { isPublishing: !device.isPublishing });
     }
   };
 

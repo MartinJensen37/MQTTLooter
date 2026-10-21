@@ -23,17 +23,21 @@ class MessageTemplateService {
         id: 'temperature-sensor',
         name: 'Temperature Sensor',
         topic: 'sensors/temperature/{{sensorId}}',
-        payload: JSON.stringify({
-          temperature: '{{randomFloat(15, 35, 1)}}',
-          humidity: '{{randomFloat(30, 80, 1)}}',
-          timestamp: '{{timestamp}}',
-          sensorId: '{{sensorId}}'
-        }, null, 2),
+        payload: JSON.stringify(
+          {
+            temperature: '{{randomFloat(15, 35, 1)}}',
+            humidity: '{{randomFloat(30, 80, 1)}}',
+            timestamp: '{{timestamp}}',
+            sensorId: '{{sensorId}}',
+          },
+          null,
+          2,
+        ),
         qos: 0,
         retain: false,
         category: 'IoT Sensors',
         variables: {
-          sensorId: { type: 'text', default: 'temp-001', description: 'Sensor identifier' }
+          sensorId: { type: 'text', default: 'temp-001', description: 'Sensor identifier' },
         },
         schema: {
           type: 'object',
@@ -41,21 +45,25 @@ class MessageTemplateService {
             temperature: { type: 'number', minimum: -50, maximum: 100 },
             humidity: { type: 'number', minimum: 0, maximum: 100 },
             timestamp: { type: 'number' },
-            sensorId: { type: 'string', minLength: 1 }
+            sensorId: { type: 'string', minLength: 1 },
           },
-          required: ['temperature', 'humidity', 'timestamp', 'sensorId']
-        }
+          required: ['temperature', 'humidity', 'timestamp', 'sensorId'],
+        },
       },
       'device-status': {
         id: 'device-status',
         name: 'Device Status',
         topic: 'devices/{{deviceId}}/status',
-        payload: JSON.stringify({
-          status: '{{randomChoice("online", "offline", "maintenance")}}',
-          lastSeen: '{{timestamp}}',
-          batteryLevel: '{{randomInt(0, 100)}}',
-          firmwareVersion: '1.2.3'
-        }, null, 2),
+        payload: JSON.stringify(
+          {
+            status: '{{randomChoice("online", "offline", "maintenance")}}',
+            lastSeen: '{{timestamp}}',
+            batteryLevel: '{{randomInt(0, 100)}}',
+            firmwareVersion: '1.2.3',
+          },
+          null,
+          2,
+        ),
         qos: 1,
         retain: true,
         category: 'Device Management',
@@ -65,22 +73,26 @@ class MessageTemplateService {
             status: { type: 'string', enum: ['online', 'offline', 'maintenance'] },
             lastSeen: { type: 'number' },
             batteryLevel: { type: 'integer', minimum: 0, maximum: 100 },
-            firmwareVersion: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+$' }
+            firmwareVersion: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+$' },
           },
-          required: ['status', 'lastSeen']
-        }
+          required: ['status', 'lastSeen'],
+        },
       },
       'gps-location': {
         id: 'gps-location',
         name: 'GPS Location',
         topic: 'tracking/{{vehicleId}}/location',
-        payload: JSON.stringify({
-          latitude: '{{randomFloat(-90, 90, 6)}}',
-          longitude: '{{randomFloat(-180, 180, 6)}}',
-          speed: '{{randomFloat(0, 120, 1)}}',
-          heading: '{{randomInt(0, 360)}}',
-          timestamp: '{{timestamp}}'
-        }, null, 2),
+        payload: JSON.stringify(
+          {
+            latitude: '{{randomFloat(-90, 90, 6)}}',
+            longitude: '{{randomFloat(-180, 180, 6)}}',
+            speed: '{{randomFloat(0, 120, 1)}}',
+            heading: '{{randomInt(0, 360)}}',
+            timestamp: '{{timestamp}}',
+          },
+          null,
+          2,
+        ),
         qos: 0,
         retain: false,
         category: 'Location Services',
@@ -91,11 +103,11 @@ class MessageTemplateService {
             longitude: { type: 'number', minimum: -180, maximum: 180 },
             speed: { type: 'number', minimum: 0 },
             heading: { type: 'integer', minimum: 0, maximum: 360 },
-            timestamp: { type: 'number' }
+            timestamp: { type: 'number' },
           },
-          required: ['latitude', 'longitude', 'timestamp']
-        }
-      }
+          required: ['latitude', 'longitude', 'timestamp'],
+        },
+      },
     };
   }
 
@@ -111,7 +123,7 @@ class MessageTemplateService {
     this.templates[template.id] = {
       ...template,
       createdAt: template.createdAt || Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
     this.saveTemplates();
     return this.templates[template.id];
@@ -147,36 +159,39 @@ class MessageTemplateService {
       payload: processedPayload,
       qos: template.qos,
       retain: template.retain,
-      properties: template.properties
+      properties: template.properties,
     };
   }
 
   processFunctions(text) {
     // {{timestamp}} - Current timestamp
     text = text.replace(/{{timestamp}}/g, () => Date.now());
-    
+
     // {{randomInt(min, max)}} - Random integer
     text = text.replace(/{{randomInt\((\d+),\s*(\d+)\)}}/g, (match, min, max) => {
       return Math.floor(Math.random() * (parseInt(max) - parseInt(min) + 1)) + parseInt(min);
     });
-    
+
     // {{randomFloat(min, max, decimals)}} - Random float
-    text = text.replace(/{{randomFloat\(([\d.-]+),\s*([\d.-]+),\s*(\d+)\)}}/g, (match, min, max, decimals) => {
-      const value = Math.random() * (parseFloat(max) - parseFloat(min)) + parseFloat(min);
-      return value.toFixed(parseInt(decimals));
-    });
-    
+    text = text.replace(
+      /{{randomFloat\(([\d.-]+),\s*([\d.-]+),\s*(\d+)\)}}/g,
+      (match, min, max, decimals) => {
+        const value = Math.random() * (parseFloat(max) - parseFloat(min)) + parseFloat(min);
+        return value.toFixed(parseInt(decimals));
+      },
+    );
+
     // {{randomChoice("option1", "option2", ...)}} - Random choice
     text = text.replace(/{{randomChoice\((.*?)\)}}/g, (match, options) => {
-      const choices = options.split(',').map(s => s.trim().replace(/['"]/g, ''));
+      const choices = options.split(',').map((s) => s.trim().replace(/['"]/g, ''));
       return choices[Math.floor(Math.random() * choices.length)];
     });
-    
+
     // {{uuid}} - Generate UUID
     text = text.replace(/{{uuid}}/g, () => {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = (Math.random() * 16) | 0;
+        const v = c == 'x' ? r : (r & 0x3) | 0x8;
         return v.toString(16);
       });
     });
@@ -186,7 +201,7 @@ class MessageTemplateService {
 
   getCategories() {
     const categories = new Set();
-    Object.values(this.templates).forEach(template => {
+    Object.values(this.templates).forEach((template) => {
       if (template.category) {
         categories.add(template.category);
       }
@@ -199,13 +214,13 @@ class MessageTemplateService {
     // Extract metadata from schema
     const title = schema.title || 'Imported Schema';
     const id = this.generateIdFromTitle(title);
-    
+
     // Generate a flexible default topic - can be easily changed by user
     const topic = `${id}`;
-    
+
     // Generate empty payload structure from schema
     const payload = this.generateSampleFromSchema(schema);
-    
+
     return {
       id: id,
       name: title,
@@ -215,19 +230,21 @@ class MessageTemplateService {
       retain: false,
       category: 'Imported Schemas',
       schema: schema,
-      description: schema.description || `Template created from imported ${title} schema`
+      description: schema.description || `Template created from imported ${title} schema`,
     };
   }
 
   // Generate a valid ID from a title
   generateIdFromTitle(title) {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '') // Remove special characters
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
-      .substring(0, 50) // Limit length
-      || 'imported-schema'; // Fallback
+    return (
+      title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '') // Remove special characters
+        .replace(/\s+/g, '-') // Replace spaces with hyphens
+        .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+        .substring(0, 50) || // Limit length
+      'imported-schema'
+    ); // Fallback
   }
 
   // Helper function to validate if a schema structure is valid
@@ -248,7 +265,7 @@ class MessageTemplateService {
       }
 
       return false;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -258,27 +275,31 @@ class MessageTemplateService {
     try {
       const text = await file.text();
       const importData = JSON.parse(text);
-      
+
       console.log('Import data received:', {
         hasSchema: !!importData.$schema,
-        hasId: !!importData.$id, 
+        hasId: !!importData.$id,
         hasTitle: !!importData.title,
         hasType: !!importData.type,
         hasProperties: !!importData.properties,
-        hasTemplates: !!importData.templates
+        hasTemplates: !!importData.templates,
       });
-      
+
       const imported = [];
       const errors = [];
 
       // Check if this is a standalone schema or a template collection
-      if (importData.$schema || importData.$id || importData.title || 
-          (importData.type && importData.properties)) {
+      if (
+        importData.$schema ||
+        importData.$id ||
+        importData.title ||
+        (importData.type && importData.properties)
+      ) {
         // This is a standalone JSON Schema - create a template from it
         console.log('Detected standalone schema:', importData.title || 'Untitled');
         try {
           const template = this.createTemplateFromSchema(importData);
-          
+
           // Generate unique ID if conflicts exist
           let templateId = template.id;
           let counter = 1;
@@ -292,7 +313,7 @@ class MessageTemplateService {
             id: templateId,
             createdAt: Date.now(),
             updatedAt: Date.now(),
-            imported: true
+            imported: true,
           };
 
           this.templates[templateId] = templateToSave;
@@ -306,14 +327,21 @@ class MessageTemplateService {
         for (const template of importData.templates) {
           try {
             // Validate required fields
-            if (!template.id || !template.name || !template.topic || template.payload === undefined) {
+            if (
+              !template.id ||
+              !template.name ||
+              !template.topic ||
+              template.payload === undefined
+            ) {
               errors.push(`Template "${template.name || 'Unknown'}" missing required fields`);
               continue;
             }
 
             // Validate schema if present
             if (template.schema && !this.isValidSchema(template.schema)) {
-              console.warn(`Template "${template.name}" has invalid schema, but will still be imported`);
+              console.warn(
+                `Template "${template.name}" has invalid schema, but will still be imported`,
+              );
             }
 
             // Generate unique ID if conflicts exist
@@ -329,7 +357,7 @@ class MessageTemplateService {
               id: templateId,
               createdAt: Date.now(),
               updatedAt: Date.now(),
-              imported: true
+              imported: true,
             };
 
             this.templates[templateId] = templateToSave;
@@ -340,7 +368,9 @@ class MessageTemplateService {
         }
       } else {
         console.log('File format not recognized. Data structure:', Object.keys(importData));
-        throw new Error('Invalid file format. Expected either a JSON Schema or a template collection with { templates: [...] }');
+        throw new Error(
+          'Invalid file format. Expected either a JSON Schema or a template collection with { templates: [...] }',
+        );
       }
 
       if (imported.length > 0) {
@@ -350,7 +380,7 @@ class MessageTemplateService {
       return {
         imported: imported.length,
         errors,
-        templates: imported
+        templates: imported,
       };
     } catch (error) {
       console.error('Import error:', error.message);
@@ -360,20 +390,20 @@ class MessageTemplateService {
 
   // Export templates to file
   exportTemplates(templateIds = null) {
-    const templatesToExport = templateIds 
-      ? templateIds.map(id => this.templates[id]).filter(Boolean)
+    const templatesToExport = templateIds
+      ? templateIds.map((id) => this.templates[id]).filter(Boolean)
       : Object.values(this.templates);
 
     return {
       exportDate: new Date().toISOString(),
       version: '1.0',
-      templates: templatesToExport.map(template => ({
+      templates: templatesToExport.map((template) => ({
         ...template,
         // Remove runtime fields for cleaner export
         createdAt: undefined,
         updatedAt: undefined,
-        imported: undefined
-      }))
+        imported: undefined,
+      })),
     };
   }
 
@@ -387,10 +417,10 @@ class MessageTemplateService {
     try {
       const parsedPayload = JSON.parse(payload);
       return this.validateAgainstSchema(parsedPayload, template.schema);
-    } catch (error) {
+    } catch {
       return {
         valid: false,
-        errors: ['Invalid JSON format']
+        errors: ['Invalid JSON format'],
       };
     }
   }
@@ -406,18 +436,26 @@ class MessageTemplateService {
       validationSchema = schema;
     }
 
-    if (validationSchema.type === 'object' && typeof data !== 'object') {
+    if (
+      validationSchema.type === 'object' &&
+      (data === null || typeof data !== 'object' || Array.isArray(data))
+    ) {
       errors.push('Expected object type');
       return { valid: false, errors };
     }
 
+    if (
+      validationSchema.properties &&
+      (data === null || typeof data !== 'object' || Array.isArray(data))
+    ) {
+      return { valid: false, errors: ['Expected object type'] };
+    }
+    for (const key of validationSchema.required || []) {
+      if (data === null || typeof data !== 'object' || !Object.hasOwn(data, key))
+        errors.push(`Missing required property: ${key}`);
+    }
     if (validationSchema.properties) {
       for (const [key, propSchema] of Object.entries(validationSchema.properties)) {
-        if (validationSchema.required && validationSchema.required.includes(key) && !(key in data)) {
-          errors.push(`Missing required property: ${key}`);
-          continue;
-        }
-
         if (key in data) {
           const value = data[key];
           const propErrors = this.validateProperty(key, value, propSchema);
@@ -428,7 +466,7 @@ class MessageTemplateService {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -438,13 +476,24 @@ class MessageTemplateService {
     // Type validation
     if (schema.type) {
       const expectedType = schema.type;
-      const actualType = schema.type === 'integer' ? 'number' : typeof value;
-      
-      if (expectedType === 'integer' && (!Number.isInteger(value))) {
+      const actualType = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+
+      if (expectedType === 'integer' && !Number.isInteger(value)) {
         errors.push(`${key}: Expected integer, got ${typeof value}`);
       } else if (expectedType !== 'integer' && actualType !== expectedType) {
         errors.push(`${key}: Expected ${expectedType}, got ${actualType}`);
       }
+    }
+
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      errors.push(
+        ...this.validateAgainstSchema(value, schema).errors.map((error) => `${key}.${error}`),
+      );
+    }
+    if (Array.isArray(value) && schema.items) {
+      value.forEach((item, index) =>
+        errors.push(...this.validateProperty(`${key}[${index}]`, item, schema.items)),
+      );
     }
 
     // Enum validation
@@ -492,7 +541,7 @@ class MessageTemplateService {
     }
 
     const sample = {};
-    
+
     for (const [key, propSchema] of Object.entries(validationSchema.properties)) {
       sample[key] = this.generateSampleValue(propSchema);
     }
@@ -506,28 +555,28 @@ class MessageTemplateService {
         if (schema.enum) return schema.enum[0];
         if (schema.pattern === '^\\d+\\.\\d+\\.\\d+$') return '1.0.0';
         return 'sample_string';
-      
+
       case 'number':
         if (schema.minimum !== undefined && schema.maximum !== undefined) {
-          return Math.round((schema.minimum + schema.maximum) / 2 * 100) / 100;
+          return Math.round(((schema.minimum + schema.maximum) / 2) * 100) / 100;
         }
         return 42.5;
-      
+
       case 'integer':
         if (schema.minimum !== undefined && schema.maximum !== undefined) {
           return Math.round((schema.minimum + schema.maximum) / 2);
         }
         return 42;
-      
+
       case 'boolean':
         return true;
-      
+
       case 'array':
         return [];
-      
+
       case 'object':
         return {};
-      
+
       default:
         return null;
     }

@@ -1,13 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './MessagePanel.css';
 
-function MessagePanel({
-  messages,
-  selectedTopic,
-  onClearMessages,
-  connectionName,
-  showFeedback
-}) {
+function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName, showFeedback }) {
   const [sortBy, setSortBy] = useState('timestamp');
   const [sortOrder, setSortOrder] = useState('desc');
   const [showRetainedOnly, setShowRetainedOnly] = useState(false);
@@ -16,11 +10,16 @@ function MessagePanel({
 
   const listRef = useRef(null);
 
+  useEffect(() => {
+    if (!autoScroll || !listRef.current) return;
+    listRef.current.scrollTop = sortOrder === 'desc' ? 0 : listRef.current.scrollHeight;
+  }, [messages, autoScroll, sortOrder]);
+
   const processedMessages = React.useMemo(() => {
-    let filtered = showRetainedOnly ? messages.filter(m => m.retain) : messages;
+    let filtered = showRetainedOnly ? messages.filter((m) => m.retain) : messages;
     if (sortBy === 'timestamp') {
       return [...filtered].sort((a, b) =>
-        sortOrder === 'desc' ? b.timestamp - a.timestamp : a.timestamp - b.timestamp
+        sortOrder === 'desc' ? b.timestamp - a.timestamp : a.timestamp - b.timestamp,
       );
     }
     return filtered;
@@ -28,8 +27,12 @@ function MessagePanel({
 
   const topicDetails = React.useMemo(() => {
     if (!selectedTopic) return null;
-    if (processedMessages.length === 0) return { timestamp: null, qos: 0, retain: false, topic: selectedTopic.topicPath };
-    return processedMessages.reduce((latest, cur) => cur.timestamp > latest.timestamp ? cur : latest, processedMessages[0]);
+    if (processedMessages.length === 0)
+      return { timestamp: null, qos: 0, retain: false, topic: selectedTopic.topicPath };
+    return processedMessages.reduce(
+      (latest, cur) => (cur.timestamp > latest.timestamp ? cur : latest),
+      processedMessages[0],
+    );
   }, [selectedTopic, processedMessages]);
 
   useEffect(() => {
@@ -49,14 +52,20 @@ function MessagePanel({
       connectionName: connectionName || 'Unknown',
       topic: selectedTopic.topicPath,
       messageCount: processedMessages.length,
-      messages: processedMessages.map(m => ({
-        timestamp: m.timestamp, payload: m.message, qos: m.qos, retain: m.retain, connectionId: m.connectionId
-      }))
+      messages: processedMessages.map((m) => ({
+        timestamp: m.timestamp,
+        payload: m.message,
+        qos: m.qos,
+        retain: m.retain,
+        connectionId: m.connectionId,
+      })),
     };
-    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
+    );
     const a = Object.assign(document.createElement('a'), {
       href: url,
-      download: `mqtt-topic-${selectedTopic.topicPath.replace(/[/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 19)}.json`
+      download: `mqtt-topic-${selectedTopic.topicPath.replace(/[/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 19)}.json`,
     });
     document.body.appendChild(a);
     a.click();
@@ -70,16 +79,20 @@ function MessagePanel({
     if (!selectedTopic || processedMessages.length === 0) return;
     const csv = [
       ['Timestamp', 'Payload', 'QoS', 'Retain', 'Connection'].join(','),
-      ...processedMessages.map(m => [
-        `"${m.timestamp}"`,
-        `"${m.message.replace(/"/g, '""')}"`,
-        m.qos, m.retain, `"${m.connectionId}"`
-      ].join(','))
+      ...processedMessages.map((m) =>
+        [
+          `"${m.timestamp}"`,
+          `"${m.message.replace(/"/g, '""')}"`,
+          m.qos,
+          m.retain,
+          `"${m.connectionId}"`,
+        ].join(','),
+      ),
     ].join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const a = Object.assign(document.createElement('a'), {
       href: url,
-      download: `mqtt-topic-${selectedTopic.topicPath.replace(/[/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 19)}.csv`
+      download: `mqtt-topic-${selectedTopic.topicPath.replace(/[/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 19)}.csv`,
     });
     document.body.appendChild(a);
     a.click();
@@ -100,11 +113,14 @@ function MessagePanel({
     }
   }, [selectedTopic, showFeedback]);
 
-  const copyPayload = useCallback((payload, e) => {
-    e?.stopPropagation();
-    navigator.clipboard.writeText(payload);
-    showFeedback?.('Payload copied!', 'success');
-  }, [showFeedback]);
+  const copyPayload = useCallback(
+    (payload, e) => {
+      e?.stopPropagation();
+      navigator.clipboard.writeText(payload);
+      showFeedback?.('Payload copied!', 'success');
+    },
+    [showFeedback],
+  );
 
   const formatTimestamp = (ts) => new Date(ts).toLocaleString();
   const getPayloadPreview = (payload, max = 100) =>
@@ -121,6 +137,30 @@ function MessagePanel({
             )}
           </h2>
         </div>
+      </div>
+
+      <div className="message-filters" aria-label="Message filters">
+        <label>
+          Order{' '}
+          <select
+            value={sortOrder}
+            onChange={(e) => {
+              setSortBy('timestamp');
+              setSortOrder(e.target.value);
+            }}
+          >
+            <option value="desc">Newest first</option>
+            <option value="asc">Oldest first</option>
+          </select>
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={showRetainedOnly}
+            onChange={(e) => setShowRetainedOnly(e.target.checked)}
+          />
+          Retained only
+        </label>
       </div>
 
       {selectedTopic && topicDetails && (
@@ -147,11 +187,15 @@ function MessagePanel({
               </div>
               <div className="topic-info-item">
                 <label>QoS:</label>
-                <span className={`badge badge-qos-${topicDetails.qos}`}>QoS {topicDetails.qos}</span>
+                <span className={`badge badge-qos-${topicDetails.qos}`}>
+                  QoS {topicDetails.qos}
+                </span>
               </div>
               <div className="topic-info-item">
                 <label>Retained:</label>
-                <span className={`retain-status ${topicDetails.retain ? 'retained' : 'not-retained'}`}>
+                <span
+                  className={`retain-status ${topicDetails.retain ? 'retained' : 'not-retained'}`}
+                >
                   {topicDetails.retain ? 'Yes' : 'No'}
                 </span>
               </div>
@@ -167,8 +211,10 @@ function MessagePanel({
               </button>
               <button
                 className={`btn btn-sm ${autoScroll ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setAutoScroll(v => !v)}
-                title={autoScroll ? 'Auto-scroll ON — click to pin' : 'Auto-scroll OFF — click to follow'}
+                onClick={() => setAutoScroll((v) => !v)}
+                title={
+                  autoScroll ? 'Auto-scroll ON — click to pin' : 'Auto-scroll OFF — click to follow'
+                }
               >
                 <i className={`fas ${autoScroll ? 'fa-arrow-down' : 'fa-thumbtack'}`}></i>
                 {autoScroll ? ' Following' : ' Pinned'}
@@ -177,11 +223,13 @@ function MessagePanel({
                 <button
                   type="button"
                   className="custom-select-button"
-                  onClick={() => setShowTopicExportMenu(v => !v)}
+                  onClick={() => setShowTopicExportMenu((v) => !v)}
                   disabled={processedMessages.length === 0}
                   title="Export topic data"
                 >
-                  <span className="select-value"><i className="fas fa-download"></i> Export</span>
+                  <span className="select-value">
+                    <i className="fas fa-download"></i> Export
+                  </span>
                   <i className={`fas fa-chevron-down ${showTopicExportMenu ? 'rotated' : ''}`}></i>
                 </button>
                 {showTopicExportMenu && (
@@ -200,10 +248,16 @@ function MessagePanel({
         </div>
       )}
 
-      <div className="message-list" ref={listRef} style={{ overflowAnchor: autoScroll ? 'auto' : 'none' }}>
+      <div
+        className="message-list"
+        ref={listRef}
+        style={{ overflowAnchor: autoScroll ? 'auto' : 'none' }}
+      >
         {processedMessages.length === 0 ? (
           <div className="no-messages">
-            <div className="no-messages-icon"><i className="fas fa-inbox"></i></div>
+            <div className="no-messages-icon">
+              <i className="fas fa-inbox"></i>
+            </div>
             <h3>No messages yet</h3>
             <p>
               {!selectedTopic
@@ -215,7 +269,8 @@ function MessagePanel({
           <>
             {selectedTopic && processedMessages.length >= 300 && (
               <div className="message-limit-notice">
-                <i className="fas fa-info-circle"></i> Showing up to 300 most recent messages for this topic.
+                <i className="fas fa-info-circle"></i> Showing up to 300 most recent messages for
+                this topic.
               </div>
             )}
             {processedMessages.map((msg) => (
@@ -228,14 +283,17 @@ function MessagePanel({
                 <div className="message-header">
                   <div className="message-meta">
                     <span className="timestamp" title={formatTimestamp(msg.timestamp)}>
-                      <i className="fas fa-clock"></i> {new Date(msg.timestamp).toLocaleTimeString()}
+                      <i className="fas fa-clock"></i>{' '}
+                      {new Date(msg.timestamp).toLocaleTimeString()}
                     </span>
                     <span className="topic" title={msg.topic}>
                       <i className="fas fa-tag"></i> {msg.topic}
                     </span>
                     <span className={`badge badge-qos-${msg.qos}`}>QoS {msg.qos}</span>
                     {msg.retain && (
-                      <span className="badge badge-retain"><i className="fas fa-save"></i> RETAIN</span>
+                      <span className="badge badge-retain">
+                        <i className="fas fa-save"></i> RETAIN
+                      </span>
                     )}
                     <span className="connection-id" title={`Connection: ${msg.connectionId}`}>
                       <i className="fas fa-plug"></i> {msg.connectionId}
@@ -257,7 +315,8 @@ function MessagePanel({
                   {msg.message.length > 100 && (
                     <details className="payload-full">
                       <summary>
-                        <i className="fas fa-expand-alt"></i> Show full payload ({msg.message.length} chars)
+                        <i className="fas fa-expand-alt"></i> Show full payload (
+                        {msg.message.length} chars)
                       </summary>
                       <pre className="payload-code">{msg.message}</pre>
                     </details>

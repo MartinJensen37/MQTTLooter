@@ -59,7 +59,7 @@ function EditOutputModal({ output, onClose, onSave }: Props) {
         }
 
         setPreviewValue(outputPayload);
-      } catch (error) {
+      } catch {
         setPreviewValue({ error: 'Preview generation failed' });
       }
     };

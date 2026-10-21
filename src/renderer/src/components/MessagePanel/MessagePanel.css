@@ -313,34 +313,34 @@
     align-items: stretch;
     gap: 10px;
   }
-  
+
   .topic-info-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .message-meta {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
   }
-  
+
   .message-meta .topic {
     max-width: 100%;
   }
-  
+
   .copy-payload-btn {
     min-width: 20px;
     height: 20px;
     font-size: 10px;
     padding: 4px;
   }
-  
+
   .message-header {
     flex-direction: column;
     align-items: stretch;
     gap: var(--spacing-sm);
   }
-  
+
   .message-actions {
     justify-content: flex-end;
     margin-left: 0;
@@ -364,4 +364,26 @@
 
 .message-list::-webkit-scrollbar-thumb:hover {
   background: #a1a1a1;
+}
+.message-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--gray-300);
+}
+
+.message-filters label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.message-filters select {
+  padding: 4px 8px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: white;
 }

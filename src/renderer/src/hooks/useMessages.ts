@@ -8,12 +8,6 @@ interface SelectedTopic {
   [key: string]: unknown;
 }
 
-interface ConnectionLike {
-  id: string;
-  isConnected?: boolean;
-  status?: string;
-}
-
 /**
  * Message display hook. Messages are derived from the topic tree's per-node ring
  * buffers rather than a flat array — avoiding the O(n×topics) memory bloat that
@@ -22,7 +16,6 @@ interface ConnectionLike {
 export function useMessages(
   selectedConnection: string | null,
   selectedTopic: SelectedTopic | null,
-  connections: ConnectionLike[],
   showFeedback: ShowFeedback,
 ) {
   // Counter bump to re-render when the tree updates.
@@ -42,9 +35,13 @@ export function useMessages(
     };
     TopicTreeService.on('treeUpdated', onTreeUpdate);
     TopicTreeService.on('topicMessagesCleared', onTopicCleared);
+    TopicTreeService.on('treeCleared', onTopicCleared);
+    TopicTreeService.on('treeRemoved', onTopicCleared);
     return () => {
       TopicTreeService.off('treeUpdated', onTreeUpdate);
       TopicTreeService.off('topicMessagesCleared', onTopicCleared);
+      TopicTreeService.off('treeCleared', onTopicCleared);
+      TopicTreeService.off('treeRemoved', onTopicCleared);
     };
   }, [selectedConnection, selectedTopic]);
 
@@ -64,19 +61,12 @@ export function useMessages(
   // Messages for the currently selected topic, pulled from its ring buffer.
   const connectionMessages = useMemo(() => {
     if (!selectedConnection || !selectedTopic) return [];
-    const conn = connections.find((c) => c.id === selectedConnection);
-    if (!conn?.isConnected && conn?.status !== 'connected') return [];
     void updateTick; // re-compute when the tree updates
     return TopicTreeService.getTopicMessages(selectedConnection, selectedTopic.topicPath);
-  }, [selectedConnection, selectedTopic, connections, updateTick]);
-
-  // RecordingPanel still reads this; it stays empty until that panel is migrated
-  // to the ring-buffer source (tracked in Phase 3/4).
-  const allConnectionMessages = useMemo(() => [], []);
+  }, [selectedConnection, selectedTopic, updateTick]);
 
   return {
     connectionMessages,
-    allConnectionMessages,
     handleClearMessages,
   };
 }

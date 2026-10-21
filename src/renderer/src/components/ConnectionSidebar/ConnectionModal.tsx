@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './ConnectionModal.css';
 import type { ConnectionFormData, FormErrors, CertFileType } from './connectionModal/types';
-import { buildBrokerUrl, buildInitialFormData, createDefaultFormData } from './connectionModal/formHelpers';
+import {
+  buildBrokerUrl,
+  buildInitialFormData,
+  createDefaultFormData,
+} from './connectionModal/formHelpers';
 import ConnectionDetailsSection from './connectionModal/ConnectionDetailsSection';
 import Mqtt5PropertiesSection from './connectionModal/Mqtt5PropertiesSection';
 import TlsSection from './connectionModal/TlsSection';
@@ -129,9 +133,6 @@ function ConnectionModal({ connection, onSave, onCancel }: ConnectionModalProps)
     if (formData.willEnabled) {
       if (!formData.willTopic.trim()) {
         newErrors.willTopic = 'Will topic is required when Last Will is enabled';
-      }
-      if (!formData.willMessage.trim()) {
-        newErrors.willMessage = 'Will message is required when Last Will is enabled';
       }
     }
 

@@ -1,6 +1,8 @@
 import RingBuffer from '../../utils/RingBuffer';
 import { MESSAGE_HISTORY } from '../../config';
 
+const RATE_BUCKET_MS = 100;
+
 /** Message handed to a node when a publish arrives. */
 export interface IncomingMessage {
   payload: string;
@@ -12,6 +14,7 @@ export interface IncomingMessage {
 
 /** Message as stored in a node's ring buffer (`length` drives the byte budget). */
 export interface StoredMessage {
+  id: number;
   payload: string | null;
   qos: number;
   retain: boolean;
@@ -27,6 +30,10 @@ class TopicNode {
   parent: TopicNode | null = null;
 
   messageCount = 0;
+  directMessageCount = 0;
+  private sequence = 0;
+  private rateBuckets = new Map<number, number>();
+  private totalMessageRate = 0;
   lastMessage: IncomingMessage | null = null;
   lastMessageTime: number | null = null;
 
@@ -59,7 +66,7 @@ class TopicNode {
 
   addChild(name: string): TopicNode {
     if (!this.children.has(name)) {
-      const childPath = this.fullPath ? `${this.fullPath}/${name}` : name;
+      const childPath = this.parent === null ? name : `${this.fullPath}/${name}`;
       const child = new TopicNode(name, childPath);
       child.parent = this;
       child.level = this.level + 1;
@@ -76,12 +83,15 @@ class TopicNode {
     }
 
     this.messageCount++;
+    this.directMessageCount++;
     this.lastMessage = message;
     this.lastMessageTime = timestamp;
     this.hasDirectMessages = true;
 
-    const payloadLen = message?.payload ? message.payload.length : 0;
+    // Account for the UTF-8 payload, rather than UTF-16 character count.
+    const payloadLen = new TextEncoder().encode(message.payload).byteLength;
     this.messageHistory.add({
+      id: ++this.sequence,
       payload: message ? message.payload : null,
       qos: message ? message.qos : 0,
       retain: message ? message.retain : false,
@@ -90,7 +100,8 @@ class TopicNode {
       length: payloadLen,
     });
 
-    this.calculateMessageRate(timestamp);
+    const bucket = Math.floor(timestamp / RATE_BUCKET_MS) * RATE_BUCKET_MS;
+    this.rateBuckets.set(bucket, (this.rateBuckets.get(bucket) ?? 0) + 1);
     this.propagateMessageCount();
   }
 
@@ -127,20 +138,16 @@ class TopicNode {
       return;
     }
 
-    // Count ring-buffer entries within the adaptive window (ordered oldest→newest).
+    // Count time buckets independently of payload eviction. Boundary precision is 100 ms.
     const cutoff = currentTime - this.adaptiveTimeWindow;
-    const allMessages = this.messageHistory.toArray();
     let recentCount = 0;
-    for (let i = allMessages.length - 1; i >= 0; i--) {
-      if (allMessages[i].timestamp >= cutoff) {
-        recentCount++;
-      } else {
-        break;
-      }
+    for (const [bucket, count] of this.rateBuckets) {
+      if (bucket + RATE_BUCKET_MS > cutoff) recentCount += count;
+      if (bucket + RATE_BUCKET_MS <= currentTime - this.maxTimeWindow) this.rateBuckets.delete(bucket);
     }
 
     if (recentCount === 0) {
-      this.messageRate = 0;
+      this.setMessageRate(0);
       this.lastRateCalculation = currentTime;
       return;
     }
@@ -151,7 +158,7 @@ class TopicNode {
     // Suppress display below 0.01 msg/min.
     const minDisplayRate = 0.01 / 60;
     if (currentRate < minDisplayRate) {
-      this.messageRate = 0;
+      this.setMessageRate(0);
       this.lastRateCalculation = currentTime;
       return;
     }
@@ -166,13 +173,27 @@ class TopicNode {
       alpha = 0.3;
     }
 
-    if (this.messageRate === 0 || currentTime - this.lastRateCalculation > this.adaptiveTimeWindow) {
-      this.messageRate = currentRate;
+    if (
+      this.messageRate === 0 ||
+      currentTime - this.lastRateCalculation > this.adaptiveTimeWindow
+    ) {
+      this.setMessageRate(currentRate);
     } else {
-      this.messageRate = alpha * currentRate + (1 - alpha) * this.messageRate;
+      this.setMessageRate(alpha * currentRate + (1 - alpha) * this.messageRate);
     }
 
     this.lastRateCalculation = currentTime;
+  }
+
+  private setMessageRate(rate: number): void {
+    const delta = rate - this.messageRate;
+    this.messageRate = rate;
+    this.totalMessageRate = Math.max(0, this.totalMessageRate + delta);
+    let node = this.parent;
+    while (node) {
+      node.totalMessageRate = Math.max(0, node.totalMessageRate + delta);
+      node = node.parent;
+    }
   }
 
   propagateMessageCount(): void {
@@ -184,19 +205,11 @@ class TopicNode {
   }
 
   getTotalChildMessages(): number {
-    let total = this.hasDirectMessages ? this.messageCount : 0;
-    for (const child of this.children.values()) {
-      total += child.getTotalChildMessages();
-    }
-    return total;
+    return this.messageCount;
   }
 
   getTotalMessageRate(): number {
-    let totalRate = this.hasDirectMessages ? this.messageRate : 0;
-    for (const child of this.children.values()) {
-      totalRate += child.getTotalMessageRate();
-    }
-    return totalRate;
+    return this.totalMessageRate;
   }
 
   getPath(): string {
@@ -232,6 +245,7 @@ class TopicNode {
       lastMessage: this.lastMessage,
       lastMessageTime: this.lastMessageTime,
       isLeaf: this.hasDirectMessages && this.children.size === 0,
+      hasDirectMessages: this.hasDirectMessages,
       isExpanded: this.isExpanded,
       level: this.level,
       childCount: this.children.size,
@@ -245,13 +259,15 @@ class TopicNode {
   }
 
   clearMessages(): void {
-    const previousCount = this.messageCount;
+    const previousCount = this.directMessageCount;
 
-    this.messageCount = 0;
+    this.messageCount -= previousCount;
+    this.directMessageCount = 0;
     this.lastMessage = null;
     this.lastMessageTime = null;
     this.messageHistory.clear();
-    this.messageRate = 0;
+    this.setMessageRate(0);
+    this.rateBuckets.clear();
     this.lastRateCalculation = Date.now();
     this.hasDirectMessages = false;
 

@@ -6,21 +6,21 @@ function generateNumberValue(generator, config, decimalPrecision = 2) {
 
   switch (generator) {
     case 'static':
-      value = config.value || 0;
+      value = config.value ?? 0;
       break;
 
     case 'uniform': {
-      const range = (config.max || 100) - (config.min || 0);
-      value = (config.min || 0) + Math.random() * range;
+      const range = (config.max ?? 100) - (config.min ?? 0);
+      value = (config.min ?? 0) + Math.random() * range;
       break;
     }
 
     case 'normal': {
       // Box–Muller transform for a normal distribution.
-      const u1 = Math.random();
+      const u1 = Math.max(Number.MIN_VALUE, Math.random());
       const u2 = Math.random();
       const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-      value = (config.mean || 0) + z0 * (config.stdDev || 1);
+      value = (config.mean ?? 0) + z0 * (config.stdDev ?? 1);
       if (config.min !== undefined) value = Math.max(value, config.min);
       if (config.max !== undefined) value = Math.min(value, config.max);
       break;
@@ -28,9 +28,9 @@ function generateNumberValue(generator, config, decimalPrecision = 2) {
 
     case 'sine': {
       const time = Date.now() / 1000;
-      const amplitude = ((config.max || 100) - (config.min || 0)) / 2;
-      const offset = (config.min || 0) + amplitude;
-      const frequency = config.frequency || 0.1;
+      const amplitude = ((config.max ?? 100) - (config.min ?? 0)) / 2;
+      const offset = (config.min ?? 0) + amplitude;
+      const frequency = config.frequency ?? 0.1;
       value = offset + amplitude * Math.sin(2 * Math.PI * frequency * time);
       break;
     }
@@ -44,10 +44,10 @@ function generateNumberValue(generator, config, decimalPrecision = 2) {
     }
 
     default:
-      value = config.min || 0;
+      value = config.min ?? 0;
   }
 
-  return Number(value.toFixed(decimalPrecision || 2));
+  return Number(value.toFixed(decimalPrecision ?? 2));
 }
 
 function generateBooleanValue(generator, config) {
@@ -56,7 +56,7 @@ function generateBooleanValue(generator, config) {
       return Boolean(config.value);
 
     case 'probability':
-      return Math.random() < (config.trueProbability || 0.5);
+      return Math.random() < (config.trueProbability ?? 0.5);
 
     case 'pattern': {
       if (!Array.isArray(config.sequence) || config.sequence.length === 0) {
@@ -74,7 +74,7 @@ function generateBooleanValue(generator, config) {
 function generateStringValue(generator, config) {
   switch (generator) {
     case 'static':
-      return String(config.value || 'default');
+      return String(config.value ?? 'default');
 
     case 'list':
     case 'random': {
@@ -84,15 +84,27 @@ function generateStringValue(generator, config) {
       return config.values[Math.floor(Math.random() * config.values.length)];
     }
 
+    case 'pattern': {
+      if (!Array.isArray(config.sequence) || !config.sequence.length) return '';
+      return String(
+        config.sequence[
+          Math.floor(Date.now() / Math.max(1, config.intervalMs ?? 5000)) % config.sequence.length
+        ],
+      );
+    }
+
     case 'weighted': {
       if (!Array.isArray(config.weightedValues) || config.weightedValues.length === 0) {
         return 'default';
       }
-      const totalWeight = config.weightedValues.reduce((sum, item) => sum + (item.weight || 1), 0);
+      const totalWeight = config.weightedValues.reduce(
+        (sum, item) => sum + Math.max(0, item.weight ?? 1),
+        0,
+      );
       let random = Math.random() * totalWeight;
       for (const item of config.weightedValues) {
-        random -= item.weight || 1;
-        if (random <= 0) return item.value;
+        random -= Math.max(0, item.weight ?? 1);
+        if (random < 0) return item.value;
       }
       return config.weightedValues[0].value;
     }

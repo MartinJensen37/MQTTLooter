@@ -19,6 +19,11 @@ class RingBuffer<T extends { length?: number }> {
   private _byteUsage = 0;
 
   constructor(maxItems = 300, maxBytes = 2 * 1024 * 1024, compactionFactor = 10) {
+    if (!Number.isInteger(maxItems) || maxItems < 1 || !Number.isFinite(maxBytes) || maxBytes < 0) {
+      throw new RangeError(
+        'Buffer limits must be a positive item count and a nonnegative byte budget',
+      );
+    }
     this.maxItems = maxItems;
     this.maxBytes = maxBytes;
     this.compactionFactor = compactionFactor;
@@ -35,6 +40,7 @@ class RingBuffer<T extends { length?: number }> {
   /** Add an item, evicting oldest entries if the count or byte limit would be exceeded. */
   add(item: T): void {
     const itemBytes = typeof item?.length === 'number' ? item.length : 0;
+    if (!Number.isFinite(itemBytes) || itemBytes < 0 || itemBytes > this.maxBytes) return;
 
     while (this._byteUsage + itemBytes > this.maxBytes && this.count > 0) {
       this._dropFirst();

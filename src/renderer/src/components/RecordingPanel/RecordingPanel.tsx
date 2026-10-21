@@ -1,31 +1,42 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './RecordingPanel.css';
-import type { RecordedMessage, Recording, CurrentPlayback } from './recordingPanel/types';
+import MQTTService from '../../services/MQTTService';
+import RecordingCapture from '../../services/RecordingCapture';
+import { parseRecording } from './recordingPanel/parseRecording';
+import type { Recording, CurrentPlayback } from './recordingPanel/types';
 import { getFilteredMessagesFor } from './recordingPanel/recordingHelpers';
 import RecordingControls from './recordingPanel/RecordingControls';
 import RecordingItem from './recordingPanel/RecordingItem';
 import PlaybackControls from './recordingPanel/PlaybackControls';
 
 interface RecordingPanelProps {
-  messages: RecordedMessage[];
   connectionName?: string;
   selectedTopic?: any;
-  onPublishMessage?: (data: any) => void;
+  onPublishMessage?: (data: any) => Promise<void> | void;
+  showFeedback?: (message: string, type?: string) => void;
   isConnected?: boolean;
   activeConnectionId?: string | null;
 }
 
 function RecordingPanel({
-  messages,
   connectionName,
+  showFeedback,
   onPublishMessage,
   isConnected = false,
   activeConnectionId = null,
 }: RecordingPanelProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStart, setRecordingStart] = useState<Date | null>(null);
-  const [recordedMessages, setRecordedMessages] = useState<RecordedMessage[]>([]);
-  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const captureRef = useRef<RecordingCapture | null>(null);
+  const [captureCounts, setCaptureCounts] = useState({ messages: 0, topics: 0 });
+  const [republish, setRepublish] = useState(false);
+  const [recordings, setRecordings] = useState<Recording[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('mqtt-recordings') || '[]').map(parseRecording);
+    } catch {
+      return [];
+    }
+  });
 
   // Playback state.
   const [isPlaying, setIsPlaying] = useState(false);
@@ -42,106 +53,146 @@ function RecordingPanel({
   const [editingRecording, setEditingRecording] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
 
-  const playbackTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const isPlayingRef = useRef(isPlaying);
-
   const isRecordingDisabled = !isConnected || !activeConnectionId;
+  const playbackGeneration = useRef(0);
+
+  const stopRecording = useCallback(() => {
+    const recording = captureRef.current?.finish();
+    captureRef.current = null;
+    setIsRecording(false);
+    setRecordingStart(null);
+    setCaptureCounts({ messages: 0, topics: 0 });
+    if (recording) setRecordings((prev) => [...prev, recording]);
+  }, []);
 
   useEffect(() => {
-    isPlayingRef.current = isPlaying;
-  }, [isPlaying]);
-
-  // Auto-stop recording if the connection is lost.
-  useEffect(() => {
-    if (isRecording && isRecordingDisabled) {
-      stopRecording();
-    }
-  }, [isRecordingDisabled, isRecording]);
-
-  // Load recordings from localStorage (rehydrating Date fields).
-  useEffect(() => {
-    const savedRecordings = localStorage.getItem('mqtt-recordings');
-    if (savedRecordings) {
-      try {
-        const parsedRecordings = JSON.parse(savedRecordings);
-        const recordingsWithDates: Recording[] = parsedRecordings.map((recording: any) => ({
-          ...recording,
-          startTime: new Date(recording.startTime),
-          endTime: new Date(recording.endTime),
-          messages: recording.messages.map((msg: any) => ({
-            ...msg,
-            timestamp: new Date(msg.timestamp),
-          })),
-        }));
-        setRecordings(recordingsWithDates);
-      } catch (error) {
-        console.error('Failed to load recordings:', error);
+    const generation = playbackGeneration;
+    const onMessage = (data: any) => {
+      if (captureRef.current && !captureRef.current.add(data)) {
+        stopRecording();
+        showFeedback?.(
+          'Recording stopped at the 10,000-message or 2 MB limit. Export it before starting another.',
+          'info',
+        );
       }
+    };
+    const onDisconnect = (data: any) => {
+      if (captureRef.current?.connectionId === data.id) stopRecording();
+    };
+    MQTTService.onAny('message', onMessage);
+    MQTTService.onAny('disconnected', onDisconnect);
+    const timer = setInterval(() => {
+      const capture = captureRef.current;
+      if (capture)
+        setCaptureCounts({ messages: capture.messages.length, topics: capture.topics.size });
+    }, 250);
+    return () => {
+      generation.current++;
+      MQTTService.off('*', 'message', onMessage);
+      MQTTService.off('*', 'disconnected', onDisconnect);
+      clearInterval(timer);
+    };
+  }, [stopRecording, showFeedback]);
+
+  useEffect(() => {
+    playbackGeneration.current++;
+    if (
+      captureRef.current &&
+      (isRecordingDisabled || captureRef.current.connectionId !== activeConnectionId)
+    )
+      stopRecording();
+    setIsPlaying(false);
+    setIsPaused(false);
+    setRepublish(false);
+  }, [activeConnectionId, isRecordingDisabled, stopRecording]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('mqtt-recordings', JSON.stringify(recordings));
+    } catch {
+      showFeedback?.('Recordings could not be saved locally. Export them to keep them.', 'error');
     }
-  }, []);
+  }, [recordings, showFeedback]);
 
-  // Persist recordings.
   useEffect(() => {
-    localStorage.setItem('mqtt-recordings', JSON.stringify(recordings));
-  }, [recordings]);
-
-  // Capture incoming messages while recording.
-  useEffect(() => {
-    if (isRecording && recordingStart) {
-      setRecordedMessages(messages.filter((msg) => new Date(msg.timestamp) >= recordingStart));
-    }
-  }, [messages, isRecording, recordingStart]);
-
-  // Cancel pending playback timeouts on unmount.
-  useEffect(() => {
-    return () => clearAllPlaybackTimeouts();
-  }, []);
-
-  // Re-filter playback messages when the topic filter changes.
-  useEffect(() => {
-    if (currentPlayback) {
-      const filteredMessages = getFilteredMessagesFor(
-        currentPlayback.originalMessages,
-        selectedTopicsFilter,
-      );
-      setCurrentPlayback((prev) => (prev ? { ...prev, messages: filteredMessages } : prev));
-      setCurrentIndex(0);
-    }
+    playbackGeneration.current++;
+    setIsPlaying(false);
+    setIsPaused(false);
+    setCurrentPlayback((prev) =>
+      prev
+        ? { ...prev, messages: getFilteredMessagesFor(prev.originalMessages, selectedTopicsFilter) }
+        : null,
+    );
+    setCurrentIndex(0);
   }, [selectedTopicsFilter]);
 
-  const startRecording = () => {
-    if (isRecordingDisabled) {
-      alert('Please connect to an MQTT broker before starting a recording.');
+  // Only one timer is live. Publishing is never performed inside a React state updater.
+  useEffect(() => {
+    if (!isPlaying || !currentPlayback) return;
+    const msg = currentPlayback.messages[currentIndex];
+    if (!msg) {
+      setIsPlaying(false);
+      setIsPaused(false);
       return;
     }
-    setIsRecording(true);
-    setRecordingStart(new Date());
-    setRecordedMessages([]);
-  };
+    const previous = currentPlayback.messages[currentIndex - 1];
+    const delay = previous
+      ? Math.max(
+          0,
+          (new Date(msg.timestamp).getTime() - new Date(previous.timestamp).getTime()) /
+            playbackSpeed,
+        )
+      : 0;
+    let cancelled = false;
+    const timer = setTimeout(
+      async () => {
+        try {
+          if (republish && isConnected && onPublishMessage) {
+            await onPublishMessage({
+              topic: msg.topic,
+              payload: msg.message,
+              qos: msg.qos,
+              retain: msg.retain,
+            });
+          }
+          if (!cancelled) setCurrentIndex(currentIndex + 1);
+        } catch (error) {
+          if (!cancelled) {
+            setIsPlaying(false);
+            showFeedback?.(`Playback publish failed: ${(error as Error).message}`, 'error');
+          }
+        }
+      },
+      Math.min(delay, 2_147_483_647),
+    );
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    isPlaying,
+    currentPlayback,
+    currentIndex,
+    playbackSpeed,
+    republish,
+    isConnected,
+    onPublishMessage,
+    showFeedback,
+  ]);
 
-  const stopRecording = () => {
-    setIsRecording(false);
-    if (recordedMessages.length > 0) {
-      const uniqueTopics = [...new Set(recordedMessages.map((msg) => msg.topic))];
-      const recording: Recording = {
-        id: Date.now(),
-        name: `Recording ${new Date().toLocaleString()}`,
-        startTime: recordingStart!,
-        endTime: new Date(),
-        messageCount: recordedMessages.length,
-        messages: [...recordedMessages],
-        topic: uniqueTopics.length === 1 ? uniqueTopics[0] : `${uniqueTopics.length} Topics`,
-        connectionName: connectionName || 'Unknown',
-      };
-      setRecordings((prev) => [...prev, recording]);
-      setRecordedMessages([]);
-      setRecordingStart(null);
-    }
+  const startRecording = () => {
+    if (isRecordingDisabled || !activeConnectionId) return;
+    captureRef.current = new RecordingCapture(activeConnectionId, connectionName || 'Unknown');
+    setRecordingStart(captureRef.current.startTime);
+    setCaptureCounts({ messages: 0, topics: 0 });
+    setIsRecording(true);
   };
 
   const selectRecording = (recording: Recording) => {
-    clearAllPlaybackTimeouts();
+    playbackGeneration.current++;
+    setIsPlaying(false);
     if (expandedRecording === recording.id) {
+      setIsPlaying(false);
       setExpandedRecording(null);
       setCurrentPlayback(null);
     } else {
@@ -149,7 +200,11 @@ function RecordingPanel({
         (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
       );
       setExpandedRecording(recording.id);
-      setCurrentPlayback({ ...recording, messages: sortedMessages, originalMessages: sortedMessages });
+      setCurrentPlayback({
+        ...recording,
+        messages: sortedMessages,
+        originalMessages: sortedMessages,
+      });
       setCurrentIndex(0);
       setIsPlaying(false);
       setIsPaused(false);
@@ -159,89 +214,55 @@ function RecordingPanel({
   };
 
   const resetPlayback = () => {
-    clearAllPlaybackTimeouts();
+    playbackGeneration.current++;
     setCurrentIndex(0);
     setIsPlaying(false);
     setIsPaused(false);
   };
 
-  function clearAllPlaybackTimeouts() {
-    playbackTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
-    playbackTimeoutsRef.current = [];
-  }
-
   const startRealtimePlayback = () => {
-    if (!currentPlayback) return;
-    const filteredMessages = currentPlayback.messages;
-    if (filteredMessages.length === 0) {
-      alert('No messages match the selected topic filter.');
-      return;
-    }
+    if (!currentPlayback?.messages.length) return;
+    if (currentIndex >= currentPlayback.messages.length) setCurrentIndex(0);
     setIsPlaying(true);
     setIsPaused(false);
-    clearAllPlaybackTimeouts();
-
-    const startTime = filteredMessages[currentIndex]?.timestamp ?? filteredMessages[0].timestamp;
-    for (let i = currentIndex; i < filteredMessages.length; i++) {
-      const msg = filteredMessages[i];
-      const delay = (new Date(msg.timestamp).getTime() - new Date(startTime).getTime()) / playbackSpeed;
-
-      const timeout = setTimeout(() => {
-        if (!isPlayingRef.current) return;
-        setCurrentIndex(() => {
-          if (onPublishMessage && isConnected) {
-            onPublishMessage({
-              topic: msg.topic,
-              payload: msg.message,
-              qos: msg.qos,
-              retain: msg.retain,
-            });
-          }
-          if (i === filteredMessages.length - 1) {
-            setIsPlaying(false);
-            setIsPaused(false);
-          }
-          return i + 1;
-        });
-      }, delay);
-
-      playbackTimeoutsRef.current.push(timeout);
-    }
   };
 
   const pausePlayback = () => {
-    clearAllPlaybackTimeouts();
+    playbackGeneration.current++;
     setIsPlaying(false);
     setIsPaused(true);
   };
+  const resumePlayback = startRealtimePlayback;
 
-  const resumePlayback = () => {
-    setIsPlaying(true);
-    setIsPaused(false);
-    startRealtimePlayback();
-  };
-
-  const stepForward = (e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
+  const stepForward = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    setIsPlaying(false);
     if (!currentPlayback) return;
-    const filteredMessages = currentPlayback.messages;
-    const nextIndex = Math.min(currentIndex + stepSize, filteredMessages.length);
-    for (let i = currentIndex; i < nextIndex; i++) {
-      if (onPublishMessage && isConnected) {
-        onPublishMessage({
-          topic: filteredMessages[i].topic,
-          payload: filteredMessages[i].message,
-          qos: filteredMessages[i].qos,
-          retain: filteredMessages[i].retain,
-        });
+    const generation = ++playbackGeneration.current;
+    const nextIndex = Math.min(currentIndex + stepSize, currentPlayback.messages.length);
+    try {
+      for (let i = currentIndex; i < nextIndex; i++) {
+        if (playbackGeneration.current !== generation) return;
+        const msg = currentPlayback.messages[i];
+        if (republish && isConnected && onPublishMessage) {
+          await onPublishMessage({
+            topic: msg.topic,
+            payload: msg.message,
+            qos: msg.qos,
+            retain: msg.retain,
+          });
+        }
       }
+      if (playbackGeneration.current === generation) setCurrentIndex(nextIndex);
+    } catch (error) {
+      showFeedback?.(`Playback publish failed: ${(error as Error).message}`, 'error');
     }
-    setCurrentIndex(nextIndex);
   };
 
   const stepBackward = (e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
-    if (!currentPlayback) return;
+    playbackGeneration.current++;
+    e?.preventDefault();
+    setIsPlaying(false);
     setCurrentIndex(Math.max(currentIndex - stepSize, 0));
   };
 
@@ -323,25 +344,18 @@ function RecordingPanel({
     input.onchange = (event) => {
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Recording files must be at most 10 MB.');
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
           const data = JSON.parse(e.target?.result as string);
           if (data.recordingInfo && data.messages) {
-            const recording: Recording = {
-              id: Date.now(),
-              name: data.recordingInfo.name + ' (Imported)',
-              startTime: new Date(data.recordingInfo.startTime),
-              endTime: new Date(data.recordingInfo.endTime),
-              messageCount: data.recordingInfo.messageCount,
-              topic: data.recordingInfo.topic,
-              connectionName: data.recordingInfo.connectionName,
-              messages: data.messages.map((msg: any) => ({
-                ...msg,
-                timestamp: new Date(msg.timestamp),
-                message: msg.payload,
-              })),
-            };
+            const recording = parseRecording(data);
+            recording.id = Date.now();
+            recording.name += ' (Imported)';
             setRecordings((prev) => [...prev, recording]);
             alert('Recording loaded successfully!');
           } else {
@@ -357,6 +371,7 @@ function RecordingPanel({
   };
 
   const deleteRecording = (recordingId: number) => {
+    playbackGeneration.current++;
     setRecordings((prev) => {
       const newRecordings = prev.filter((r) => r.id !== recordingId);
       if (newRecordings.length === 0) {
@@ -365,6 +380,7 @@ function RecordingPanel({
       return newRecordings;
     });
     if (expandedRecording === recordingId) {
+      setIsPlaying(false);
       setExpandedRecording(null);
       setCurrentPlayback(null);
     }
@@ -382,11 +398,21 @@ function RecordingPanel({
         isRecording={isRecording}
         isRecordingDisabled={isRecordingDisabled}
         recordingStart={recordingStart}
-        recordedMessages={recordedMessages}
+        messageCount={captureCounts.messages}
+        topicCount={captureCounts.topics}
         startRecording={startRecording}
         stopRecording={stopRecording}
       />
 
+      <label className="recording-controls-section">
+        <input
+          type="checkbox"
+          checked={republish}
+          disabled={!isConnected || isPlaying}
+          onChange={(e) => setRepublish(e.target.checked)}
+        />
+        Republish playback messages to {connectionName || 'the selected broker'}
+      </label>
       <div className="recording-scrollable-content">
         <div className="recording-saved-list">
           <div className="recording-saved-list-header">

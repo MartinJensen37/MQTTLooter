@@ -1,5 +1,6 @@
 import TopicTree from './models/TopicTree';
 import { UI } from '../config';
+import MQTTService from './MQTTService';
 
 type MQTTServiceInstance = typeof import('./MQTTService').default;
 type EventHandler = (data: any) => void;
@@ -31,20 +32,10 @@ class TopicTreeService {
   private _UPDATE_THROTTLE_MS = 150;
 
   constructor() {
-    this.initializeAsync();
-  }
-
-  private async initializeAsync(): Promise<void> {
-    try {
-      // Dynamic import avoids a circular dependency with MQTTService.
-      const module = await import('./MQTTService');
-      this.MQTTService = module.default;
-      this.setupEventListeners();
-      this.startRateCalculationTimer();
-      this.initialized = true;
-    } catch (error) {
-      console.error('Failed to initialize TopicTreeService:', error);
-    }
+    this.MQTTService = MQTTService;
+    this.setupEventListeners();
+    this.startRateCalculationTimer();
+    this.initialized = true;
   }
 
   private setupEventListeners(): void {
@@ -84,9 +75,11 @@ class TopicTreeService {
     this._pendingUpdates.get(connectionId)!.topics.add(topic);
   }
 
-  /** Emit pre-calculated statistics at a moderate interval (no per-node iteration). */
+  /** Recalculate rates on a timer, including idle topics, instead of per message. */
   private startRateCalculationTimer(): void {
     setInterval(() => {
+      const now = Date.now();
+      this.topicTrees.forEach((tree) => tree.updateRates(now));
       this.emitEvent('ratesUpdated', { trees: this.getAllTreeStatistics() });
     }, UI.RATE_EMIT_INTERVAL_MS);
   }
@@ -164,15 +157,23 @@ class TopicTreeService {
   clearTopicTree(connectionId: string): boolean {
     const tree = this.topicTrees.get(connectionId);
     if (!tree) return false;
+    this.cancelPendingUpdate(connectionId);
     tree.clear();
     this.emitEvent('treeCleared', { connectionId });
     return true;
   }
 
   removeTopicTree(connectionId: string): boolean {
+    this.cancelPendingUpdate(connectionId);
     const removed = this.topicTrees.delete(connectionId);
     if (removed) this.emitEvent('treeRemoved', { connectionId });
     return removed;
+  }
+
+  private cancelPendingUpdate(connectionId: string): void {
+    const pending = this._pendingUpdates.get(connectionId);
+    if (pending) clearTimeout(pending.timer);
+    this._pendingUpdates.delete(connectionId);
   }
 
   getConnectionIds(): string[] {
@@ -193,7 +194,7 @@ class TopicTreeService {
       .toArray()
       .reverse()
       .map((m) => ({
-        id: `${m.timestamp}`,
+        id: `${connectionId}:${topicPath}:${m.id}`,
         connectionId,
         topic: m.topic || topicPath,
         message: m.payload || '',

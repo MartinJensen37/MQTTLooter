@@ -34,20 +34,27 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
   useEffect(() => {
     if (!connectionId || !topicTreeService) return;
     setIsLoading(true);
+    setSelectedNode(null);
     loadNodes();
 
-    const handleTreeUpdated  = (data) => { if (data.connectionId === connectionId) scheduleLoad(); };
-    const handleNodeToggled  = (data) => { if (data.connectionId === connectionId) scheduleLoad(); };
-    const handleTreeExpanded = (data) => { if (data.connectionId === connectionId) scheduleLoad(); };
+    const handleTreeUpdated = (data) => {
+      if (data.connectionId === connectionId) scheduleLoad();
+    };
+    const handleNodeToggled = (data) => {
+      if (data.connectionId === connectionId) scheduleLoad();
+    };
+    const handleTreeExpanded = (data) => {
+      if (data.connectionId === connectionId) scheduleLoad();
+    };
 
-    const handleTreeCleared  = (data) => {
+    const handleTreeCleared = (data) => {
       if (data.connectionId !== connectionId) return;
       setNodes([]);
       setStatistics(null);
       setSelectedNode(null);
     };
 
-    const handleTreeRemoved  = (data) => {
+    const handleTreeRemoved = (data) => {
       if (data.connectionId !== connectionId) return;
       setNodes([]);
       setStatistics(null);
@@ -58,14 +65,15 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
     const handleRatesUpdated = (data) => {
       if (data.trees && data.trees[connectionId]) {
         setStatistics(data.trees[connectionId]);
+        scheduleLoad();
       }
     };
 
-    topicTreeService.on('treeUpdated',  handleTreeUpdated);
-    topicTreeService.on('nodeToggled',  handleNodeToggled);
+    topicTreeService.on('treeUpdated', handleTreeUpdated);
+    topicTreeService.on('nodeToggled', handleNodeToggled);
     topicTreeService.on('treeExpanded', handleTreeExpanded);
-    topicTreeService.on('treeCleared',  handleTreeCleared);
-    topicTreeService.on('treeRemoved',  handleTreeRemoved);
+    topicTreeService.on('treeCleared', handleTreeCleared);
+    topicTreeService.on('treeRemoved', handleTreeRemoved);
     topicTreeService.on('ratesUpdated', handleRatesUpdated);
 
     return () => {
@@ -73,32 +81,44 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
         cancelAnimationFrame(pendingRaf.current);
         pendingRaf.current = null;
       }
-      topicTreeService.off('treeUpdated',  handleTreeUpdated);
-      topicTreeService.off('nodeToggled',  handleNodeToggled);
+      topicTreeService.off('treeUpdated', handleTreeUpdated);
+      topicTreeService.off('nodeToggled', handleNodeToggled);
       topicTreeService.off('treeExpanded', handleTreeExpanded);
-      topicTreeService.off('treeCleared',  handleTreeCleared);
-      topicTreeService.off('treeRemoved',  handleTreeRemoved);
+      topicTreeService.off('treeCleared', handleTreeCleared);
+      topicTreeService.off('treeRemoved', handleTreeRemoved);
       topicTreeService.off('ratesUpdated', handleRatesUpdated);
     };
   }, [connectionId, topicTreeService, loadNodes, scheduleLoad]);
 
-  const handleNodeClick = useCallback((node) => {
-    const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
-    const hasMessages = node.messageCount > 0;
+  const handleNodeClick = useCallback(
+    (node) => {
+      const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
+      const hasMessages = node.messageCount > 0;
 
-    if (node.hasChildren) {
-      topicTreeService.toggleTopicNode(connectionId, node.fullPath);
-    }
+      if (node.hasChildren) {
+        topicTreeService.toggleTopicNode(connectionId, node.fullPath);
+      }
 
-    if (hasMessages && (hasDirectMessages || node.hasChildren)) {
-      setSelectedNode(node.fullPath);
-      if (onTopicSelect) onTopicSelect(node.fullPath, node);
-    }
-  }, [connectionId, topicTreeService, onTopicSelect]);
+      if (hasMessages && (hasDirectMessages || node.hasChildren)) {
+        setSelectedNode(node.fullPath);
+        if (onTopicSelect) onTopicSelect(node.fullPath, node);
+      }
+    },
+    [connectionId, topicTreeService, onTopicSelect],
+  );
 
-  const handleExpandAll  = useCallback(() => topicTreeService.expandTopicTreeToDepth(connectionId, 10), [connectionId, topicTreeService]);
-  const handleCollapseAll = useCallback(() => topicTreeService.expandTopicTreeToDepth(connectionId, 0),  [connectionId, topicTreeService]);
-  const handleClearTree  = useCallback(() => topicTreeService.clearTopicTree(connectionId), [connectionId, topicTreeService]);
+  const handleExpandAll = useCallback(
+    () => topicTreeService.expandTopicTreeToDepth(connectionId, Infinity),
+    [connectionId, topicTreeService],
+  );
+  const handleCollapseAll = useCallback(
+    () => topicTreeService.expandTopicTreeToDepth(connectionId, 0),
+    [connectionId, topicTreeService],
+  );
+  const handleClearTree = useCallback(
+    () => topicTreeService.clearTopicTree(connectionId),
+    [connectionId, topicTreeService],
+  );
 
   // Virtualize: only render visible topic rows (massive DOM savings)
   const rowVirtualizer = useVirtualizer({
@@ -107,7 +127,6 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
     estimateSize: () => 38,
     overscan: 15,
   });
-
 
   if (isLoading) {
     return (
@@ -141,16 +160,40 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
         <div className="topic-tree-header-top">
           <h3>Topic Tree</h3>
           <div className="topic-tree-controls">
-            <button onClick={handleExpandAll}  className="tree-control-btn expand-btn"   title="Expand all topics"><i className="fas fa-expand-arrows-alt"></i></button>
-            <button onClick={handleCollapseAll} className="tree-control-btn collapse-btn" title="Collapse all topics"><i className="fas fa-compress-arrows-alt"></i></button>
-            <button onClick={handleClearTree}  className="tree-control-btn clear-btn"    title="Clear topic tree"><i className="fas fa-trash"></i></button>
+            <button
+              onClick={handleExpandAll}
+              className="tree-control-btn expand-btn"
+              title="Expand all topics"
+            >
+              <i className="fas fa-expand-arrows-alt"></i>
+            </button>
+            <button
+              onClick={handleCollapseAll}
+              className="tree-control-btn collapse-btn"
+              title="Collapse all topics"
+            >
+              <i className="fas fa-compress-arrows-alt"></i>
+            </button>
+            <button
+              onClick={handleClearTree}
+              className="tree-control-btn clear-btn"
+              title="Clear topic tree"
+            >
+              <i className="fas fa-trash"></i>
+            </button>
           </div>
         </div>
         {statistics && (
           <div className="topic-tree-stats">
-            <span className="stat-item"><i className="fas fa-sitemap"></i> {statistics.totalNodes} topics</span>
-            <span className="stat-item"><i className="fas fa-envelope"></i> {statistics.totalMessages} messages</span>
-            <span className="stat-item"><i className="fas fa-tachometer-alt"></i> {statistics.totalRate?.toFixed(1)} msg/s</span>
+            <span className="stat-item">
+              <i className="fas fa-sitemap"></i> {statistics.totalNodes} topics
+            </span>
+            <span className="stat-item">
+              <i className="fas fa-envelope"></i> {statistics.totalMessages} messages
+            </span>
+            <span className="stat-item">
+              <i className="fas fa-tachometer-alt"></i> {statistics.totalRate?.toFixed(1)} msg/s
+            </span>
           </div>
         )}
       </div>

@@ -1,11 +1,11 @@
 import React from 'react';
-import type { RecordedMessage } from './types';
 
 interface Props {
   isRecording: boolean;
   isRecordingDisabled: boolean;
   recordingStart: Date | null;
-  recordedMessages: RecordedMessage[];
+  messageCount: number;
+  topicCount: number;
   startRecording: () => void;
   stopRecording: () => void;
 }
@@ -14,7 +14,8 @@ function RecordingControls({
   isRecording,
   isRecordingDisabled,
   recordingStart,
-  recordedMessages,
+  messageCount,
+  topicCount,
   startRecording,
   stopRecording,
 }: Props) {
@@ -48,8 +49,8 @@ function RecordingControls({
           {isRecording && (
             <div className="recording-live-info">
               <span>Started: {recordingStart?.toLocaleTimeString()}</span>
-              <span>Messages: {recordedMessages.length}</span>
-              <span>Topics: {[...new Set(recordedMessages.map((msg) => msg.topic))].length}</span>
+              <span>Messages: {messageCount}</span>
+              <span>Topics: {topicCount}</span>
             </div>
           )}
         </div>

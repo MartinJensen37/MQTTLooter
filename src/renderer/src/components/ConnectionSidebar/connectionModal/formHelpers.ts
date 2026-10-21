@@ -107,8 +107,8 @@ export function buildInitialFormData(connection: any): ConnectionFormData {
     username: config.username || '',
     password: config.password || '',
     clean: config.clean !== undefined ? config.clean : true,
-    keepalive: config.keepalive || 60,
-    reconnectPeriod: config.reconnectPeriod || 1000,
+    keepalive: config.keepalive ?? 60,
+    reconnectPeriod: config.reconnectPeriod ?? 1000,
     connectTimeout: config.connectTimeout || 30000,
     protocolVersion: config.protocolVersion || 4,
     tls: {

@@ -1,6 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'path';
-// mqtt-connection-manager is still CommonJS; bundled via esbuild interop.
 import { MQTTConnectionManager } from './mqtt-connection-manager';
 
 let mainWindow: BrowserWindow | null = null;
@@ -18,6 +17,7 @@ function createSplashWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
     },
   });
 
@@ -57,11 +57,19 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
       preload: join(__dirname, '../preload/preload.js'),
       webSecurity: true,
       backgroundThrottling: false, // keep MQTT/UI responsive when backgrounded
     },
   });
+
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
+  mainWindow.webContents.session.setPermissionRequestHandler(
+    (_webContents, _permission, callback) => callback(false),
+  );
+  mainWindow.webContents.on('render-process-gone', () => void mqttManager.disconnectAll());
 
   // electron-vite injects ELECTRON_RENDERER_URL for the dev server; otherwise load the build.
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
@@ -83,15 +91,19 @@ function createWindow() {
     mqttManager.disconnectAll();
     mainWindow = null;
   });
-
-  setupMQTTEventForwarding();
 }
 
 // Relay every MQTT manager event to the renderer as `mqtt-<event>`.
 function setupMQTTEventForwarding() {
   const events = [
-    'connected', 'disconnected', 'message', 'error',
-    'reconnecting', 'subscribed', 'unsubscribed', 'published',
+    'connected',
+    'disconnected',
+    'message',
+    'error',
+    'reconnecting',
+    'subscribed',
+    'unsubscribed',
+    'published',
   ];
   events.forEach((event) => {
     mqttManager.on(event, (data: unknown) => {
@@ -102,7 +114,23 @@ function setupMQTTEventForwarding() {
   });
 }
 
-ipcMain.handle('mqtt-connect', async (_event, connectionId, config) => {
+// Register once; recreating a window must not duplicate event forwarding.
+setupMQTTEventForwarding();
+
+function handleMQTT(channel: string, handler: (...args: any[]) => any) {
+  ipcMain.handle(channel, (event, ...args) => {
+    if (
+      !mainWindow ||
+      event.sender !== mainWindow.webContents ||
+      event.senderFrame !== mainWindow.webContents.mainFrame
+    ) {
+      return { success: false, error: 'Untrusted IPC sender' };
+    }
+    return handler(event, ...args);
+  });
+}
+
+handleMQTT('mqtt-connect', async (_event, connectionId, config) => {
   try {
     console.log(`IPC: Connecting ${connectionId} with protocol version ${config.protocolVersion}`);
     const result = await mqttManager.connect(connectionId, config);
@@ -114,7 +142,7 @@ ipcMain.handle('mqtt-connect', async (_event, connectionId, config) => {
   }
 });
 
-ipcMain.handle('mqtt-disconnect', async (_event, connectionId) => {
+handleMQTT('mqtt-disconnect', async (_event, connectionId) => {
   try {
     const result = await mqttManager.disconnect(connectionId);
     return { success: result };
@@ -123,7 +151,7 @@ ipcMain.handle('mqtt-disconnect', async (_event, connectionId) => {
   }
 });
 
-ipcMain.handle('mqtt-subscribe', async (_event, connectionId, topic, qos = 0, properties = {}) => {
+handleMQTT('mqtt-subscribe', async (_event, connectionId, topic, qos = 0, properties = {}) => {
   try {
     console.log(`IPC: Subscribing ${connectionId} to ${topic} with QoS ${qos}`);
     const result = await mqttManager.subscribe(connectionId, topic, qos, properties);
@@ -135,7 +163,7 @@ ipcMain.handle('mqtt-subscribe', async (_event, connectionId, topic, qos = 0, pr
   }
 });
 
-ipcMain.handle('mqtt-unsubscribe', async (_event, connectionId, topic, properties = {}) => {
+handleMQTT('mqtt-unsubscribe', async (_event, connectionId, topic, properties = {}) => {
   try {
     console.log(`IPC: Unsubscribing ${connectionId} from ${topic}`);
     const result = await mqttManager.unsubscribe(connectionId, topic, properties);
@@ -147,7 +175,7 @@ ipcMain.handle('mqtt-unsubscribe', async (_event, connectionId, topic, propertie
   }
 });
 
-ipcMain.handle('mqtt-publish', async (_event, connectionId, topic, message, options) => {
+handleMQTT('mqtt-publish', async (_event, connectionId, topic, message, options) => {
   try {
     await mqttManager.publish(connectionId, topic, message, options);
     return { success: true };
@@ -156,7 +184,7 @@ ipcMain.handle('mqtt-publish', async (_event, connectionId, topic, message, opti
   }
 });
 
-ipcMain.handle('mqtt-get-connections', async () => {
+handleMQTT('mqtt-get-connections', async () => {
   try {
     return { success: true, data: mqttManager.getAllConnections() };
   } catch (error) {

@@ -30,11 +30,9 @@ class TopicTree {
     const cached = this.topicLookup.get(topicPath);
     if (cached) return cached;
 
-    const parts = topicPath.split('/').filter((part) => part !== '');
+    const parts = topicPath.split('/');
     let currentNode = this.root;
-    let currentPath = '';
     for (const part of parts) {
-      currentPath += (currentPath ? '/' : '') + part;
       if (!currentNode.children.has(part)) {
         currentNode.addChild(part);
       }
@@ -46,7 +44,7 @@ class TopicTree {
   }
 
   getNode(topicPath: string): TopicNode | undefined {
-    return this.topicLookup.get(topicPath);
+    return this.topicLookup.get(topicPath) ?? this.findNodeByPath(topicPath) ?? undefined;
   }
 
   getFlattenedNodes(includeCollapsed = false): FlattenedNode[] {
@@ -82,7 +80,7 @@ class TopicTree {
   }
 
   findNodeByPath(targetPath: string): TopicNode | null {
-    const parts = targetPath.split('/').filter((part) => part !== '');
+    const parts = targetPath.split('/');
     let currentNode = this.root;
     for (const part of parts) {
       const child = currentNode.children.get(part);
@@ -135,6 +133,10 @@ class TopicTree {
     };
   }
 
+  updateRates(now = Date.now()): void {
+    for (const node of this.topicLookup.values()) node.calculateMessageRate(now);
+  }
+
   clear(): void {
     this.root = new TopicNode('', '');
     this.topicLookup.clear();
@@ -154,7 +156,7 @@ class TopicTree {
     const node = this.topicLookup.get(topicPath);
     if (!node) return false;
 
-    const previousCount = node.messageCount;
+    const previousCount = node.directMessageCount;
     node.clearMessages();
     this.messageCount = Math.max(0, this.messageCount - previousCount);
     return true;

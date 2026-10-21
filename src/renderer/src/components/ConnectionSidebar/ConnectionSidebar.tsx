@@ -56,9 +56,7 @@ function ConnectionSidebar({
 
   // Sync with the parent's selectedConnectionId.
   useEffect(() => {
-    if (selectedConnectionId !== localSelectedId) {
-      setLocalSelectedId(selectedConnectionId);
-    }
+    setLocalSelectedId(selectedConnectionId);
   }, [selectedConnectionId]);
 
   const handleCreateConnection = useCallback(

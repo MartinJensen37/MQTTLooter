@@ -5,7 +5,7 @@ function TopicTreeNode({ node, onClick, isSelected }) {
 
   const formatRate = (rate) => {
     if (rate >= 1) return `${rate.toFixed(1)}/s`;
-    if (rate > 0)  return `${(rate * 60).toFixed(1)}/min`;
+    if (rate > 0) return `${(rate * 60).toFixed(1)}/min`;
     return '';
   };
 
@@ -14,7 +14,7 @@ function TopicTreeNode({ node, onClick, isSelected }) {
     let payload = message.payload.toString();
     try {
       payload = JSON.stringify(JSON.parse(payload));
-    } catch (_) {}
+    } catch {}
     return payload;
   };
 
@@ -23,22 +23,32 @@ function TopicTreeNode({ node, onClick, isSelected }) {
     return node.isExpanded ? '▼' : '▶';
   };
 
-  const hasStats          = node.messageCount > 0 || node.messageRate > 0;
-  const hasPayload        = !!node.lastMessage;
+  const hasStats = node.messageCount > 0 || node.messageRate > 0;
+  const hasPayload = !!node.lastMessage;
   const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
   const hasRetainedMessage = node.lastMessage?.retain;
-  const subtopicCount     = node.hasChildren ? (node.childCount || 0) : 0;
+  const subtopicCount = node.hasChildren ? node.childCount || 0 : 0;
 
   return (
     <div
       className={`topic-tree-node ${node.hasChildren ? 'has-children' : 'is-leaf'} ${hasDirectMessages ? 'has-messages' : ''} ${isSelected ? 'selected' : ''}`}
       style={indentStyle}
+      title={node.fullPath || 'Empty topic level'}
+      role="button"
+      tabIndex={0}
+      aria-expanded={node.hasChildren ? node.isExpanded : undefined}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick(node);
+        }
+      }}
       onClick={() => onClick(node)}
     >
       <div className="node-content">
         <div className="node-left">
           <span className="node-expand-icon">{getExpandIcon()}</span>
-          <span className="node-name">{node.name}</span>
+          <span className="node-name">{node.name || '(empty)'}</span>
           <div className="node-bubbles">
             {hasRetainedMessage && (
               <span className="retained-bubble" title="Has retained message">
@@ -46,8 +56,12 @@ function TopicTreeNode({ node, onClick, isSelected }) {
               </span>
             )}
             {subtopicCount > 0 && (
-              <span className="subtopic-bubble" title={`${subtopicCount} subtopic${subtopicCount > 1 ? 's' : ''}`}>
-                <i className="fas fa-sitemap"></i> {subtopicCount} Subtopic{subtopicCount > 1 ? 's' : ''}
+              <span
+                className="subtopic-bubble"
+                title={`${subtopicCount} subtopic${subtopicCount > 1 ? 's' : ''}`}
+              >
+                <i className="fas fa-sitemap"></i> {subtopicCount} Subtopic
+                {subtopicCount > 1 ? 's' : ''}
               </span>
             )}
           </div>
@@ -58,8 +72,12 @@ function TopicTreeNode({ node, onClick, isSelected }) {
             <>
               {hasStats && (
                 <div className="node-stats">
-                  {node.messageCount > 0 && <span className="message-count">{node.messageCount}</span>}
-                  {node.messageRate > 0  && <span className="message-rate">{formatRate(node.messageRate)}</span>}
+                  {node.messageCount > 0 && (
+                    <span className="message-count">{node.messageCount}</span>
+                  )}
+                  {node.messageRate > 0 && (
+                    <span className="message-rate">{formatRate(node.messageRate)}</span>
+                  )}
                 </div>
               )}
               {hasStats && hasPayload && <span className="stats-separator">|</span>}

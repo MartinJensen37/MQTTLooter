@@ -44,12 +44,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   mqtt: {
     connect: (connectionId: string, config: unknown) =>
       ipcRenderer.invoke('mqtt-connect', connectionId, config),
-    disconnect: (connectionId: string) =>
-      ipcRenderer.invoke('mqtt-disconnect', connectionId),
-    subscribe: (connectionId: string, topic: string, qos = 0) =>
-      ipcRenderer.invoke('mqtt-subscribe', connectionId, topic, qos),
-    unsubscribe: (connectionId: string, topic: string) =>
-      ipcRenderer.invoke('mqtt-unsubscribe', connectionId, topic),
+    disconnect: (connectionId: string) => ipcRenderer.invoke('mqtt-disconnect', connectionId),
+    subscribe: (connectionId: string, topic: string, qos = 0, properties = {}) =>
+      ipcRenderer.invoke('mqtt-subscribe', connectionId, topic, qos, properties),
+    unsubscribe: (connectionId: string, topic: string, properties = {}) =>
+      ipcRenderer.invoke('mqtt-unsubscribe', connectionId, topic, properties),
     publish: (connectionId: string, topic: string, message: unknown, options: unknown) =>
       ipcRenderer.invoke('mqtt-publish', connectionId, topic, message, options),
     getConnections: () => ipcRenderer.invoke('mqtt-get-connections'),

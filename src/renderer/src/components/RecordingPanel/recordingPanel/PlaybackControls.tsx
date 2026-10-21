@@ -49,7 +49,7 @@ function PlaybackControls({
   pausePlayback,
   stepForward,
 }: Props) {
-  const currentMessage = currentPlayback.messages[currentIndex] || null;
+  const currentMessage = currentPlayback.messages[Math.max(0, currentIndex - 1)] || null;
 
   return (
     <div className="recording-expanded-area">

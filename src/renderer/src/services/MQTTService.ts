@@ -165,7 +165,7 @@ class MQTTService {
         connection.status = 'disconnected';
         this.connections.set(connectionId, connection);
       }
-      this.removeHandlers((key) => key.startsWith(`${connectionId}:`) && !key.startsWith('*:'));
+      this.handleEvent('disconnected', { id: connectionId });
     } else {
       throw new Error(result.error);
     }
@@ -174,7 +174,7 @@ class MQTTService {
 
   async deleteConnection(connectionId: string): Promise<IpcResult> {
     const connection = this.connections.get(connectionId);
-    if (connection?.isConnected) {
+    if (connection) {
       await this.disconnect(connectionId);
     }
     this.connections.delete(connectionId);
@@ -188,12 +188,21 @@ class MQTTService {
     }
   }
 
-  async subscribe(connectionId: string, topic: string, qos = 0, properties = {}): Promise<IpcResult> {
-    return window.electronAPI.mqtt.subscribe(connectionId, topic, qos, properties);
+  async subscribe(
+    connectionId: string,
+    topic: string,
+    qos = 0,
+    properties = {},
+  ): Promise<IpcResult> {
+    const result = await window.electronAPI.mqtt.subscribe(connectionId, topic, qos, properties);
+    if (!result.success) throw new Error(result.error);
+    return result;
   }
 
   async unsubscribe(connectionId: string, topic: string, properties = {}): Promise<IpcResult> {
-    return window.electronAPI.mqtt.unsubscribe(connectionId, topic, properties);
+    const result = await window.electronAPI.mqtt.unsubscribe(connectionId, topic, properties);
+    if (!result.success) throw new Error(result.error);
+    return result;
   }
 
   async publish(connectionId: string, data: PublishData): Promise<IpcResult> {
@@ -216,10 +225,7 @@ class MQTTService {
     return Array.from(this.connections.values());
   }
 
-  async updateConnectionConfig(
-    connectionId: string,
-    config: ConnectionConfig,
-  ): Promise<IpcResult> {
+  async updateConnectionConfig(connectionId: string, config: ConnectionConfig): Promise<IpcResult> {
     const connection = this.connections.get(connectionId);
     if (connection) {
       connection.config = config;

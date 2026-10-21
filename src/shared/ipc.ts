@@ -20,7 +20,7 @@ export interface ConnectionConfig {
 /** Connection state as reported back from the main process. */
 export interface MainConnectionInfo {
   isConnected: boolean;
-  subscriptions?: string[];
+  subscriptions?: Record<string, unknown>;
   protocolVersion?: number;
   [key: string]: unknown;
 }

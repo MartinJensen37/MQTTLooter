@@ -23,11 +23,27 @@ function PublishingPanel({
   selectedTopic = null,
   showFeedback,
 }: PublishingPanelProps) {
-  const [topic, setTopic] = useState('');
-  const [payload, setPayload] = useState('');
-  const [qos, setQos] = useState(0);
-  const [retain, setRetain] = useState(false);
-  const [publishHistory, setPublishHistory] = useState<PublishHistoryItem[]>([]);
+  const formKey = `publish-form-state-${connectionId}`;
+  const [initialForm] = useState(() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem(formKey) || localStorage.getItem('publish-form-state') || '{}',
+      );
+    } catch {
+      return {};
+    }
+  });
+  const [topic, setTopic] = useState<string>(initialForm.topic || '');
+  const [payload, setPayload] = useState<string>(initialForm.payload || '');
+  const [qos, setQos] = useState<number>(initialForm.qos || 0);
+  const [retain, setRetain] = useState<boolean>(initialForm.retain || false);
+  const [publishHistory, setPublishHistory] = useState<PublishHistoryItem[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`publish-history-${connectionId}`) || '[]');
+    } catch {
+      return [];
+    }
+  });
   const [isPublishing, setIsPublishing] = useState(false);
   const [showQosDropdown, setShowQosDropdown] = useState(false);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
@@ -39,33 +55,6 @@ function PublishingPanel({
   const [showTemplates, setShowTemplates] = useState(false);
   const [autoLoadSelectedTopic, setAutoLoadSelectedTopic] = useState(true);
   const [retainedMessageRemoved, setRetainedMessageRemoved] = useState(false);
-
-  // Load form data and history from localStorage on mount / connection change.
-  useEffect(() => {
-    const savedFormState = localStorage.getItem('publish-form-state');
-    if (savedFormState) {
-      try {
-        const formState = JSON.parse(savedFormState);
-        setTopic(formState.topic || '');
-        setPayload(formState.payload || '');
-        setQos(formState.qos || 0);
-        setRetain(formState.retain || false);
-      } catch (error) {
-        console.error('Failed to load form state:', error);
-      }
-    }
-
-    if (connectionId) {
-      const savedHistory = localStorage.getItem(`publish-history-${connectionId}`);
-      if (savedHistory) {
-        try {
-          setPublishHistory(JSON.parse(savedHistory));
-        } catch (error) {
-          console.error('Failed to load publish history:', error);
-        }
-      }
-    }
-  }, [connectionId]);
 
   useEffect(() => {
     setMessageTemplates(templateService.getAllTemplates());
@@ -112,23 +101,8 @@ function PublishingPanel({
       setTopic(template.topic);
     }
 
-    // Produce an empty payload from schema, or strip the template's variables.
-    let emptyPayload = '';
-    if (template.schema) {
-      emptyPayload = templateService.generateSampleFromSchema(template.schema);
-      emptyPayload = emptyPayload
-        .replace(/"sample_string"/g, '""')
-        .replace(/42\.5/g, '0')
-        .replace(/42/g, '0')
-        .replace(/true/g, 'false');
-    } else {
-      emptyPayload = template.payload
-        .replace(/{{[^}]+}}/g, '""')
-        .replace(/:\s*""/g, ': ""')
-        .replace(/:\s*"",/g, ': "",');
-    }
-
-    setPayload(emptyPayload);
+    const processed = templateService.processTemplate(template);
+    setPayload(processed.payload);
     setQos(template.qos);
     setRetain(template.retain);
     setSelectedTemplate(templateId);
@@ -203,19 +177,26 @@ function PublishingPanel({
 
   // Persist form state.
   useEffect(() => {
-    localStorage.setItem('publish-form-state', JSON.stringify({ topic, payload, qos, retain }));
-  }, [topic, payload, qos, retain]);
+    try {
+      localStorage.setItem(formKey, JSON.stringify({ topic, payload, qos, retain }));
+    } catch {
+      showFeedback?.('Publishing draft could not be saved locally.', 'error');
+    }
+  }, [formKey, topic, payload, qos, retain, showFeedback]);
 
   // Persist publish history per connection.
   useEffect(() => {
-    if (connectionId && publishHistory.length > 0) {
+    if (!connectionId) return;
+    try {
       localStorage.setItem(`publish-history-${connectionId}`, JSON.stringify(publishHistory));
+    } catch {
+      showFeedback?.('Publish history could not be saved locally.', 'error');
     }
-  }, [publishHistory, connectionId]);
+  }, [publishHistory, connectionId, showFeedback]);
 
   const handlePublish = async () => {
     const messageData: PublishHistoryItem = {
-      topic: topic.trim(),
+      topic,
       payload,
       qos,
       retain,
@@ -224,7 +205,8 @@ function PublishingPanel({
 
     setIsPublishing(true);
     try {
-      if (onPublishMessage) await onPublishMessage(messageData);
+      if (!onPublishMessage || !isConnected) throw new Error('Not connected');
+      await onPublishMessage(messageData);
 
       // Add to history, de-duplicating by topic/payload/qos/retain.
       setPublishHistory((prev) => {
@@ -276,7 +258,8 @@ function PublishingPanel({
 
     setIsPublishing(true);
     try {
-      if (onPublishMessage) await onPublishMessage(messageData);
+      if (!onPublishMessage || !isConnected) throw new Error('Not connected');
+      await onPublishMessage(messageData);
       setRetainedMessageRemoved(true);
       showFeedback?.('Retained message removed succesfully!', 'success');
     } catch (error) {
@@ -340,7 +323,7 @@ function PublishingPanel({
     setQos(0);
     setRetain(false);
     setSelectedTemplate(null);
-    localStorage.removeItem('publish-form-state');
+    localStorage.removeItem(formKey);
   };
 
   const clearHistory = () => {
@@ -504,7 +487,9 @@ function PublishingPanel({
                 onClick={loadFromSelectedTopic}
                 className="publish-form-load-topic-btn"
                 disabled={isPublishing || !selectedTopic}
-                title={selectedTopic ? `Load topic: ${selectedTopic.topicPath}` : 'No topic selected'}
+                title={
+                  selectedTopic ? `Load topic: ${selectedTopic.topicPath}` : 'No topic selected'
+                }
               >
                 <i className="fas fa-download"></i> Use Selected Topic
               </button>
