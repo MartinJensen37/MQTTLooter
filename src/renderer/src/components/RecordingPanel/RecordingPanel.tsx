@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './RecordingPanel.css';
 import MQTTService from '../../services/MQTTService';
 import RecordingCapture from '../../services/RecordingCapture';
+import { useRecordingLibrary } from '../../hooks/useRecordingLibrary';
 import { parseRecording } from './recordingPanel/parseRecording';
 import type { Recording, CurrentPlayback } from './recordingPanel/types';
 import { getFilteredMessagesFor } from './recordingPanel/recordingHelpers';
@@ -30,13 +31,15 @@ function RecordingPanel({
   const captureRef = useRef<RecordingCapture | null>(null);
   const [captureCounts, setCaptureCounts] = useState({ messages: 0, topics: 0 });
   const [republish, setRepublish] = useState(false);
-  const [recordings, setRecordings] = useState<Recording[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('mqtt-recordings') || '[]').map(parseRecording);
-    } catch {
-      return [];
-    }
-  });
+  const {
+    recordings,
+    setRecordings,
+    addRecording,
+    ready,
+    status,
+    error: storageError,
+    retry,
+  } = useRecordingLibrary();
 
   // Playback state.
   const [isPlaying, setIsPlaying] = useState(false);
@@ -53,7 +56,7 @@ function RecordingPanel({
   const [editingRecording, setEditingRecording] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
 
-  const isRecordingDisabled = !isConnected || !activeConnectionId;
+  const isRecordingDisabled = !isConnected || !activeConnectionId || !ready;
   const playbackGeneration = useRef(0);
 
   const stopRecording = useCallback(() => {
@@ -62,18 +65,15 @@ function RecordingPanel({
     setIsRecording(false);
     setRecordingStart(null);
     setCaptureCounts({ messages: 0, topics: 0 });
-    if (recording) setRecordings((prev) => [...prev, recording]);
-  }, []);
+    if (recording) addRecording(recording);
+  }, [addRecording]);
 
   useEffect(() => {
     const generation = playbackGeneration;
     const onMessage = (data: any) => {
       if (captureRef.current && !captureRef.current.add(data)) {
         stopRecording();
-        showFeedback?.(
-          'Recording stopped at the 10,000-message or 2 MB limit. Export it before starting another.',
-          'info',
-        );
+        showFeedback?.('Recording stopped at the 10,000-message or 2 MB capture limit.', 'info');
       }
     };
     const onDisconnect = (data: any) => {
@@ -105,14 +105,6 @@ function RecordingPanel({
     setIsPaused(false);
     setRepublish(false);
   }, [activeConnectionId, isRecordingDisabled, stopRecording]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('mqtt-recordings', JSON.stringify(recordings));
-    } catch {
-      showFeedback?.('Recordings could not be saved locally. Export them to keep them.', 'error');
-    }
-  }, [recordings, showFeedback]);
 
   useEffect(() => {
     playbackGeneration.current++;
@@ -357,10 +349,9 @@ function RecordingPanel({
           const data = JSON.parse(e.target?.result as string);
           if (data.recordingInfo && data.messages) {
             const recording = parseRecording(data);
-            recording.id = Date.now();
             recording.name += ' (Imported)';
-            setRecordings((prev) => [...prev, recording]);
-            alert('Recording loaded successfully!');
+            addRecording(recording);
+            showFeedback?.('Recording imported. Check the save status before closing.', 'info');
           } else {
             alert('Invalid recording file format.');
           }
@@ -375,13 +366,7 @@ function RecordingPanel({
 
   const deleteRecording = (recordingId: number) => {
     playbackGeneration.current++;
-    setRecordings((prev) => {
-      const newRecordings = prev.filter((r) => r.id !== recordingId);
-      if (newRecordings.length === 0) {
-        localStorage.removeItem('mqtt-recordings');
-      }
-      return newRecordings;
-    });
+    setRecordings((prev) => prev.filter((r) => r.id !== recordingId));
     if (expandedRecording === recordingId) {
       setIsPlaying(false);
       setExpandedRecording(null);
@@ -397,7 +382,28 @@ function RecordingPanel({
         </div>
       </div>
 
+      <div className="recording-storage-status" role={status === 'error' ? 'alert' : 'status'}>
+        {status === 'loading' && 'Loading saved recordings...'}
+        {status === 'saving' && 'Saving recordings to disk...'}
+        {status === 'saved' && 'Saved recordings are stored on disk.'}
+        {status === 'error' && (
+          <>
+            <span>
+              Recordings could not be {ready ? 'saved' : 'loaded'}: {storageError}.{' '}
+              {ready
+                ? 'Unsaved changes remain in memory; retry or export recordings before closing.'
+                : 'Existing storage has been kept.'}
+            </span>
+            <button className="btn btn-sm" onClick={retry}>
+              Retry storage
+            </button>
+          </>
+        )}
+        {isRecording && <span> The active capture is saved when stopped.</span>}
+      </div>
+
       <RecordingControls
+        storageReady={ready}
         isRecording={isRecording}
         isRecordingDisabled={isRecordingDisabled}
         recordingStart={recordingStart}
@@ -422,6 +428,7 @@ function RecordingPanel({
             <h3>Saved Recordings ({recordings.length})</h3>
             <button
               onClick={loadRecordingFromFile}
+              disabled={!ready}
               className="btn btn-md btn-primary"
               title="Load recording from file"
             >

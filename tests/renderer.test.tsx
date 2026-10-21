@@ -46,6 +46,9 @@ vi.mock('../src/renderer/src/components/SimulationPanel/simulationPanel/DeviceCo
 let container: HTMLDivElement;
 let root: Root;
 const feedback = vi.fn();
+let savedRecordings: any[];
+let recordingRevision: number;
+let migrated: boolean;
 const emit = (event: string, data: any) => events.get(event)?.forEach((handler) => handler(data));
 const click = async (text: string) => {
   const button = [...container.querySelectorAll('button')].find(
@@ -60,6 +63,42 @@ beforeEach(() => {
   vi.useFakeTimers();
   localStorage.clear();
   events.clear();
+  savedRecordings = [];
+  recordingRevision = 0;
+  migrated = false;
+  Object.assign(window, {
+    electronAPI: {
+      recordings: {
+        load: vi.fn(async () => ({
+          success: true,
+          data: {
+            recordings: savedRecordings,
+            revision: recordingRevision,
+            legacyMigrated: migrated,
+          },
+        })),
+        migrate: vi.fn(async (recordings) => {
+          if (!migrated) {
+            savedRecordings = recordings;
+            migrated = true;
+            recordingRevision++;
+          }
+          return {
+            success: true,
+            data: {
+              recordings: savedRecordings,
+              revision: recordingRevision,
+              legacyMigrated: migrated,
+            },
+          };
+        }),
+        save: vi.fn(async (recordings) => {
+          savedRecordings = recordings;
+          return { success: true, data: ++recordingRevision };
+        }),
+      },
+    },
+  });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -72,6 +111,90 @@ afterEach(async () => {
 });
 
 describe('renderer state', () => {
+  it('serializes saves and keeps captures made while a disk write is pending', async () => {
+    let finishFirstSave: () => void;
+    vi.mocked(window.electronAPI.recordings.save).mockImplementationOnce(
+      (recordings) =>
+        new Promise((resolve) => {
+          finishFirstSave = () => {
+            savedRecordings = recordings;
+            recordingRevision = 1;
+            resolve({ success: true, data: 1 });
+          };
+        }),
+    );
+    await act(async () => root.render(<RecordingPanel activeConnectionId="a" isConnected />));
+    for (const message of ['first', 'second']) {
+      await click('Record');
+      await act(async () =>
+        emit('message', { id: 'a', topic: 'a', message, timestamp: 1, qos: 0, retain: false }),
+      );
+      await click('Stop');
+    }
+    expect(window.electronAPI.recordings.save).toHaveBeenCalledTimes(1);
+    await act(async () => finishFirstSave!());
+    expect(window.electronAPI.recordings.save).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(window.electronAPI.recordings.save).mock.calls[1][1]).toBe(1);
+    expect(savedRecordings.map((item) => item.messages[0].message)).toEqual(['first', 'second']);
+    expect(new Set(savedRecordings.map((item) => item.id)).size).toBe(2);
+  });
+
+  it('keeps corrupt legacy data and blocks recording until storage is available', async () => {
+    localStorage.setItem('mqtt-recordings', 'broken JSON');
+    await act(async () => root.render(<RecordingPanel activeConnectionId="a" isConnected />));
+    expect(container.querySelector('[role="alert"]')).toBeTruthy();
+    expect(
+      (container.querySelector('.recording-action-buttons button') as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(localStorage.getItem('mqtt-recordings')).toBe('broken JSON');
+    expect(window.electronAPI.recordings.save).not.toHaveBeenCalled();
+  });
+
+  it('keeps legacy recordings until migration succeeds and never saves an empty library over them', async () => {
+    const legacy = JSON.stringify([
+      { id: 1, name: 'Legacy', startTime: 0, endTime: 1, messages: [] },
+    ]);
+    localStorage.setItem('mqtt-recordings', legacy);
+    vi.mocked(window.electronAPI.recordings.migrate).mockResolvedValueOnce({
+      success: false,
+      error: 'Disk full',
+    });
+    await act(async () => root.render(<RecordingPanel />));
+    expect(container.textContent).toContain('Disk full');
+    expect(localStorage.getItem('mqtt-recordings')).toBe(legacy);
+    expect(window.electronAPI.recordings.save).not.toHaveBeenCalled();
+    await click('Retry storage');
+    expect(localStorage.getItem('mqtt-recordings')).toBeNull();
+    expect(container.textContent).toContain('Legacy');
+    expect(savedRecordings).toHaveLength(1);
+  });
+
+  it('keeps a failed capture save available for export and retry', async () => {
+    vi.mocked(window.electronAPI.recordings.save).mockResolvedValueOnce({
+      success: false,
+      error: 'Disk full',
+    });
+    await act(async () => root.render(<RecordingPanel activeConnectionId="a" isConnected />));
+    await click('Record');
+    await act(async () =>
+      emit('message', {
+        id: 'a',
+        topic: 'a',
+        message: 'keep me',
+        timestamp: 1,
+        qos: 0,
+        retain: false,
+      }),
+    );
+    await click('Stop');
+    expect(container.textContent).toContain('Disk full');
+    expect(container.querySelector('[title="Save recording to file"]')).toBeTruthy();
+    expect(savedRecordings).toHaveLength(0);
+    await click('Retry storage');
+    expect(savedRecordings[0].messages[0].message).toBe('keep me');
+    expect(container.textContent).toContain('stored on disk');
+  });
+
   it('preserves saved profiles on mount and refresh in StrictMode', async () => {
     localStorage.setItem(
       'mqtt-connections',
@@ -136,7 +259,7 @@ describe('renderer state', () => {
         </StrictMode>,
       ),
     );
-    const recordings = JSON.parse(localStorage.getItem('mqtt-recordings')!);
+    const recordings = savedRecordings;
     expect(recordings).toHaveLength(1);
     expect(recordings[0].messageCount).toBe(500);
     expect(recordings[0].connectionName).toBe('Broker A');

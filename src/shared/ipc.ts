@@ -47,6 +47,26 @@ export type MqttEventCallback = (data: any) => void;
 
 /** The surface the preload bridge exposes on window.electronAPI. */
 export interface ElectronAPI {
+  recordings: {
+    load(): Promise<
+      IpcResult<{
+        revision: number;
+        legacyMigrated: boolean;
+        recordings: import('./recording').Recording[];
+      }>
+    >;
+    migrate(recordings: unknown[]): Promise<
+      IpcResult<{
+        revision: number;
+        legacyMigrated: boolean;
+        recordings: import('./recording').Recording[];
+      }>
+    >;
+    save(
+      recordings: import('./recording').Recording[],
+      revision: number,
+    ): Promise<IpcResult<number>>;
+  };
   mqtt: {
     connect(connectionId: string, config: ConnectionConfig): Promise<IpcResult<ConnectResultData>>;
     disconnect(connectionId: string): Promise<IpcResult>;

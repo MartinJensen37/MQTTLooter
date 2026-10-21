@@ -41,6 +41,12 @@ function createEventHandler(eventPrefix: string) {
 const mqttEvents = createEventHandler('mqtt');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  recordings: {
+    load: () => ipcRenderer.invoke('recordings-load'),
+    migrate: (recordings: unknown[]) => ipcRenderer.invoke('recordings-migrate', recordings),
+    save: (recordings: unknown[], revision: number) =>
+      ipcRenderer.invoke('recordings-save', recordings, revision),
+  },
   mqtt: {
     connect: (connectionId: string, config: unknown) =>
       ipcRenderer.invoke('mqtt-connect', connectionId, config),

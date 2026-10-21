@@ -39,11 +39,12 @@ The Electron smoke test uses hidden windows, isolated storage under `.tmp/`, and
 - Adaptive message-rate estimates measured independently of retained history. Rates update while idle and eventually return to zero; bucket boundary precision is 100 ms.
 - Publishing drafts and history per connection, templates, and a limited subset of JSON Schema validation.
 - Recording directly from live MQTT events, independent of the selected topic. A recording stops on disconnect, connection switch, or the 10,000-message / 2 MiB capture limit. Saved recordings can be exported and imported (up to 10 MiB per import).
+- Stopped captures, imports, renames and deletions are saved through the main process to `recordings.json` in Electron's user-data directory. Saves replace the file atomically, with a visible status and retry button. Existing localStorage recordings migrate automatically and are removed only after a successful disk write. The library currently loads into memory and is capped at 64 MiB / 1,000 recordings; export and remove older captures when needed.
 - Playback with speed, stepping, and topic filters. Republish is an explicit option, off by default; enabling it sends messages to the selected broker with their recorded QoS and retain flags.
 - Device simulation with configurable outputs and intervals. Saved devices load stopped. Running intervals use the latest device settings and stop on disconnect or unmount.
 - Resizable topic panel, collapsible connection sidebar, and F1-F4 panel shortcuts.
 
-Connection credentials and certificates are currently stored in renderer localStorage along with connection settings. Recordings also use localStorage; if its quota is exhausted, the app reports the save failure and recordings can still be exported from memory. See the review notes before treating this as a production data-capture tool.
+Connection credentials and certificates are currently stored in renderer localStorage along with connection settings. Active captures remain in memory until stopped; closing or reloading during a capture can lose it. Wait for the recording save status before closing. Failed saves remain available for retry or export from memory. The app allows one running instance per user-data directory to keep recording writes coordinated. See the review notes before treating this as a production data-capture tool.
 
 ## Structure
 

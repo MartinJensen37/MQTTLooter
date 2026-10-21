@@ -1,28 +1,7 @@
-// Shared types for the RecordingPanel and its section components.
+import type { Recording, RecordedMessage } from '../../../../../shared/recording';
+export type { Recording, RecordedMessage };
 
-export interface RecordedMessage {
-  encoding?: import('../../../../../shared/payload').PayloadEncoding;
-  topic: string;
-  message: string; // payload
-  qos?: number;
-  retain?: boolean;
-  timestamp: Date | string | number;
-  connectionId?: string;
-  [key: string]: unknown;
-}
-
-export interface Recording {
-  id: number;
-  name: string;
-  startTime: Date;
-  endTime: Date;
-  messageCount: number;
-  messages: RecordedMessage[];
-  topic: string;
-  connectionName: string;
-}
-
-/** A recording prepared for playback (carries the unfiltered message list). */
+/** A recording prepared for playback. */
 export interface CurrentPlayback extends Recording {
   originalMessages: RecordedMessage[];
 }

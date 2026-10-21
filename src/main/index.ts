@@ -1,10 +1,20 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'path';
 import { MQTTConnectionManager } from './mqtt-connection-manager';
+import { RecordingStore } from './recording-store';
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
 const mqttManager = new MQTTConnectionManager();
+const recordingStore = new RecordingStore(join(app.getPath('userData'), 'recordings.json'));
+// One main process owns the library; renderer revisions prevent stale snapshots within it.
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
+app.on('second-instance', () => {
+  if (mainWindow?.isMinimized()) mainWindow.restore();
+  mainWindow?.show();
+  mainWindow?.focus();
+});
 
 function createSplashWindow() {
   splashWindow = new BrowserWindow({
@@ -117,7 +127,7 @@ function setupMQTTEventForwarding() {
 // Register once; recreating a window must not duplicate event forwarding.
 setupMQTTEventForwarding();
 
-function handleMQTT(channel: string, handler: (...args: any[]) => any) {
+function handleIPC(channel: string, handler: (...args: any[]) => any) {
   ipcMain.handle(channel, (event, ...args) => {
     if (
       !mainWindow ||
@@ -130,7 +140,7 @@ function handleMQTT(channel: string, handler: (...args: any[]) => any) {
   });
 }
 
-handleMQTT('mqtt-connect', async (_event, connectionId, config) => {
+handleIPC('mqtt-connect', async (_event, connectionId, config) => {
   try {
     console.log(`IPC: Connecting ${connectionId} with protocol version ${config.protocolVersion}`);
     const result = await mqttManager.connect(connectionId, config);
@@ -142,7 +152,7 @@ handleMQTT('mqtt-connect', async (_event, connectionId, config) => {
   }
 });
 
-handleMQTT('mqtt-disconnect', async (_event, connectionId) => {
+handleIPC('mqtt-disconnect', async (_event, connectionId) => {
   try {
     const result = await mqttManager.disconnect(connectionId);
     return { success: result };
@@ -151,7 +161,7 @@ handleMQTT('mqtt-disconnect', async (_event, connectionId) => {
   }
 });
 
-handleMQTT('mqtt-subscribe', async (_event, connectionId, topic, qos = 0, properties = {}) => {
+handleIPC('mqtt-subscribe', async (_event, connectionId, topic, qos = 0, properties = {}) => {
   try {
     console.log(`IPC: Subscribing ${connectionId} to ${topic} with QoS ${qos}`);
     const result = await mqttManager.subscribe(connectionId, topic, qos, properties);
@@ -163,7 +173,7 @@ handleMQTT('mqtt-subscribe', async (_event, connectionId, topic, qos = 0, proper
   }
 });
 
-handleMQTT('mqtt-unsubscribe', async (_event, connectionId, topic, properties = {}) => {
+handleIPC('mqtt-unsubscribe', async (_event, connectionId, topic, properties = {}) => {
   try {
     console.log(`IPC: Unsubscribing ${connectionId} from ${topic}`);
     const result = await mqttManager.unsubscribe(connectionId, topic, properties);
@@ -175,7 +185,7 @@ handleMQTT('mqtt-unsubscribe', async (_event, connectionId, topic, properties = 
   }
 });
 
-handleMQTT('mqtt-publish', async (_event, connectionId, topic, message, options) => {
+handleIPC('mqtt-publish', async (_event, connectionId, topic, message, options) => {
   try {
     await mqttManager.publish(connectionId, topic, message, options);
     return { success: true };
@@ -184,7 +194,7 @@ handleMQTT('mqtt-publish', async (_event, connectionId, topic, message, options)
   }
 });
 
-handleMQTT('mqtt-get-connections', async () => {
+handleIPC('mqtt-get-connections', async () => {
   try {
     return { success: true, data: mqttManager.getAllConnections() };
   } catch (error) {
@@ -193,9 +203,36 @@ handleMQTT('mqtt-get-connections', async () => {
 });
 
 app.on('ready', () => {
+  if (!primaryInstance) return;
   // Splash first, then the main window once it has had a moment to paint.
   createSplashWindow();
   setTimeout(createWindow, 100);
+});
+
+for (const [channel, handler] of Object.entries({
+  'recordings-load': () => recordingStore.load(),
+  'recordings-migrate': (recordings: unknown) => recordingStore.migrate(recordings),
+  'recordings-save': (recordings: unknown, revision: number) =>
+    recordingStore.save(recordings, revision),
+})) {
+  handleIPC(channel, async (_event, ...args) => {
+    try {
+      return { success: true, data: await (handler as (...args: any[]) => unknown)(...args) };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+}
+
+let finishingQuit = false;
+app.on('before-quit', (event) => {
+  if (!finishingQuit && recordingStore.busy) {
+    event.preventDefault();
+    void recordingStore.flush().finally(() => {
+      finishingQuit = true;
+      app.quit();
+    });
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -206,7 +243,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  if (mainWindow === null) {
+  if (primaryInstance && mainWindow === null) {
     createSplashWindow();
     setTimeout(createWindow, 100);
   }

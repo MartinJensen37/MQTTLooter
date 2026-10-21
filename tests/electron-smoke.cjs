@@ -106,12 +106,27 @@ async function run() {
   await evaluate(
     `localStorage.setItem('mqtt-connections', JSON.stringify([{id:'smoke',config:${JSON.stringify(config)}}]))`,
   );
+  await evaluate(`localStorage.setItem('mqtt-recordings', JSON.stringify([{
+    id: 1, name: 'Legacy binary capture', startTime: 0, endTime: 1,
+    messages: [{ topic: 'binary', message: '${binaryPayload.toString('base64')}', encoding: 'base64', timestamp: 1 }]
+  }]))`);
   window.webContents.reload();
   await waitFor(() => !window.webContents.isLoading(), 'reload');
   await waitFor(
     () => evaluate("document.querySelector('.connection-card') !== null"),
     'saved profile',
   );
+  await evaluate("document.querySelector('.connection-card').click()");
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.recording-name-text')?.textContent === 'Legacy binary capture'",
+      ),
+    'recording migration',
+  );
+  assert.equal(await evaluate("localStorage.getItem('mqtt-recordings')"), null);
+  const recordingFile = path.join(temporary, 'recordings.json');
+  assert.equal(JSON.parse(fs.readFileSync(recordingFile, 'utf8')).legacyMigrated, true);
   await evaluate("document.querySelector('.connection-card .toggle-btn').click()");
   await waitFor(
     () => evaluate("document.querySelector('.topic-tree-stats')?.textContent.includes('4 topics')"),
@@ -185,6 +200,27 @@ async function run() {
   assert.equal(published[0].qos, 0);
   assert.equal(published[0].retain, true);
   await evaluate(
+    "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F3', bubbles: true }))",
+  );
+  await evaluate("document.querySelector('.recording-action-buttons button').click()");
+  await evaluate("window.electronAPI.mqtt.subscribe('smoke', 'capture/#', 0)");
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.recording-live-info')?.textContent.includes('Messages: 4')",
+      ),
+    'live capture',
+  );
+  await evaluate("document.querySelector('.recording-action-buttons button').click()");
+  await waitFor(
+    () => JSON.parse(fs.readFileSync(recordingFile, 'utf8')).recordings.length === 2,
+    'capture disk save',
+  );
+  const savedCapture = JSON.parse(fs.readFileSync(recordingFile, 'utf8')).recordings[1];
+  const savedBinary = savedCapture.messages.find((message) => message.topic === 'binary');
+  assert.equal(savedBinary.encoding, 'base64');
+  assert.deepEqual(Buffer.from(savedBinary.message, 'base64'), binaryPayload);
+  await evaluate(
     "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1', bubbles: true }))",
   );
   await evaluate("document.querySelector('.connection-card .toggle-btn').click()");
@@ -193,7 +229,7 @@ async function run() {
       evaluate("document.querySelector('.connection-status-text')?.textContent === 'disconnected'"),
     'disconnect',
   );
-  assert.equal(await evaluate("document.querySelectorAll('.message-item').length"), 1);
+  assert.equal(await evaluate("document.querySelectorAll('.message-item').length"), 2);
   assert.equal(await evaluate('typeof window.require'), 'undefined');
   assert.equal(await evaluate('document.fonts.check(\'900 16px "Font Awesome 6 Free"\')'), true);
   assert.deepEqual(errors, []);
@@ -206,8 +242,21 @@ async function run() {
   await new Promise((resolve) => setTimeout(resolve, 250));
   const screenshot = await window.webContents.capturePage();
   fs.writeFileSync(path.join(workspace, '.tmp', 'electron-smoke.png'), screenshot.toPNG());
+  window.webContents.reload();
+  await waitFor(() => !window.webContents.isLoading(), 'recording reload');
+  await waitFor(
+    () => evaluate("document.querySelector('.connection-card') !== null"),
+    'reloaded profile',
+  );
+  await evaluate("document.querySelector('.connection-card').click()");
+  await waitFor(
+    () => evaluate("document.querySelectorAll('.recording-saved-item').length === 2"),
+    'saved recording recovery',
+  );
+  assert.equal(await evaluate("localStorage.getItem('mqtt-recordings')"), null);
+  assert.deepEqual(errors, []);
   console.log(
-    'Electron smoke passed: MQTT 5, exact topic paths, binary display/export/publish, disconnect history, sandbox and local icons.',
+    'Electron smoke passed: MQTT 5, binary display/export/publish, recording migration/save/reload, disconnect history and sandbox.',
   );
 }
 

@@ -3,6 +3,7 @@ import React from 'react';
 interface Props {
   isRecording: boolean;
   isRecordingDisabled: boolean;
+  storageReady?: boolean;
   recordingStart: Date | null;
   messageCount: number;
   topicCount: number;
@@ -13,6 +14,7 @@ interface Props {
 function RecordingControls({
   isRecording,
   isRecordingDisabled,
+  storageReady = true,
   recordingStart,
   messageCount,
   topicCount,
@@ -21,7 +23,7 @@ function RecordingControls({
 }: Props) {
   return (
     <div className="recording-fixed-controls">
-      {isRecordingDisabled && (
+      {isRecordingDisabled && storageReady && (
         <div className="recording-connection-warning">
           <div className="recording-warning-content">
             <i className="fas fa-plug"></i>
@@ -42,9 +44,11 @@ function RecordingControls({
             <i className={`fas fa-${isRecording ? 'circle' : 'stop-circle'}`}></i>
             {isRecording
               ? 'Recording...'
-              : isRecordingDisabled
-                ? 'Connection Required'
-                : 'Ready to Record'}
+              : !storageReady
+                ? 'Storage unavailable'
+                : isRecordingDisabled
+                  ? 'Connection Required'
+                  : 'Ready to Record'}
           </div>
           {isRecording && (
             <div className="recording-live-info">
@@ -61,9 +65,11 @@ function RecordingControls({
               className="btn btn-lg btn-success"
               disabled={isRecordingDisabled}
               title={
-                isRecordingDisabled
-                  ? 'Connect to an MQTT broker to start recording'
-                  : 'Start recording messages'
+                !storageReady
+                  ? 'Wait for recording storage to load'
+                  : isRecordingDisabled
+                    ? 'Connect to an MQTT broker to start recording'
+                    : 'Start recording messages'
               }
             >
               <i className="fas fa-record-vinyl"></i> Record

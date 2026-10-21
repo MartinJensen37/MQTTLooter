@@ -910,3 +910,8 @@
     padding: var(--spacing-lg);
   }
 }
+.recording-storage-status {
+  padding: 8px 16px;
+  font-size: 12px;
+  line-height: 1.5;
+}
