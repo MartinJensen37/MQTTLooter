@@ -151,6 +151,7 @@ function RecordingPanel({
             await onPublishMessage({
               topic: msg.topic,
               payload: msg.message,
+              encoding: msg.encoding ?? 'utf8',
               qos: msg.qos,
               retain: msg.retain,
             });
@@ -248,6 +249,7 @@ function RecordingPanel({
           await onPublishMessage({
             topic: msg.topic,
             payload: msg.message,
+            encoding: msg.encoding ?? 'utf8',
             qos: msg.qos,
             retain: msg.retain,
           });
@@ -320,6 +322,7 @@ function RecordingPanel({
         timestamp: msg.timestamp,
         topic: msg.topic,
         payload: msg.message,
+        encoding: msg.encoding ?? 'utf8',
         qos: msg.qos,
         retain: msg.retain,
         connectionId: msg.connectionId,

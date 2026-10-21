@@ -32,8 +32,10 @@ The Electron smoke test uses hidden windows, isolated storage under `.tmp/`, and
 - Multiple MQTT 3.1.1 and MQTT 5 connections, including TLS and WebSocket configuration.
 - Saved connection settings, subscriptions, reconnect intervals, and last wills, including empty will payloads.
 - Virtualized topic tree that preserves exact MQTT paths, including empty levels such as `a//b`.
-- Message history, retained-message filtering, sorting, copying, and JSON/CSV export. Captured history remains available after disconnect until explicitly cleared or the connection is deleted.
-- Up to 300 messages and 2 MiB of UTF-8 payload per topic history buffer. An individual payload exceeding this history budget is not added to the buffer. These are per-topic limits, **not an application-wide memory limit**.
+- Message history, retained-message filtering, sorting, copying, and JSON/CSV export. History remains available after disconnect, subject to its limits, until cleared or the connection is deleted.
+- Byte-preserving payloads: valid UTF-8 stays text; other bytes use base64 through IPC, recording, export and playback. Message inspection offers text/hex views; binary copy/export uses base64 with an explicit encoding field. Publishing accepts UTF-8 or canonical padded base64. Older recordings without an encoding field are read as UTF-8.
+- Up to 300 messages and 2 MiB of raw payload bytes per topic. An oversized individual payload is discarded from browsing history, including its latest-message cache. Each connection also has a 32 MiB retained-storage budget, 50,000-message cap, 5,000-node cap and 128-level depth cap. Least recently received topics are evicted first, and the UI reports discards. Defaults live in `src/renderer/src/config.ts`.
+- The retained-storage budget estimates encoded strings and bookkeeping. It is **not a process-memory or application-wide limit**: transport queues, runtime overhead, multiple connections, recordings and publishing drafts need additional memory. Message previews are bounded; export contains the complete stored payload.
 - Adaptive message-rate estimates measured independently of retained history. Rates update while idle and eventually return to zero; bucket boundary precision is 100 ms.
 - Publishing drafts and history per connection, templates, and a limited subset of JSON Schema validation.
 - Recording directly from live MQTT events, independent of the selected topic. A recording stops on disconnect, connection switch, or the 10,000-message / 2 MiB capture limit. Saved recordings can be exported and imported (up to 10 MiB per import).
@@ -48,7 +50,7 @@ Connection credentials and certificates are currently stored in renderer localSt
 ```text
 src/main/           Electron lifecycle, IPC handlers, MQTT clients
 src/preload/        Restricted renderer-to-main bridge
-src/shared/         IPC types
+src/shared/         IPC types and payload encoding
 src/renderer/src/
   components/       Connection, topic, message, publishing, recording, simulation UI
   hooks/            Connection, message, and layout state

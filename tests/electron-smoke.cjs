@@ -34,6 +34,8 @@ Module._load = function (request, ...args) {
 };
 
 const sockets = new Set();
+const binaryPayload = Buffer.from([0, 255, 128, 13, 10]);
+const published = [];
 const broker = net.createServer((socket) => {
   sockets.add(socket);
   socket.on('close', () => sockets.delete(socket));
@@ -54,6 +56,9 @@ const broker = net.createServer((socket) => {
       for (const topic of ['a/b', 'a//b', '/a/b']) {
         send({ cmd: 'publish', topic, payload: `sample:${topic}`, qos: 0, retain: true });
       }
+      send({ cmd: 'publish', topic: 'binary', payload: binaryPayload, qos: 0, retain: true });
+    } else if (packet.cmd === 'publish') {
+      published.push(packet);
     } else if (packet.cmd === 'pingreq') send({ cmd: 'pingresp' });
   });
   parser.on('error', (error) => socket.destroy(error));
@@ -109,12 +114,12 @@ async function run() {
   );
   await evaluate("document.querySelector('.connection-card .toggle-btn').click()");
   await waitFor(
-    () => evaluate("document.querySelector('.topic-tree-stats')?.textContent.includes('3 topics')"),
+    () => evaluate("document.querySelector('.topic-tree-stats')?.textContent.includes('4 topics')"),
     'MQTT 5 topics',
   );
   await evaluate('document.querySelector(\'[title="Expand all topics"]\').click()');
   await waitFor(
-    () => evaluate("document.querySelectorAll('.topic-tree-node.has-messages').length === 3"),
+    () => evaluate("document.querySelectorAll('.topic-tree-node.has-messages').length === 4"),
     'distinct topics',
   );
   await evaluate(
@@ -123,6 +128,64 @@ async function run() {
   await waitFor(
     () => evaluate("document.querySelector('.message-item')?.textContent.includes('sample:a//b')"),
     'message details',
+  );
+  await evaluate('document.querySelector(\'.topic-tree-node[title="binary"]\').click()');
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.payload-preview')?.textContent.includes('00 ff 80 0d 0a')",
+      ),
+    'binary hex display',
+  );
+  // Capture real export blobs without opening a download dialog.
+  await evaluate(`
+    window.smokeExports = [];
+    URL.createObjectURL = blob => {
+      blob.text().then(text => window.smokeExports.push(text));
+      return 'blob:smoke';
+    };
+    URL.revokeObjectURL = () => {};
+    HTMLAnchorElement.prototype.click = () => {};
+    void 0;
+  `);
+  for (const format of ['JSON', 'CSV']) {
+    await evaluate('document.querySelector(\'[title="Export topic data"]\').click()');
+    await waitFor(
+      () => evaluate("document.querySelector('.message-export-wrapper .dropdown-option') !== null"),
+      'export menu',
+    );
+    await evaluate(
+      `[...document.querySelectorAll('.message-export-wrapper .dropdown-option')].find(button => button.textContent.includes('${format}')).click()`,
+    );
+  }
+  await waitFor(() => evaluate('window.smokeExports.length === 2'), 'payload exports');
+  const exports = await evaluate('window.smokeExports');
+  const exported = JSON.parse(exports[0]).messages[0];
+  assert.equal(exported.encoding, 'base64');
+  assert.deepEqual(Buffer.from(exported.payload, 'base64'), binaryPayload);
+  assert.equal(exported.qos, 0);
+  assert.ok(exports[1].includes('Payload,Encoding,QoS'));
+  assert.ok(exports[1].includes(`"${binaryPayload.toString('base64')}",base64,0,true`));
+
+  await evaluate(
+    "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }))",
+  );
+  await evaluate("document.querySelector('.publish-form-load-topic-btn').click()");
+  await waitFor(
+    () => evaluate("document.querySelector('#publish-encoding').value === 'base64'"),
+    'load binary draft',
+  );
+  assert.equal(
+    await evaluate("document.querySelector('#payload').value"),
+    binaryPayload.toString('base64'),
+  );
+  await evaluate("document.querySelector('.publish-form-publish-btn').click()");
+  await waitFor(() => published.length === 1, 'binary publish');
+  assert.deepEqual(published[0].payload, binaryPayload);
+  assert.equal(published[0].qos, 0);
+  assert.equal(published[0].retain, true);
+  await evaluate(
+    "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1', bubbles: true }))",
   );
   await evaluate("document.querySelector('.connection-card .toggle-btn').click()");
   await waitFor(
@@ -144,7 +207,7 @@ async function run() {
   const screenshot = await window.webContents.capturePage();
   fs.writeFileSync(path.join(workspace, '.tmp', 'electron-smoke.png'), screenshot.toPNG());
   console.log(
-    'Electron smoke passed: MQTT 5, exact topic paths, message display, disconnect history, sandbox and local icons.',
+    'Electron smoke passed: MQTT 5, exact topic paths, binary display/export/publish, disconnect history, sandbox and local icons.',
   );
 }
 

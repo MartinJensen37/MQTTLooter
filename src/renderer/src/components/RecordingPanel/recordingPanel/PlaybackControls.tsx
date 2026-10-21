@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatPayloadBytes } from '../../../../../shared/payload';
 import type { CurrentPlayback } from './types';
 import { getUniqueTopics, formatPayload } from './recordingHelpers';
 
@@ -62,7 +63,10 @@ function PlaybackControls({
 
       {/* Topic filter */}
       <div className="recording-topic-filter-section">
-        <button onClick={() => setShowTopicFilter(!showTopicFilter)} className="btn btn-md btn-secondary">
+        <button
+          onClick={() => setShowTopicFilter(!showTopicFilter)}
+          className="btn btn-md btn-secondary"
+        >
           <i className="fas fa-filter"></i> Topic Filter ({selectedTopicsFilter.length} of{' '}
           {getUniqueTopics(currentPlayback.originalMessages).length} selected)
         </button>
@@ -70,7 +74,9 @@ function PlaybackControls({
           <div className="recording-topic-filter-panel">
             <div className="recording-filter-actions">
               <button
-                onClick={() => setSelectedTopicsFilter(getUniqueTopics(currentPlayback.originalMessages))}
+                onClick={() =>
+                  setSelectedTopicsFilter(getUniqueTopics(currentPlayback.originalMessages))
+                }
                 className="btn btn-sm btn-success"
               >
                 Select All
@@ -125,7 +131,11 @@ function PlaybackControls({
             <i className="fas fa-step-backward"></i>
           </button>
 
-          <button onClick={resetPlayback} className="btn btn-md btn-secondary" title="Reset to beginning">
+          <button
+            onClick={resetPlayback}
+            className="btn btn-md btn-secondary"
+            title="Reset to beginning"
+          >
             <i className="fas fa-undo"></i>
           </button>
 
@@ -195,7 +205,7 @@ function PlaybackControls({
             <div className="recording-message-position">
               <strong>Position:</strong>
               <span>
-                Message {currentIndex + 1} of {currentPlayback.messages.length}
+                Message {Math.max(1, currentIndex)} of {currentPlayback.messages.length}
               </span>
             </div>
             <div className="recording-message-details">
@@ -217,9 +227,11 @@ function PlaybackControls({
               </div>
             </div>
             <div className="recording-message-payload">
-              <strong>Payload:</strong>
+              <strong>Payload{currentMessage.encoding === 'base64' ? ' (hex)' : ''}:</strong>
               <pre className="recording-payload-content">
-                {formatPayload(currentMessage.message || '')}
+                {currentMessage.encoding === 'base64'
+                  ? formatPayloadBytes(currentMessage.message, 'base64', 'hex')
+                  : formatPayload(currentMessage.message || '')}
               </pre>
             </div>
           </div>

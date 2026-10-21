@@ -12,6 +12,13 @@
   font-family: var(--font-family);
 }
 
+.history-limit-notice {
+  margin: var(--spacing-sm) 0 0;
+  color: var(--text-body);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 /* ── Header ── */
 .topic-tree-header {
   padding: var(--spacing-md) var(--spacing-xl);

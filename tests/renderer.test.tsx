@@ -194,7 +194,10 @@ describe('renderer state', () => {
           startTime: 1000,
           endTime: 2000,
           connectionName: 'A',
-          messages: [1000, 2000].map((timestamp) => ({ topic: 'a', message: 'hello', timestamp })),
+          messages: [
+            { topic: 'a', message: 'hello', timestamp: 1000 },
+            { topic: 'a', message: '/wAB', encoding: 'base64', timestamp: 2000 },
+          ],
         },
       ]),
     );
@@ -228,6 +231,10 @@ describe('renderer state', () => {
     expect(vi.getTimerCount()).toBeLessThanOrEqual(2);
     await act(async () => vi.advanceTimersByTimeAsync(1000));
     expect(publish).toHaveBeenCalledTimes(2);
+    expect(publish).toHaveBeenLastCalledWith(
+      expect.objectContaining({ payload: '/wAB', encoding: 'base64' }),
+    );
+    expect(container.querySelector('.recording-payload-content')?.textContent).toBe('ff 00 01');
     expect(vi.getTimerCount()).toBe(1); // Only the recording UI poll remains.
   });
 });

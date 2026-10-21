@@ -26,7 +26,7 @@ export function useMessages(
     if (!selectedConnection) return;
     const onTreeUpdate = (data: any) => {
       if (data.connectionId !== selectedConnection) return;
-      if (selectedTopic && data.topics && data.topics.includes(selectedTopic.topicPath)) {
+      if (selectedTopic && (!data.topics || data.topics.includes(selectedTopic.topicPath))) {
         setUpdateTick((t) => t + 1);
       }
     };

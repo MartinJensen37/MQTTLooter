@@ -1,5 +1,6 @@
 import mqtt from 'mqtt';
 import { EventEmitter } from 'events';
+import { encodePayload, payloadBytes } from '../shared/payload';
 
 class MQTTConnection extends EventEmitter {
   constructor(id, config) {
@@ -248,7 +249,7 @@ class MQTTConnection extends EventEmitter {
           this.emit('message', {
             id: this.id,
             topic,
-            message: message.toString(),
+            ...encodePayload(message),
             timestamp,
             qos: packet.qos,
             retain: packet.retain,
@@ -365,6 +366,7 @@ class MQTTConnection extends EventEmitter {
 
   publish(topic, message, options = {}) {
     return new Promise((resolve, reject) => {
+      const bytes = Buffer.from(payloadBytes(message, options.encoding ?? 'utf8'));
       if (!this.client || !this.isConnected || this.isDestroyed) {
         reject(new Error('Not connected'));
         return;
@@ -380,16 +382,17 @@ class MQTTConnection extends EventEmitter {
         publishOptions.properties = options.properties;
       }
 
-      this.client.publish(topic, message, publishOptions, (err) => {
+      this.client.publish(topic, bytes, publishOptions, (err) => {
         if (err) {
           reject(err);
         } else {
           this.connectionStats.messagesPublished++;
-          this.connectionStats.bytesSent +=
-            typeof message === 'string' ? Buffer.byteLength(message) : message.byteLength || 0;
+          this.connectionStats.bytesSent += bytes.byteLength;
 
           const publishData = {
             id: this.id,
+            encoding: options.encoding ?? 'utf8',
+            byteLength: bytes.byteLength,
             topic,
             message,
             options: publishOptions,

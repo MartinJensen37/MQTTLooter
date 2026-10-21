@@ -115,6 +115,7 @@ function App() {
       await MQTTService.publish(selectedConnection, {
         topic: messageData.topic,
         message: messageData.payload,
+        encoding: messageData.encoding,
         qos: messageData.qos,
         retain: messageData.retain,
       });

@@ -1,4 +1,6 @@
 import TopicNode from './TopicNode';
+import { CONNECTION_HISTORY } from '../../config';
+import type { PayloadEncoding } from '../../../../shared/payload';
 
 export type TopicNodeJSON = ReturnType<TopicNode['toJSON']>;
 
@@ -13,34 +15,124 @@ class TopicTree {
   topicLookup = new Map<string, TopicNode>(); // O(1) topic → leaf lookups
   messageCount = 0;
   createdAt = Date.now();
+  private sequence = 0;
+  private nodeCount = 0;
+  private retainedBytes = 0;
+  private retainedMessages = 0;
+  discardedMessages = 0;
+  evictedTopics = 0;
+  limitVersion = 0;
 
-  constructor(connectionId: string) {
+  private nodeBytes(node: TopicNode): number {
+    return 256 + 2 * (node.name.length + node.fullPath.length);
+  }
+
+  constructor(
+    connectionId: string,
+    readonly limits = { ...CONNECTION_HISTORY },
+  ) {
+    if (Object.values(limits).some((value) => !Number.isSafeInteger(value) || value < 1))
+      throw new RangeError('History limits must be positive integers');
     this.connectionId = connectionId;
     this.root = new TopicNode('', '');
   }
 
-  addMessage(topic: string, message: string, qos = 0, retain = false, timestamp = Date.now()) {
+  addMessage(
+    topic: string,
+    message: string,
+    qos = 0,
+    retain = false,
+    timestamp = Date.now(),
+    encoding: PayloadEncoding = 'utf8',
+  ) {
     this.messageCount++;
     const leafNode = this.getOrCreateNode(topic);
-    leafNode.addMessage({ payload: message, qos, retain, topic, timestamp }, timestamp);
-    return leafNode;
+    if (!leafNode) {
+      this.discardedMessages++;
+      this.limitVersion++;
+      return undefined;
+    }
+    const beforeBytes = leafNode.messageHistory.storageUsage;
+    const beforeCount = leafNode.messageHistory.count;
+    leafNode.addMessage(
+      { payload: message, encoding, qos, retain, topic, timestamp },
+      timestamp,
+      ++this.sequence,
+    );
+    this.retainedBytes += leafNode.messageHistory.storageUsage - beforeBytes;
+    this.retainedMessages += leafNode.messageHistory.count - beforeCount;
+    const discarded = beforeCount + 1 - leafNode.messageHistory.count;
+    this.discardedMessages += discarded;
+    if (discarded) this.limitVersion++;
+    // Map insertion order is least-recently-received first.
+    this.topicLookup.delete(topic);
+    this.topicLookup.set(topic, leafNode);
+    while (
+      this.retainedBytes > this.limits.maxBytes ||
+      this.retainedMessages > this.limits.maxMessages
+    ) {
+      if (!this.evictOldestTopic()) break;
+    }
+    return this.topicLookup.get(topic);
   }
 
-  getOrCreateNode(topicPath: string): TopicNode {
+  private getOrCreateNode(topicPath: string): TopicNode | undefined {
     const cached = this.topicLookup.get(topicPath);
     if (cached) return cached;
-
     const parts = topicPath.split('/');
+    if (parts.length > this.limits.maxDepth || parts.length > this.limits.maxNodes)
+      return undefined;
+    const missingNodes = () => {
+      let current = this.root;
+      for (let i = 0; i < parts.length; i++) {
+        const next = current.children.get(parts[i]);
+        if (!next) return parts.length - i;
+        current = next;
+      }
+      return 0;
+    };
+    while (this.nodeCount + missingNodes() > this.limits.maxNodes) {
+      if (!this.evictOldestTopic()) return undefined;
+    }
     let currentNode = this.root;
     for (const part of parts) {
-      if (!currentNode.children.has(part)) {
-        currentNode.addChild(part);
+      const existing = currentNode.children.get(part);
+      if (existing) currentNode = existing;
+      else {
+        currentNode = currentNode.addChild(part);
+        this.nodeCount++;
+        this.retainedBytes += this.nodeBytes(currentNode);
       }
-      currentNode = currentNode.children.get(part)!;
     }
-
     this.topicLookup.set(topicPath, currentNode);
     return currentNode;
+  }
+
+  private evictOldestTopic(): boolean {
+    const entry = this.topicLookup.entries().next().value;
+    if (!entry) return false;
+    const [path, node] = entry;
+    this.topicLookup.delete(path);
+    this.discardedMessages += node.messageHistory.count;
+    this.retainedMessages -= node.messageHistory.count;
+    this.retainedBytes -= node.messageHistory.storageUsage;
+    node.clearMessages();
+    this.evictedTopics++;
+    this.limitVersion++;
+    let current = node;
+    // Preserve parents that still own direct messages or descendants.
+    while (
+      current.parent &&
+      current.children.size === 0 &&
+      !this.topicLookup.has(current.fullPath)
+    ) {
+      this.nodeCount--;
+      this.retainedBytes -= this.nodeBytes(current);
+      const parent = current.parent;
+      parent.children.delete(current.name);
+      current = parent;
+    }
+    return true;
   }
 
   getNode(topicPath: string): TopicNode | undefined {
@@ -125,6 +217,12 @@ class TopicTree {
     return {
       connectionId: this.connectionId,
       totalNodes,
+      nodeCount: this.nodeCount,
+      retainedBytes: this.retainedBytes,
+      retainedMessages: this.retainedMessages,
+      discardedMessages: this.discardedMessages,
+      evictedTopics: this.evictedTopics,
+      limits: this.limits,
       leafNodes,
       totalMessages: this.messageCount,
       totalRate: this.root.getTotalMessageRate(),
@@ -141,6 +239,12 @@ class TopicTree {
     this.root = new TopicNode('', '');
     this.topicLookup.clear();
     this.messageCount = 0;
+    this.nodeCount = 0;
+    this.retainedBytes = 0;
+    this.retainedMessages = 0;
+    this.discardedMessages = 0;
+    this.evictedTopics = 0;
+    this.limitVersion++;
   }
 
   export() {
@@ -157,6 +261,8 @@ class TopicTree {
     if (!node) return false;
 
     const previousCount = node.directMessageCount;
+    this.retainedBytes -= node.messageHistory.storageUsage;
+    this.retainedMessages -= node.messageHistory.count;
     node.clearMessages();
     this.messageCount = Math.max(0, this.messageCount - previousCount);
     return true;

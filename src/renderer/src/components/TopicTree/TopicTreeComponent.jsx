@@ -128,6 +128,14 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
     overscan: 15,
   });
 
+  const historyNotice = statistics?.discardedMessages > 0 && (
+    <p role="status" className="history-limit-notice">
+      History limit: {statistics.discardedMessages} messages discarded; {statistics.evictedTopics}{' '}
+      topics evicted. Retained history budget: {(statistics.retainedBytes / 1048576).toFixed(1)} /{' '}
+      {(statistics.limits.maxBytes / 1048576).toFixed(0)} MiB per connection.
+    </p>
+  );
+
   if (isLoading) {
     return (
       <div className="topic-tree-container">
@@ -147,6 +155,7 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
           <div className="topic-tree-stats">No topics yet — waiting for messages...</div>
         </div>
         <div className="topic-tree-empty">
+          {historyNotice}
           <p>Connect to an MQTT broker and start receiving messages to see the topic tree.</p>
           <p>Topics will appear here as messages are received.</p>
         </div>
@@ -196,6 +205,7 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
             </span>
           </div>
         )}
+        {historyNotice}
       </div>
 
       <div className="topic-tree-content" ref={scrollRef}>

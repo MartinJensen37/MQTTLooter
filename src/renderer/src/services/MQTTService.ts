@@ -4,6 +4,7 @@ import type {
   MainConnectionInfo,
   MqttEventType,
 } from '../../../shared/ipc';
+import type { PayloadEncoding } from '../../../shared/payload';
 
 type EventHandler = (data: any) => void;
 
@@ -21,6 +22,7 @@ export interface RendererConnection {
 }
 
 export interface PublishData {
+  encoding?: PayloadEncoding;
   topic: string;
   message: unknown;
   qos?: number;
@@ -206,8 +208,9 @@ class MQTTService {
   }
 
   async publish(connectionId: string, data: PublishData): Promise<IpcResult> {
-    const { topic, message, qos, retain, properties } = data;
+    const { topic, message, qos, retain, properties, encoding = 'utf8' } = data;
     const options = {
+      encoding,
       qos: qos || 0,
       retain: retain || false,
       ...(properties && { properties }),

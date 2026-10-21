@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './MessagePanel.css';
+import PayloadView from './PayloadView';
 
 function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName, showFeedback }) {
   const [sortBy, setSortBy] = useState('timestamp');
@@ -55,6 +56,7 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
       messages: processedMessages.map((m) => ({
         timestamp: m.timestamp,
         payload: m.message,
+        encoding: m.encoding ?? 'utf8',
         qos: m.qos,
         retain: m.retain,
         connectionId: m.connectionId,
@@ -78,11 +80,12 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
   const exportTopicAsCSV = useCallback(() => {
     if (!selectedTopic || processedMessages.length === 0) return;
     const csv = [
-      ['Timestamp', 'Payload', 'QoS', 'Retain', 'Connection'].join(','),
+      ['Timestamp', 'Payload', 'Encoding', 'QoS', 'Retain', 'Connection'].join(','),
       ...processedMessages.map((m) =>
         [
           `"${m.timestamp}"`,
           `"${m.message.replace(/"/g, '""')}"`,
+          m.encoding ?? 'utf8',
           m.qos,
           m.retain,
           `"${m.connectionId}"`,
@@ -123,8 +126,6 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
   );
 
   const formatTimestamp = (ts) => new Date(ts).toLocaleString();
-  const getPayloadPreview = (payload, max = 100) =>
-    payload.length <= max ? payload : payload.substring(0, max) + '...';
 
   return (
     <div className="message-panel">
@@ -258,11 +259,11 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
             <div className="no-messages-icon">
               <i className="fas fa-inbox"></i>
             </div>
-            <h3>No messages yet</h3>
+            <h3>No messages in this view</h3>
             <p>
               {!selectedTopic
                 ? 'Select a topic from the topic tree to view its messages'
-                : `No messages received for topic "${selectedTopic.topicPath}" yet`}
+                : 'No stored messages match this view. History may have been cleared or discarded at its limit.'}
             </p>
           </div>
         ) : (
@@ -278,7 +279,11 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
                 key={msg.id}
                 className="message-item"
                 onDoubleClick={(e) => copyPayload(msg.message, e)}
-                title="Double-click to copy payload"
+                title={
+                  msg.encoding === 'base64'
+                    ? 'Double-click to copy base64 payload'
+                    : 'Double-click to copy payload'
+                }
               >
                 <div className="message-header">
                   <div className="message-meta">
@@ -290,6 +295,9 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
                       <i className="fas fa-tag"></i> {msg.topic}
                     </span>
                     <span className={`badge badge-qos-${msg.qos}`}>QoS {msg.qos}</span>
+                    {msg.encoding === 'base64' && (
+                      <span className="badge">Binary (base64 export)</span>
+                    )}
                     {msg.retain && (
                       <span className="badge badge-retain">
                         <i className="fas fa-save"></i> RETAIN
@@ -303,7 +311,7 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
                     <button
                       className="copy-btn"
                       onClick={(e) => copyPayload(msg.message, e)}
-                      title="Copy payload"
+                      title={msg.encoding === 'base64' ? 'Copy base64 payload' : 'Copy payload'}
                       style={{ borderRadius: '50%', minWidth: '24px', height: '24px' }}
                     >
                       <i className="fas fa-copy"></i>
@@ -311,16 +319,7 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
                   </div>
                 </div>
                 <div className="message-content">
-                  <div className="payload-preview">{getPayloadPreview(msg.message)}</div>
-                  {msg.message.length > 100 && (
-                    <details className="payload-full">
-                      <summary>
-                        <i className="fas fa-expand-alt"></i> Show full payload (
-                        {msg.message.length} chars)
-                      </summary>
-                      <pre className="payload-code">{msg.message}</pre>
-                    </details>
-                  )}
+                  <PayloadView value={msg.message} encoding={msg.encoding} />
                 </div>
               </div>
             ))}

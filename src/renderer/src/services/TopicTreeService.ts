@@ -1,17 +1,21 @@
 import TopicTree from './models/TopicTree';
 import { UI } from '../config';
 import MQTTService from './MQTTService';
+import type { PayloadEncoding } from '../../../shared/payload';
 
 type MQTTServiceInstance = typeof import('./MQTTService').default;
 type EventHandler = (data: any) => void;
 
 interface PendingUpdate {
+  allTopics: boolean;
+  topicChars: number;
   topics: Set<string>;
   timer: ReturnType<typeof setTimeout>;
 }
 
 /** Display-ready message shape consumed by MessagePanel. */
 export interface DisplayMessage {
+  encoding: PayloadEncoding;
   id: string;
   connectionId: string;
   topic: string;
@@ -45,7 +49,7 @@ class TopicTreeService {
   }
 
   private handleMessage(messageData: any): void {
-    const { id: connectionId, topic, message, qos, retain, timestamp } = messageData;
+    const { id: connectionId, topic, message, qos, retain, timestamp, encoding } = messageData;
 
     let topicTree = this.topicTrees.get(connectionId);
     if (!topicTree) {
@@ -54,25 +58,41 @@ class TopicTreeService {
       this.emitEvent('treeCreated', { connectionId, tree: topicTree });
     }
 
-    topicTree.addMessage(topic, message, qos, retain, timestamp);
+    const limitVersion = topicTree.limitVersion;
+    topicTree.addMessage(topic, message, qos, retain, timestamp, encoding);
 
     // Throttle treeUpdated; track which topics changed so listeners can filter.
     if (!this._pendingUpdates.has(connectionId)) {
       const tree = topicTree;
       this._pendingUpdates.set(connectionId, {
+        allTopics: false,
+        topicChars: 0,
         topics: new Set<string>(),
         timer: setTimeout(() => {
           const pending = this._pendingUpdates.get(connectionId);
           this._pendingUpdates.delete(connectionId);
           this.emitEvent('treeUpdated', {
             connectionId,
-            topics: pending ? Array.from(pending.topics) : [],
+            topics: pending?.allTopics ? undefined : pending ? Array.from(pending.topics) : [],
             statistics: tree.getStatistics(),
           });
         }, this._UPDATE_THROTTLE_MS),
       });
     }
-    this._pendingUpdates.get(connectionId)!.topics.add(topic);
+    const pending = this._pendingUpdates.get(connectionId)!;
+    if (
+      topicTree.limitVersion !== limitVersion ||
+      pending.topics.size >= 128 ||
+      pending.topicChars + topic.length > 262144
+    ) {
+      pending.allTopics = true;
+      pending.topics.clear();
+      pending.topicChars = 0;
+    }
+    if (!pending.allTopics && !pending.topics.has(topic)) {
+      pending.topics.add(topic);
+      pending.topicChars += topic.length;
+    }
   }
 
   /** Recalculate rates on a timer, including idle topics, instead of per message. */
@@ -198,6 +218,7 @@ class TopicTreeService {
         connectionId,
         topic: m.topic || topicPath,
         message: m.payload || '',
+        encoding: m.encoding,
         qos: m.qos || 0,
         retain: m.retain || false,
         timestamp: m.timestamp,

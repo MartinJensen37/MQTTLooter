@@ -1,10 +1,12 @@
 import RingBuffer from '../../utils/RingBuffer';
 import { MESSAGE_HISTORY } from '../../config';
+import { payloadBytes, type PayloadEncoding } from '../../../../shared/payload';
 
 const RATE_BUCKET_MS = 100;
 
 /** Message handed to a node when a publish arrives. */
 export interface IncomingMessage {
+  encoding?: PayloadEncoding;
   payload: string;
   qos: number;
   retain: boolean;
@@ -14,6 +16,8 @@ export interface IncomingMessage {
 
 /** Message as stored in a node's ring buffer (`length` drives the byte budget). */
 export interface StoredMessage {
+  encoding: PayloadEncoding;
+  storageBytes: number;
   id: number;
   payload: string | null;
   qos: number;
@@ -75,7 +79,7 @@ class TopicNode {
     return this.children.get(name)!;
   }
 
-  addMessage(message: IncomingMessage, timestamp = Date.now()): void {
+  addMessage(message: IncomingMessage, timestamp = Date.now(), id = ++this.sequence): void {
     // Track interval between messages for the adaptive window.
     if (this.lastMessageTime) {
       this.lastMessageInterval = timestamp - this.lastMessageTime;
@@ -84,14 +88,15 @@ class TopicNode {
 
     this.messageCount++;
     this.directMessageCount++;
-    this.lastMessage = message;
     this.lastMessageTime = timestamp;
     this.hasDirectMessages = true;
 
     // Account for the UTF-8 payload, rather than UTF-16 character count.
-    const payloadLen = new TextEncoder().encode(message.payload).byteLength;
-    this.messageHistory.add({
-      id: ++this.sequence,
+    const payloadLen = payloadBytes(message.payload, message.encoding).byteLength;
+    const accepted = this.messageHistory.add({
+      id,
+      encoding: message.encoding ?? 'utf8',
+      storageBytes: (message.payload.length + message.topic.length) * 2 + 128,
       payload: message ? message.payload : null,
       qos: message ? message.qos : 0,
       retain: message ? message.retain : false,
@@ -99,9 +104,13 @@ class TopicNode {
       topic: message ? message.topic : null,
       length: payloadLen,
     });
+    // No separate unbounded latest-payload cache when history rejects a large message.
+    this.lastMessage = accepted ? message : null;
 
     const bucket = Math.floor(timestamp / RATE_BUCKET_MS) * RATE_BUCKET_MS;
     this.rateBuckets.set(bucket, (this.rateBuckets.get(bucket) ?? 0) + 1);
+    // Rate estimates must not grow with the lifetime of a busy topic.
+    if (this.rateBuckets.size > 128) this.rateBuckets.delete(this.rateBuckets.keys().next().value!);
     this.propagateMessageCount();
   }
 
@@ -143,7 +152,8 @@ class TopicNode {
     let recentCount = 0;
     for (const [bucket, count] of this.rateBuckets) {
       if (bucket + RATE_BUCKET_MS > cutoff) recentCount += count;
-      if (bucket + RATE_BUCKET_MS <= currentTime - this.maxTimeWindow) this.rateBuckets.delete(bucket);
+      if (bucket + RATE_BUCKET_MS <= currentTime - this.maxTimeWindow)
+        this.rateBuckets.delete(bucket);
     }
 
     if (recentCount === 0) {
@@ -242,7 +252,13 @@ class TopicNode {
           ? Math.round(this.messageRate * 1000) / 1000
           : 0,
       formattedRate: this.hasDirectMessages ? this.getFormattedRate() : '',
-      lastMessage: this.lastMessage,
+      lastMessage: this.lastMessage
+        ? {
+            ...this.lastMessage,
+            payload: this.lastMessage.payload.slice(0, 160),
+            truncated: this.lastMessage.payload.length > 160,
+          }
+        : null,
       lastMessageTime: this.lastMessageTime,
       isLeaf: this.hasDirectMessages && this.children.size === 0,
       hasDirectMessages: this.hasDirectMessages,

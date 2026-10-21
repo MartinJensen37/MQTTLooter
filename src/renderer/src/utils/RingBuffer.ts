@@ -8,7 +8,7 @@
  *
  * Items carry an optional `length` (byte size) used for the byte-budget accounting.
  */
-class RingBuffer<T extends { length?: number }> {
+class RingBuffer<T extends { length?: number; storageBytes?: number }> {
   maxItems: number;
   maxBytes: number;
   compactionFactor: number;
@@ -17,6 +17,11 @@ class RingBuffer<T extends { length?: number }> {
   private _start = 0; // index of first valid item (inclusive)
   private _end = 0; // index of next write slot (exclusive)
   private _byteUsage = 0;
+  private _storageUsage = 0;
+
+  get storageUsage(): number {
+    return this._storageUsage;
+  }
 
   constructor(maxItems = 300, maxBytes = 2 * 1024 * 1024, compactionFactor = 10) {
     if (!Number.isInteger(maxItems) || maxItems < 1 || !Number.isFinite(maxBytes) || maxBytes < 0) {
@@ -38,9 +43,9 @@ class RingBuffer<T extends { length?: number }> {
   }
 
   /** Add an item, evicting oldest entries if the count or byte limit would be exceeded. */
-  add(item: T): void {
+  add(item: T): boolean {
     const itemBytes = typeof item?.length === 'number' ? item.length : 0;
-    if (!Number.isFinite(itemBytes) || itemBytes < 0 || itemBytes > this.maxBytes) return;
+    if (!Number.isFinite(itemBytes) || itemBytes < 0 || itemBytes > this.maxBytes) return false;
 
     while (this._byteUsage + itemBytes > this.maxBytes && this.count > 0) {
       this._dropFirst();
@@ -52,11 +57,13 @@ class RingBuffer<T extends { length?: number }> {
     this._items[this._end] = item;
     this._end += 1;
     this._byteUsage += itemBytes;
+    this._storageUsage += item.storageBytes ?? itemBytes;
 
     // Compact when the backing array gets too sparse.
     if (this._end > this.compactionFactor * this.maxItems) {
       this._compact();
     }
+    return true;
   }
 
   /** New array copy of all items, oldest → newest. */
@@ -76,6 +83,7 @@ class RingBuffer<T extends { length?: number }> {
     this._start = 0;
     this._end = 0;
     this._byteUsage = 0;
+    this._storageUsage = 0;
   }
 
   private _dropFirst(): void {
@@ -84,6 +92,7 @@ class RingBuffer<T extends { length?: number }> {
     delete this._items[this._start];
     this._start += 1;
     this._byteUsage = Math.max(0, this._byteUsage - itemBytes);
+    this._storageUsage = Math.max(0, this._storageUsage - (item?.storageBytes ?? itemBytes));
   }
 
   private _compact(): void {

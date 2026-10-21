@@ -11,6 +11,7 @@ function TopicTreeNode({ node, onClick, isSelected }) {
 
   const formatMessage = (message) => {
     if (!message || !message.payload) return '';
+    if (message.encoding === 'base64') return `Base64: ${message.payload}`;
     let payload = message.payload.toString();
     try {
       payload = JSON.stringify(JSON.parse(payload));

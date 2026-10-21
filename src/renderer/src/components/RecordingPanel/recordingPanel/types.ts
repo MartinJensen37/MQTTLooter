@@ -1,6 +1,7 @@
 // Shared types for the RecordingPanel and its section components.
 
 export interface RecordedMessage {
+  encoding?: import('../../../../../shared/payload').PayloadEncoding;
   topic: string;
   message: string; // payload
   qos?: number;

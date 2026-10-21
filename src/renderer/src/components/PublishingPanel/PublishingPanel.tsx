@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import MessageTemplateService from '../../services/MessageTemplateService';
 import './PublishingPanel.css';
+import { payloadBytes, type PayloadEncoding } from '../../../../shared/payload';
+import TopicTreeService from '../../services/TopicTreeService';
 import type { PublishHistoryItem, SchemaValidationResult } from './publishingPanel/types';
 import PayloadEditor from './publishingPanel/PayloadEditor';
 import TemplatesSection from './publishingPanel/TemplatesSection';
@@ -35,6 +37,7 @@ function PublishingPanel({
   });
   const [topic, setTopic] = useState<string>(initialForm.topic || '');
   const [payload, setPayload] = useState<string>(initialForm.payload || '');
+  const [encoding, setEncoding] = useState<PayloadEncoding>(initialForm.encoding ?? 'utf8');
   const [qos, setQos] = useState<number>(initialForm.qos || 0);
   const [retain, setRetain] = useState<boolean>(initialForm.retain || false);
   const [publishHistory, setPublishHistory] = useState<PublishHistoryItem[]>(() => {
@@ -62,12 +65,12 @@ function PublishingPanel({
 
   // Validate payload against the selected template schema.
   useEffect(() => {
-    if (selectedTemplate && payload) {
+    if (selectedTemplate && payload && encoding === 'utf8') {
       setSchemaValidation(templateService.validatePayload(selectedTemplate, payload));
     } else {
       setSchemaValidation(null);
     }
-  }, [selectedTemplate, payload, templateService]);
+  }, [selectedTemplate, payload, encoding, templateService]);
 
   // Clear schema validation when templates are hidden.
   useEffect(() => {
@@ -103,6 +106,7 @@ function PublishingPanel({
 
     const processed = templateService.processTemplate(template);
     setPayload(processed.payload);
+    setEncoding('utf8');
     setQos(template.qos);
     setRetain(template.retain);
     setSelectedTemplate(templateId);
@@ -178,11 +182,11 @@ function PublishingPanel({
   // Persist form state.
   useEffect(() => {
     try {
-      localStorage.setItem(formKey, JSON.stringify({ topic, payload, qos, retain }));
+      localStorage.setItem(formKey, JSON.stringify({ topic, payload, encoding, qos, retain }));
     } catch {
       showFeedback?.('Publishing draft could not be saved locally.', 'error');
     }
-  }, [formKey, topic, payload, qos, retain, showFeedback]);
+  }, [formKey, topic, payload, encoding, qos, retain, showFeedback]);
 
   // Persist publish history per connection.
   useEffect(() => {
@@ -198,6 +202,7 @@ function PublishingPanel({
     const messageData: PublishHistoryItem = {
       topic,
       payload,
+      encoding,
       qos,
       retain,
       timestamp: new Date().toISOString(),
@@ -205,6 +210,7 @@ function PublishingPanel({
 
     setIsPublishing(true);
     try {
+      payloadBytes(messageData.payload, messageData.encoding);
       if (!onPublishMessage || !isConnected) throw new Error('Not connected');
       await onPublishMessage(messageData);
 
@@ -213,6 +219,7 @@ function PublishingPanel({
         const matches = (item: PublishHistoryItem) =>
           item.topic === messageData.topic &&
           item.payload === messageData.payload &&
+          (item.encoding ?? 'utf8') === messageData.encoding &&
           item.qos === messageData.qos &&
           item.retain === messageData.retain;
 
@@ -235,7 +242,7 @@ function PublishingPanel({
       showFeedback?.('Message published successfully!', 'success');
     } catch (error) {
       console.error('Publish failed:', error);
-      showFeedback?.('Failed to publish message', 'error');
+      showFeedback?.(`Failed to publish message: ${(error as Error).message}`, 'error');
     } finally {
       setIsPublishing(false);
     }
@@ -295,15 +302,19 @@ function PublishingPanel({
     }
 
     setTopic(selectedTopic.topicPath || selectedTopic.topic || '');
-    const messageData = selectedTopic.node?.lastMessage;
+    const messageData = connectionId
+      ? TopicTreeService.getTopicMessages(connectionId, selectedTopic.topicPath)[0]
+      : undefined;
 
     if (messageData) {
-      setPayload(messageData.payload || '');
+      setPayload(messageData.message);
+      setEncoding(messageData.encoding);
       setQos(messageData.qos || 0);
       setRetain(messageData.retain || false);
       showFeedback?.('Form filled with selected topic data', 'success');
     } else {
       setPayload('');
+      setEncoding('utf8');
       setQos(0);
       setRetain(false);
       showFeedback?.('Topic loaded, ready for new message', 'success');
@@ -313,6 +324,7 @@ function PublishingPanel({
   const loadFromHistory = (historyItem: PublishHistoryItem) => {
     setTopic(historyItem.topic);
     setPayload(historyItem.payload);
+    setEncoding(historyItem.encoding ?? 'utf8');
     setQos(historyItem.qos);
     setRetain(historyItem.retain);
   };
@@ -320,6 +332,7 @@ function PublishingPanel({
   const clearForm = () => {
     setTopic('');
     setPayload('');
+    setEncoding('utf8');
     setQos(0);
     setRetain(false);
     setSelectedTemplate(null);
@@ -424,11 +437,24 @@ function PublishingPanel({
               </div>
             </div>
 
+            <div className="form-group">
+              <label htmlFor="publish-encoding">Payload encoding</label>
+              <select
+                className="form-input"
+                id="publish-encoding"
+                value={encoding}
+                disabled={isPublishing}
+                onChange={(e) => setEncoding(e.target.value as PayloadEncoding)}
+              >
+                <option value="utf8">UTF-8 text</option>
+                <option value="base64">Base64 bytes</option>
+              </select>
+            </div>
             <PayloadEditor
               payload={payload}
               setPayload={setPayload}
               isPublishing={isPublishing}
-              isValidJson={isValidJson}
+              isValidJson={(text) => encoding === 'utf8' && isValidJson(text)}
               formatJsonPayload={formatJsonPayload}
               copyToClipboard={copyToClipboard}
               schemaValidation={schemaValidation}

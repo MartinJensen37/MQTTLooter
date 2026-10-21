@@ -22,6 +22,13 @@ export const MESSAGE_HISTORY = {
   COMPACTION_FACTOR: 10,
 };
 
+export const CONNECTION_HISTORY = {
+  maxBytes: 32 * 1024 * 1024, // Budget for retained strings and message bookkeeping, not process RSS.
+  maxNodes: 5000,
+  maxMessages: 50000,
+  maxDepth: 128,
+};
+
 export const UI = {
   RATE_UPDATE_INTERVAL_MS: 100,
   RATE_EMIT_INTERVAL_MS: 250,

@@ -1,6 +1,7 @@
 // Shared types for the PublishingPanel and its section components.
 
 export interface PublishHistoryItem {
+  encoding?: import('../../../../../shared/payload').PayloadEncoding;
   topic: string;
   payload: string;
   qos: number;

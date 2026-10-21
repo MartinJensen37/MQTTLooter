@@ -105,4 +105,28 @@ describe('MQTT lifecycle', () => {
     await expect(manager.subscribe('a', 'denied')).rejects.toThrow('rejected');
     expect(manager.getConnection('a')?.subscriptions.size).toBe(0);
   });
+
+  it('receives and republishes binary bytes without UTF-8 replacement', async () => {
+    const result = manager.connect('a', { brokerUrl: 'mqtt://localhost' });
+    client.emit('connect', {});
+    await result;
+    const received = vi.fn();
+    manager.on('message', received);
+    const bytes = Buffer.from([0, 255, 128, 10]);
+    client.emit('message', 'binary', bytes, { qos: 0, retain: true });
+    const message = received.mock.calls[0][0];
+    expect(message).toMatchObject({ encoding: 'base64', byteLength: 4 });
+    await manager.publish('a', 'binary', message.message, {
+      encoding: message.encoding,
+      qos: 0,
+      retain: true,
+    });
+    expect(client.publish.mock.calls[0].slice(0, 3)).toEqual([
+      'binary',
+      bytes,
+      { qos: 0, retain: true, dup: false },
+    ]);
+    await expect(manager.publish('a', 'binary', 'bad', { encoding: 'base64' })).rejects.toThrow();
+    expect(client.publish).toHaveBeenCalledTimes(1);
+  });
 });
