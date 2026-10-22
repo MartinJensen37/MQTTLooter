@@ -105,6 +105,10 @@ function RecordingItem({
         </div>
       </div>
 
+      {recording.incompleteReason && (
+        <p className="history-limit-notice">Incomplete capture: {recording.incompleteReason}</p>
+      )}
+
       {/* Expanded playback area (supplied by the container) */}
       {expandedContent}
     </div>

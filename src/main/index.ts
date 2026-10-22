@@ -2,10 +2,17 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'path';
 import { MQTTConnectionManager } from './mqtt-connection-manager';
 import { RecordingStore } from './recording-store';
+import { MessageDelivery } from './message-delivery';
+import type { IncomingPublish } from '../shared/traffic';
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
 const mqttManager = new MQTTConnectionManager();
+const messageDelivery = new MessageDelivery((batch) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('mqtt-message-batch', batch);
+  } else messageDelivery.reset();
+});
 const recordingStore = new RecordingStore(join(app.getPath('userData'), 'recordings.json'));
 // One main process owns the library; renderer revisions prevent stale snapshots within it.
 const primaryInstance = app.requestSingleInstanceLock();
@@ -79,7 +86,13 @@ function createWindow() {
   mainWindow.webContents.session.setPermissionRequestHandler(
     (_webContents, _permission, callback) => callback(false),
   );
-  mainWindow.webContents.on('render-process-gone', () => void mqttManager.disconnectAll());
+  mainWindow.webContents.on('render-process-gone', () => {
+    messageDelivery.reset();
+    void mqttManager.disconnectAll();
+  });
+  mainWindow.webContents.on('did-start-navigation', (_event, _url, inPlace, isMainFrame) => {
+    if (isMainFrame && !inPlace) messageDelivery.reset();
+  });
 
   // electron-vite injects ELECTRON_RENDERER_URL for the dev server; otherwise load the build.
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
@@ -98,23 +111,23 @@ function createWindow() {
   });
 
   mainWindow.on('closed', () => {
+    messageDelivery.reset();
     mqttManager.disconnectAll();
     mainWindow = null;
   });
 }
 
-// Relay every MQTT manager event to the renderer as `mqtt-<event>`.
+// Control events bypass message batches so disconnect never waits for delivery.
 function setupMQTTEventForwarding() {
   const events = [
     'connected',
     'disconnected',
-    'message',
     'error',
     'reconnecting',
     'subscribed',
     'unsubscribed',
-    'published',
   ];
+  mqttManager.on('message', (message: IncomingPublish) => messageDelivery.enqueue(message));
   events.forEach((event) => {
     mqttManager.on(event, (data: unknown) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -139,6 +152,12 @@ function handleIPC(channel: string, handler: (...args: any[]) => any) {
     return handler(event, ...args);
   });
 }
+
+handleIPC('mqtt-ack-batch', (_event, batchId) => {
+  if (Number.isSafeInteger(batchId)) messageDelivery.acknowledge(batchId);
+  return { success: true };
+});
+handleIPC('mqtt-traffic-status', () => ({ success: true, data: messageDelivery.status() }));
 
 handleIPC('mqtt-connect', async (_event, connectionId, config) => {
   try {

@@ -1,4 +1,5 @@
 import mqtt from 'mqtt';
+import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'events';
 import { encodePayload, payloadBytes } from '../shared/payload';
 
@@ -6,6 +7,8 @@ class MQTTConnection extends EventEmitter {
   constructor(id, config) {
     super();
     this.id = id;
+    this.sessionId = randomUUID();
+    this.sequence = 0;
     this.config = config;
     this.client = null;
     this.isConnected = false;
@@ -248,6 +251,8 @@ class MQTTConnection extends EventEmitter {
           this.connectionStats.bytesReceived += message.length;
           this.emit('message', {
             id: this.id,
+            sessionId: this.sessionId,
+            sequence: ++this.sequence,
             topic,
             ...encodePayload(message),
             timestamp,

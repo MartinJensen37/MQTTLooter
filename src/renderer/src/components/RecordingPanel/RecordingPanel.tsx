@@ -79,6 +79,17 @@ function RecordingPanel({
     const onDisconnect = (data: any) => {
       if (captureRef.current?.connectionId === data.id) stopRecording();
     };
+    const onGap = (data: any) => {
+      const capture = captureRef.current;
+      if (!capture || capture.connectionId !== data.id) return;
+      capture.incompleteReason = 'Incoming message delivery has a gap.';
+      stopRecording();
+      showFeedback?.(
+        'Recording stopped: incoming message delivery has a gap. The saved capture is incomplete.',
+        'error',
+      );
+    };
+    MQTTService.onAny('delivery-gap', onGap);
     MQTTService.onAny('message', onMessage);
     MQTTService.onAny('disconnected', onDisconnect);
     const timer = setInterval(() => {
@@ -88,6 +99,7 @@ function RecordingPanel({
     }, 250);
     return () => {
       generation.current++;
+      MQTTService.off('*', 'delivery-gap', onGap);
       MQTTService.off('*', 'message', onMessage);
       MQTTService.off('*', 'disconnected', onDisconnect);
       clearInterval(timer);
@@ -309,6 +321,7 @@ function RecordingPanel({
         messageCount: recording.messageCount,
         topic: recording.topic,
         connectionName: recording.connectionName,
+        incompleteReason: recording.incompleteReason,
       },
       messages: recording.messages.map((msg) => ({
         timestamp: msg.timestamp,

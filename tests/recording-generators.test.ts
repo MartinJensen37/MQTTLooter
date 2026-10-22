@@ -24,6 +24,21 @@ describe('recording capture', () => {
     expect(recording.messages[0]).toMatchObject({ connectionId: 'a', qos: 1, retain: true });
     expect(recording.connectionName).toBe('Broker A');
   });
+  it('preserves a delivery-gap warning through save and export import', () => {
+    const capture = new RecordingCapture('a', 'A');
+    capture.add(message);
+    capture.incompleteReason = 'Incoming message delivery has a gap.';
+    const recording = capture.finish()!;
+    expect(parseRecording(JSON.parse(JSON.stringify(recording))).incompleteReason).toBe(
+      capture.incompleteReason,
+    );
+    expect(
+      parseRecording({
+        recordingInfo: recording,
+        messages: recording.messages.map((m) => ({ ...m, payload: m.message })),
+      }).incompleteReason,
+    ).toBe(capture.incompleteReason);
+  });
   it('stops at count and byte limits without dropping captured data', () => {
     const capture = new RecordingCapture('a', 'A', 1);
     expect(capture.add(message)).toBe(true);

@@ -59,3 +59,9 @@ This pass followed the main/preload/renderer message path, connection lifecycle,
 - Dependency audit results are time-dependent. Run both `npm audit` and `npm audit --omit=dev`; Electron ships with the app even though npm lists it as a development dependency.
 
 The [remaining implementation plan](IMPLEMENTATION_PLAN.md) supersedes the earlier suggested ordering. It consolidates the user's backlog with the verified fixes above, including topic protection, transport budgets, disk history, active-capture checkpoints and credential storage alongside the UI work.
+
+### 2026-10-23: bounded message delivery
+
+Incoming IPC now uses acknowledged batches, an aggregate queue bound and renderer time slices. Control events bypass batches; unused per-publish payload forwarding was removed. Each transport message carries its original receive timestamp, session UUID and monotonic sequence. Overflow and reload-abandoned/unconfirmed messages have visible counters; recordings stopped by a detected gap keep a warning through save/export/import. This limits app-owned delivery queues, not MQTT parser buffers or process RSS. Full throughput/latency measurements and worker-backed durable capture remain open.
+
+Validation: 84 tests, typecheck, lint and the built Electron smoke test, including the 5,500-topic pressure case. The installed Electron 45 runtime also passed a worker-thread `node:sqlite` binary round-trip spike (SQLite 3.53.4); storage implementation and packaged validation are separate follow-ups.

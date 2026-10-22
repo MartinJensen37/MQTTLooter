@@ -63,3 +63,9 @@ tests/              Regression tests and Electron smoke test
 ```
 
 The current review and remaining limitations are in [docs/REVIEW.md](docs/REVIEW.md). The audited backlog, implementation order and acceptance criteria are in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
+
+### Message delivery under load
+
+Incoming MQTT messages are delivered in batches (up to 128 messages / roughly 256 KiB, with a 40 ms flush window). Main waits for acknowledgement after the renderer processes each batch in short slices. The shared pending and in-flight queue is limited to 8,192 messages / 8 MiB estimated; one large message may exceed the batch target but cannot exceed the aggregate queue budget. New arrivals are dropped when that queue is full. Connection controls bypass the message queue.
+
+The topic tree's **Message delivery** section shows received, processed and dropped/unconfirmed counts for this app run. Processed means dispatched to renderer subscribers, not durable storage. Reloading abandons queued data; an unacknowledged batch is reported as unconfirmed. Delivery gaps appear separately from history-cache expiration. An active recording stops on a detected delivery gap and retains an incomplete-capture warning when saved or exported. Recording is still renderer-based and bounded; this is not lossless capture or disk history.

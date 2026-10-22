@@ -20,6 +20,7 @@ export interface Recording {
   messages: RecordedMessage[];
   topic: string;
   connectionName: string;
+  incompleteReason?: string;
 }
 
 import { payloadBytes, type PayloadEncoding } from './payload';
@@ -68,6 +69,8 @@ export function parseRecording(data: any): Recording {
   return {
     id: Number.isFinite(info.id) ? info.id : Date.now(),
     name: info.name,
+    incompleteReason:
+      typeof info.incompleteReason === 'string' ? info.incompleteReason.slice(0, 512) : undefined,
     startTime: date(info.startTime),
     endTime: date(info.endTime),
     messages,

@@ -4,6 +4,8 @@ import type {
   MainConnectionInfo,
   MqttEventType,
 } from '../../../shared/ipc';
+import { BatchProcessor } from './BatchProcessor';
+import type { TrafficStatus } from '../../../shared/traffic';
 import type { PayloadEncoding } from '../../../shared/payload';
 
 type EventHandler = (data: any) => void;
@@ -33,17 +35,24 @@ export interface PublishData {
 const EVENT_TYPES: MqttEventType[] = [
   'connected',
   'disconnected',
-  'message',
+  'message-batch',
   'error',
   'reconnecting',
   'subscribed',
   'unsubscribed',
-  'published',
 ];
 
 class MQTTService {
   private connections = new Map<string, RendererConnection>();
   private eventHandlers = new Map<string, Set<EventHandler>>();
+
+  private dropped = new Map<string, number>();
+  private batchProcessor = new BatchProcessor(
+    (message) => this.handleEvent('message', message),
+    (batchId) => {
+      void window.electronAPI.mqtt.acknowledgeBatch(batchId);
+    },
+  );
 
   constructor() {
     this.setupGlobalEventHandlers();
@@ -60,6 +69,11 @@ class MQTTService {
   }
 
   private handleEvent(eventType: string, data: any): void {
+    if (eventType === 'message-batch') {
+      this.checkGaps(data.dropped);
+      this.batchProcessor.accept(data);
+      return;
+    }
     const connectionId = data.id;
 
     const connection = this.connections.get(connectionId);
@@ -95,6 +109,26 @@ class MQTTService {
         console.error(`Error in event handler for ${eventType}:`, error);
       }
     });
+  }
+
+  private checkGaps(counts: Record<string, number>): void {
+    for (const [id, count] of Object.entries(counts)) {
+      const previous = this.dropped.get(id) ?? 0;
+      this.dropped.set(id, count);
+      if (count > previous)
+        this.handleEvent('delivery-gap', { id, dropped: count, delta: count - previous });
+    }
+  }
+
+  async getTrafficStatus(): Promise<TrafficStatus | undefined> {
+    const result = await window.electronAPI.mqtt.getTrafficStatus();
+    if (!result.success || !result.data) return;
+    this.checkGaps(
+      Object.fromEntries(
+        Object.entries(result.data.connections).map(([id, counts]) => [id, counts.dropped]),
+      ),
+    );
+    return result.data;
   }
 
   on(connectionId: string, eventType: string, handler: EventHandler): void {

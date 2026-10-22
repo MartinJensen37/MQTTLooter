@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import StableScrollViewport from '../StableScrollViewport';
 import TopicTreeNode from './TopicTreeNode';
 import HistoryControls from './HistoryControls';
+import TrafficStatus from './TrafficStatus';
 import './TopicTree.css';
 
 function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTreeService }) {
@@ -239,6 +240,7 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
           onSelect={onTopicSelect}
           onChange={loadNodes}
         />
+        <TrafficStatus connectionId={connectionId} />
         {historyNotice}
       </div>
 

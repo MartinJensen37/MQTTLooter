@@ -57,6 +57,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('mqtt-unsubscribe', connectionId, topic, properties),
     publish: (connectionId: string, topic: string, message: unknown, options: unknown) =>
       ipcRenderer.invoke('mqtt-publish', connectionId, topic, message, options),
+    acknowledgeBatch: (batchId: number) => ipcRenderer.invoke('mqtt-ack-batch', batchId),
+    getTrafficStatus: () => ipcRenderer.invoke('mqtt-traffic-status'),
     getConnections: () => ipcRenderer.invoke('mqtt-get-connections'),
 
     on: mqttEvents.on,

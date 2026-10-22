@@ -7,6 +7,7 @@ export default class RecordingCapture {
   readonly topics = new Set<string>();
   readonly startTime = new Date();
   private bytes = 0;
+  incompleteReason?: string;
 
   constructor(
     readonly connectionId: string,
@@ -47,6 +48,7 @@ export default class RecordingCapture {
     if (!this.messages.length) return null;
     return {
       id: Date.now(),
+      incompleteReason: this.incompleteReason,
       name: `Recording ${this.startTime.toLocaleString()}`,
       startTime: this.startTime,
       endTime: new Date(),

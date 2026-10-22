@@ -36,6 +36,7 @@ export type MqttEventType =
   | 'connected'
   | 'disconnected'
   | 'message'
+  | 'message-batch'
   | 'error'
   | 'reconnecting'
   | 'subscribed'
@@ -83,6 +84,8 @@ export interface ElectronAPI {
       message: unknown,
       options: unknown,
     ): Promise<IpcResult>;
+    acknowledgeBatch(batchId: number): Promise<IpcResult>;
+    getTrafficStatus(): Promise<IpcResult<import('./traffic').TrafficStatus>>;
     getConnections(): Promise<IpcResult<Record<string, MainConnectionInfo>>>;
     on(eventType: MqttEventType, callback: MqttEventCallback): void;
     off(eventType: MqttEventType, callback: MqttEventCallback): void;
