@@ -1,0 +1,22 @@
+.line-plot {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 152px;
+  color: var(--primary);
+}
+.line-plot-compact {
+  width: 100px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.line-plot .line-plot-axis line {
+  stroke: var(--border-color);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.line-plot .line-plot-axis text {
+  fill: var(--text-muted);
+  font-size: 14px;
+  font-family: var(--font-mono);
+}

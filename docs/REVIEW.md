@@ -38,6 +38,8 @@ This pass followed the main/preload/renderer message path, connection lifecycle,
 
 ## Validation and limits
 
+- Compact simulator continuation: 72 regression tests pass, including per-signal last-message attribution, combined payload previews, preview state/randomness isolation and signal removal. Typecheck, lint and production build pass. The Electron smoke test verifies 40 px rows and 24 px patterns at 800 px, then publishes through the real signal editor. Screenshots were inspected. One initial smoke run timed out at the pre-existing topic expansion check; two subsequent runs passed. Failures now save renderer errors, DOM and a screenshot for diagnosis. Packaging was not rerun.
+
 - Navigation continuation: 70 passing regression tests include search through collapsed branches, stable ordering with 2,000 topics, message anchoring during insertions and eviction, sort/connection resets, and same-timestamp ordering. Typecheck and lint pass. The built Electron smoke test also verifies search, navigation through 2,000 topics, row selection during insertion, and pinned/following message scrolling in both sort orders. Packaging was not rerun.
 
 - Per-signal continuation: 64 passing regression tests cover individual topics, shared timestamps and clocks, offsets, independent periods, bounded random intervals, publish probabilities, slow-signal isolation, edits, cancellation, legacy settings and the actual signal editor. The Electron test also edits an individual destination and random schedule, checks three-cycle charts, and publishes each signal separately at QoS 1/2. Typecheck, lint and the production build pass. Packaging was not rerun.

@@ -36,7 +36,9 @@ function SimulationWorkspace({
     }
   });
   const [simulatedDevices, setSimulatedDevices] = useState<SimulatedDevice[]>(loaded.devices);
-  const [samples, setSamples] = useState<Record<number, SimulationSample>>({});
+  const [samples, setSamples] = useState<
+    Record<number, Record<number, Pick<SimulationSample, 'payload' | 'topic'>>>
+  >({});
   const [busy, setBusy] = useState<Record<number, boolean>>({});
   const engineRef = useRef<SimulationEngine | null>(null);
   const callbacks = useRef({ onPublishMessage, showFeedback });
@@ -53,8 +55,16 @@ function SimulationWorkspace({
         setSamples((previous) => ({
           ...previous,
           [id]: {
-            ...sample,
-            values: { ...previous[id]?.values, ...sample.values },
+            ...previous[id],
+            ...Object.fromEntries(
+              Object.keys(sample.values).map((outputId) => [
+                outputId,
+                {
+                  payload: sample.payload,
+                  topic: sample.topic,
+                },
+              ]),
+            ),
           },
         })),
       busy: (id, value) => setBusy((previous) => ({ ...previous, [id]: value })),
@@ -180,17 +190,15 @@ function SimulationWorkspace({
     const device = simulatedDevices.find((d) => d.id === deviceId);
     if (device) {
       updateDevice(deviceId, { outputs: device.outputs.filter((o) => o.id !== outputId) });
+      setSamples((previous) => {
+        const remaining = { ...previous[deviceId] };
+        delete remaining[outputId];
+        return { ...previous, [deviceId]: remaining };
+      });
     }
   };
 
   const selectedConfig = getSelectedDeviceData();
-  const selectedDeviceData = selectedConfig && {
-    ...selectedConfig,
-    outputs: selectedConfig.outputs.map((output) => ({
-      ...output,
-      currentValue: samples[selectedConfig.id]?.values[output.id],
-    })),
-  };
   const duplicateDevice = () => {
     if (!selectedConfig) return;
     const copy = {
@@ -286,19 +294,16 @@ function SimulationWorkspace({
 
         {/* Device configuration */}
         <div className="device-config-panel">
-          {selectedDeviceData ? (
+          {selectedConfig ? (
             <DeviceConfigPanel
-              key={selectedDeviceData.id}
-              busy={!!busy[selectedDeviceData.id]}
-              lastPayload={samples[selectedDeviceData.id]?.payload}
-              lastTopic={samples[selectedDeviceData.id]?.topic}
+              key={selectedConfig.id}
+              busy={!!busy[selectedConfig.id]}
               onDuplicate={duplicateDevice}
-              device={selectedDeviceData}
+              device={selectedConfig}
               onUpdateDevice={updateDevice}
               onPublishOnce={publishOnce}
               onTogglePublishing={togglePublishing}
               onAddOutput={addOutput}
-              onRemoveOutput={removeOutput}
               isConnected={isConnected}
               onEditOutput={(output) => {
                 setEditingOutput(output);
@@ -326,17 +331,28 @@ function SimulationWorkspace({
         />
       )}
 
-      {showEditOutput && editingOutput && selectedDeviceData && (
+      {showEditOutput && editingOutput && selectedConfig && (
         <EditOutputModal
           output={editingOutput}
           otherOutputs={selectedConfig!.outputs}
           device={selectedConfig}
+          lastPublished={samples[selectedConfig.id]?.[editingOutput.id]}
+          onRemove={
+            selectedConfig!.outputs.length > 1 &&
+            selectedConfig!.outputs.some((output) => output.id === editingOutput.id)
+              ? () => {
+                  removeOutput(selectedConfig.id, editingOutput.id);
+                  setShowEditOutput(false);
+                  setEditingOutput(null);
+                }
+              : undefined
+          }
           onClose={() => {
             setShowEditOutput(false);
             setEditingOutput(null);
           }}
           onSave={(updatedOutput: any) => {
-            updateDevice(selectedDeviceData.id, {
+            updateDevice(selectedConfig.id, {
               outputs: selectedConfig!.outputs.some((output) => output.id === editingOutput.id)
                 ? selectedConfig!.outputs.map((output) =>
                     output.id === editingOutput.id ? { ...output, ...updatedOutput } : output,

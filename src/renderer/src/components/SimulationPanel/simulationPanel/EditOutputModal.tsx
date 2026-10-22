@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { DATA_TYPE_CONFIGS, GENERATOR_CONFIGS } from './constants';
-import { defaultConfig, validateOutput } from './model';
-import { generateSignalSample } from '../../../utils/valueGenerators';
+import { defaultConfig, signalTopic, validateOutput } from './model';
+import {
+  sampleDevice,
+  type SimulationSample,
+  type SignalState,
+} from '../../../services/SimulationSample';
 import type { DeviceOutput, SimulatedDevice } from './types';
 import SignalTimingFields from './SignalTimingFields';
 import DynamicConfigFields from './DynamicConfigFields';
@@ -13,6 +17,8 @@ interface Props {
   device?: SimulatedDevice;
   onClose: () => void;
   onSave: (output: DeviceOutput) => void;
+  onRemove?: () => void;
+  lastPublished?: Pick<SimulationSample, 'payload' | 'topic'>;
 }
 export default function EditOutputModal({
   output,
@@ -20,6 +26,8 @@ export default function EditOutputModal({
   device,
   onClose,
   onSave,
+  onRemove,
+  lastPublished,
 }: Props) {
   const [form, setForm] = useState<DeviceOutput>({
     ...output,
@@ -27,7 +35,8 @@ export default function EditOutputModal({
     includeTimestamp: output.includeTimestamp !== false,
     config: { ...defaultConfig(output.dataType, output.generator), ...output.config },
   });
-  const [preview, setPreview] = useState<any>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -36,6 +45,7 @@ export default function EditOutputModal({
     setForm((previous) => ({ ...previous, ...updates }));
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
+    const fallback = previous?.closest('.outputs-section')?.querySelector('button');
     dialog.current?.querySelector('input')?.focus();
     const keyboard = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -45,7 +55,7 @@ export default function EditOutputModal({
       if (event.key === 'Tab') {
         const elements = [
           ...(dialog.current?.querySelectorAll<HTMLElement>(
-            'button:not(:disabled), input, select, textarea',
+            'button:not(:disabled), input, select, textarea, summary',
           ) ?? []),
         ];
         const first = elements[0];
@@ -62,30 +72,38 @@ export default function EditOutputModal({
     document.addEventListener('keydown', keyboard);
     return () => {
       document.removeEventListener('keydown', keyboard);
-      previous?.focus();
+      if (previous?.isConnected) previous.focus();
+      else fallback?.focus();
     };
   }, []);
   useEffect(() => {
     const started = performance.now();
-    let sampleIndex = 0;
-    let previousValue: any;
+    let previous = new Map<number, SignalState>();
+    const combined = device && device.publishMode !== 'signals';
+    const outputs = combined
+      ? device.outputs.some((item) => item.id === form.id)
+        ? device.outputs.map((item) => (item.id === form.id ? form : item))
+        : [...device.outputs, form]
+      : [form];
+    const previewDevice: SimulatedDevice = {
+      id: 0,
+      name: 'Preview',
+      topic: 'preview',
+      publishInterval: 1000,
+      isPublishing: false,
+      ...device,
+      outputs,
+      payloadFormat: combined ? device.payloadFormat : 'auto',
+    };
     const tick = () => {
       try {
         if (validateOutput(form).length) {
           setPreview(null);
           return;
         }
-        const { value, rawValue } = generateSignalSample(form, {
-          elapsedMs: performance.now() - started,
-          sampleIndex: sampleIndex++,
-          previousValue,
-        });
-        previousValue = rawValue;
-        setPreview({
-          value,
-          ...(form.dataType === 'number' && form.unit?.trim() ? { unit: form.unit.trim() } : {}),
-          ...(form.includeTimestamp !== false ? { timestamp: new Date().toISOString() } : {}),
-        });
+        const sample = sampleDevice(previewDevice, performance.now() - started, previous);
+        previous = sample.next;
+        setPreview(JSON.stringify(JSON.parse(sample.payload), null, 2));
       } catch {
         setPreview(null);
       }
@@ -93,7 +111,7 @@ export default function EditOutputModal({
     tick();
     const timer = setInterval(tick, 500);
     return () => clearInterval(timer);
-  }, [form]);
+  }, [form, device]);
   const changeType = (dataType: string) =>
     update({
       dataType,
@@ -225,16 +243,47 @@ export default function EditOutputModal({
             </ul>
           )}
           <div className="preview-section">
-            <h4>Live signal preview</h4>
+            <h4>
+              {device && device.publishMode !== 'signals'
+                ? 'Combined payload preview'
+                : 'Signal payload preview'}
+            </h4>
+            {device && (
+              <code className="preview-topic">
+                {device.publishMode === 'signals' ? signalTopic(device, form) : device.topic}
+              </code>
+            )}
             <p>
               Independent preview, sampled twice per second. A new loop starts each signal from its
               beginning.
             </p>
-            <pre>
-              {preview ? JSON.stringify(preview, null, 2) : 'Enter valid settings to preview.'}
-            </pre>
+            <pre>{preview ?? 'Enter valid settings to preview.'}</pre>
           </div>
+          {lastPublished && (
+            <details className="last-published">
+              <summary>Last successful publish</summary>
+              <p className="simulation-help">
+                Last accepted publish containing this signal; may reflect earlier settings.
+              </p>
+              <code className="preview-topic">{lastPublished.topic}</code>
+              <pre>{JSON.stringify(JSON.parse(lastPublished.payload), null, 2)}</pre>
+            </details>
+          )}
+          {confirmRemove && (
+            <p role="alert">
+              Remove this signal from the device? Its saved settings will be deleted.
+            </p>
+          )}
           <div className="form-actions">
+            {onRemove && (
+              <button
+                type="button"
+                className="btn btn-md btn-danger remove-signal"
+                onClick={() => (confirmRemove ? onRemove() : setConfirmRemove(true))}
+              >
+                {confirmRemove ? 'Confirm removal' : 'Remove Signal'}
+              </button>
+            )}
             <button type="button" className="btn btn-md btn-secondary" onClick={onClose}>
               Cancel
             </button>

@@ -345,6 +345,22 @@ async function run() {
     return { width: panel.clientWidth, scroll: panel.scrollWidth, editor: document.querySelector('.device-config-panel').getBoundingClientRect().width };
   })()`);
   assert.ok(layout.scroll <= layout.width + 2 && layout.editor > 450, JSON.stringify(layout));
+  const signalRows = await evaluate(`(() => {
+    const rows = [...document.querySelectorAll('.signal-overview-row')];
+    return rows.map(row => {
+      const rect = row.getBoundingClientRect();
+      const pattern = row.querySelector('.signal-row-pattern').getBoundingClientRect();
+      return { height: rect.height, width: row.clientWidth, scroll: row.scrollWidth,
+        patternHeight: pattern.height, patternRight: pattern.right, right: rect.right };
+    });
+  })()`);
+  assert.equal(signalRows.length, 3);
+  for (const row of signalRows) {
+    assert.ok(row.height <= 40 && row.patternHeight <= 24, JSON.stringify(row));
+    assert.ok(row.scroll <= row.width + 1 && row.patternRight <= row.right, JSON.stringify(row));
+  }
+  assert.equal(await evaluate("document.querySelector('.device-config pre') === null"), true);
+  await evaluate("document.querySelector('.outputs-section').scrollIntoView({block: 'center'})");
   fs.writeFileSync(
     path.join(workspace, '.tmp', 'electron-simulator-small.png'),
     (await window.webContents.capturePage()).toPNG(),
@@ -403,8 +419,24 @@ async function run() {
 
 run().then(
   () => finish(0),
-  (error) => {
+  async (error) => {
     console.error(error);
+    console.error('Renderer errors:', errors);
+    const window = windows.find((window) => !window.isDestroyed());
+    if (window) {
+      try {
+        fs.writeFileSync(
+          path.join(workspace, '.tmp', 'electron-failure.png'),
+          (await window.webContents.capturePage()).toPNG(),
+        );
+        fs.writeFileSync(
+          path.join(workspace, '.tmp', 'electron-failure.html'),
+          await window.webContents.executeJavaScript('document.body.innerHTML'),
+        );
+      } catch (captureError) {
+        console.error(captureError);
+      }
+    }
     finish(1);
   },
 );

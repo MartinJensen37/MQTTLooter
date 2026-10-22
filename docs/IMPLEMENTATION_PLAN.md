@@ -2,6 +2,8 @@
 
 Audited 2026-10-22 against the repository through `1834631`. This is a plan, not a claim that the features below are implemented. It replaces the older suggested ordering in [REVIEW.md](REVIEW.md); that document remains the record of fixes and known limitations.
 
+Implementation update: phase 1 is complete. Signals use 40 px rows with timing pills and 100 x 24 px numeric/boolean patterns (text/enum generator labels). Payload previews, per-signal last publishes and removal are in the editor; chart rendering is shared. The original audit table below records the baseline. Next: phase 2, selected-topic protection and resource budgets.
+
 ## What is already covered
 
 | Request | Current status | Remaining work |

@@ -1,23 +1,17 @@
-import { useMemo } from 'react';
 import type { SimulatedDevice, DeviceOutput } from './types';
-import { GENERATOR_CONFIGS } from './constants';
 import IntervalField from './IntervalField';
-import SignalWaveform from './SignalWaveform';
-import { signalTopic, validateDevice } from './model';
-import { sampleDevice } from '../../../services/SimulationEngine';
-import { formatOutputValue } from './formatters';
+import SignalSparkline from './SignalSparkline';
+import { validateDevice } from './model';
+import { formatInterval } from './formatters';
 interface Props {
   device: SimulatedDevice;
   onUpdateDevice: (id: number, updates: Partial<SimulatedDevice>) => void;
   onPublishOnce: (id: number) => void;
   onTogglePublishing: (id: number) => void;
   onAddOutput: (id: number) => void;
-  onRemoveOutput: (id: number, outputId: number) => void;
   isConnected: boolean;
   onEditOutput: (output: DeviceOutput) => void;
   busy?: boolean;
-  lastPayload?: string;
-  lastTopic?: string;
   onDuplicate?: () => void;
 }
 export default function DeviceConfigPanel({
@@ -26,38 +20,13 @@ export default function DeviceConfigPanel({
   onPublishOnce,
   onTogglePublishing,
   onAddOutput,
-  onRemoveOutput,
   isConnected,
   onEditOutput,
   busy,
-  lastPayload,
-  lastTopic,
   onDuplicate,
 }: Props) {
   const separate = device.publishMode === 'signals';
   const errors = validateDevice(device);
-  const example = useMemo(() => {
-    try {
-      const preview = (outputs = device.outputs) =>
-        JSON.parse(
-          sampleDevice(
-            { ...device, outputs, payloadFormat: separate ? 'auto' : device.payloadFormat },
-            0,
-            undefined,
-            () => 0.5,
-            '2026-01-01T00:00:00.000Z',
-          ).payload,
-        );
-      return separate
-        ? device.outputs.map((output) => ({
-            topic: signalTopic(device, output),
-            payload: preview([output]),
-          }))
-        : [{ topic: device.topic, payload: preview() }];
-    } catch {
-      return [];
-    }
-  }, [device, separate]);
   return (
     <div className="device-config panel">
       <div className="device-config-header">
@@ -187,64 +156,41 @@ export default function DeviceConfigPanel({
           </button>
         </div>
         <div className="outputs-list">
-          {device.outputs.map((output) => (
-            <div className="output-item" key={output.id}>
-              <div className="output-info">
-                <strong>{output.name}</strong>
-                <span>{GENERATOR_CONFIGS[output.generator]?.label}</span>
-                <small>
-                  {output.dataType}
-                  {output.unit ? ` / ${output.unit}` : ''}
-                </small>
-                <span className="output-value">
-                  {output.currentValue === undefined
-                    ? 'Not published yet'
-                    : formatOutputValue(output)}
+          {device.outputs.map((output) => {
+            const mode = separate ? (output.timing?.mode ?? 'sync') : 'combined';
+            const interval =
+              !separate || mode === 'sync' ? device.publishInterval : output.timing?.intervalMs;
+            const modeLabel = {
+              sync: 'Sync',
+              fixed: 'Fixed',
+              random: 'Random',
+              combined: 'Combined',
+            }[mode];
+            return (
+              <button
+                type="button"
+                className="signal-overview-row"
+                key={output.id}
+                onClick={() => onEditOutput(output)}
+                aria-label={`Edit ${output.name}`}
+                title={`Edit ${output.name}`}
+              >
+                <span className="signal-row-name">{output.name}</span>
+                <span
+                  className="badge signal-interval-pill"
+                  title={
+                    mode === 'combined'
+                      ? 'Delay after each completed device publish'
+                      : 'Publish period'
+                  }
+                >
+                  {formatInterval(interval)}
                 </span>
-              </div>
-              {separate && (
-                <div className="signal-delivery-summary">
-                  <code>{signalTopic(device, output)}</code>
-                  <span>
-                    {output.timing?.mode === 'random'
-                      ? 'Random'
-                      : output.timing?.mode === 'fixed'
-                        ? 'Fixed'
-                        : 'Synchronized'}
-                    {' / '}
-                    {!output.timing || output.timing.mode === 'sync'
-                      ? device.publishInterval
-                      : output.timing.intervalMs}{' '}
-                    ms
-                    {' / '}offset {output.timing?.offsetMs ?? 0} ms
-                    {' / '}
-                    {Math.round((output.timing?.probability ?? 1) * 100)}% sends
-                    {output.timing?.mode === 'random'
-                      ? ` / +/- ${output.timing.jitterPercent ?? 20}% interval`
-                      : ''}
-                  </span>
-                </div>
-              )}
-              <SignalWaveform output={output} compact />
-              <div className="output-actions">
-                <button
-                  className="btn btn-sm btn-secondary"
-                  onClick={() => onEditOutput(output)}
-                  aria-label={`Edit ${output.name}`}
-                >
-                  Edit
-                </button>
-                <button
-                  className="btn btn-sm btn-danger"
-                  disabled={device.outputs.length <= 1}
-                  onClick={() => onRemoveOutput(device.id, output.id)}
-                  aria-label={`Remove ${output.name}`}
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          ))}
+                <span className={`badge signal-mode-pill signal-mode-${mode}`}>{modeLabel}</span>
+                <SignalSparkline output={output} />
+              </button>
+            );
+          })}
         </div>
       </section>
       {!!errors.length && (
@@ -254,27 +200,6 @@ export default function DeviceConfigPanel({
           ))}
         </ul>
       )}
-      <section className="simulation-payload-preview">
-        <h4>{separate ? 'Topic and payload examples' : 'Payload example'}</h4>
-        <p>First sample with representative random values and an example timestamp.</p>
-        {example.length ? (
-          example.map((message, index) => (
-            <div className="payload-example" key={index}>
-              <code>{message.topic}</code>
-              <pre>{JSON.stringify(message.payload, null, 2)}</pre>
-            </div>
-          ))
-        ) : (
-          <p>Fix the settings above to preview the payload.</p>
-        )}
-        {lastPayload && (
-          <details>
-            <summary>Last successful publish</summary>
-            {lastTopic && <code>{lastTopic}</code>}
-            <pre>{JSON.stringify(JSON.parse(lastPayload), null, 2)}</pre>
-          </details>
-        )}
-      </section>
     </div>
   );
 }

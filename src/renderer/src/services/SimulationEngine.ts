@@ -107,7 +107,7 @@ export class SimulationEngine {
       });
       if (!this.disposed && this.sessions.get(id) === session) {
         session.signals = sample.next;
-        this.callbacks.sample(id, sample);
+        this.callbacks.sample(id, { ...sample, topic: device.topic });
       }
     } catch (error) {
       if (!this.disposed && this.sessions.get(id) === session) {

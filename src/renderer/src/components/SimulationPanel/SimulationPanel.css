@@ -214,60 +214,80 @@
   font-size: 14px;
 }
 .simulation-panel .outputs-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  gap: var(--spacing-md);
-}
-.simulation-panel .output-item {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: var(--spacing-md);
-  border: 1px solid var(--border-light);
-  background: var(--bg-surface);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  min-width: 0;
+  gap: var(--spacing-xs);
 }
-.simulation-panel .output-info {
+.simulation-panel .signal-overview-row {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: var(--spacing-sm);
-  color: var(--text-muted);
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-.simulation-panel .output-info strong {
-  color: var(--text-heading);
-  font-size: 14px;
-  flex-basis: 100%;
-}
-.simulation-panel .output-value {
-  display: block;
-  flex-basis: 100%;
-  font-family: var(--font-mono);
-  padding: var(--spacing-sm);
+  width: 100%;
+  height: 40px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-body);
+  font-family: var(--font-family);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.simulation-panel .signal-overview-row:hover {
+  background: var(--bg-subtle);
+  border-color: var(--primary);
+}
+.simulation-panel .signal-overview-row:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+.signal-overview-row .signal-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+.signal-overview-row .badge {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.signal-overview-row .signal-interval-pill {
   color: var(--primary);
   background: var(--primary-light);
 }
-.simulation-panel .signal-delivery-summary {
+.signal-overview-row .signal-mode-sync {
+  color: var(--success);
+  background: var(--success-light);
+}
+.signal-overview-row .signal-mode-fixed,
+.signal-overview-row .signal-mode-combined {
+  color: var(--text-muted);
+  background: var(--bg-muted);
+}
+.signal-overview-row .signal-mode-random {
+  color: var(--warning-text);
+  background: var(--warning-light);
+}
+.signal-overview-row .signal-row-pattern {
+  width: 100px;
+  flex-shrink: 0;
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  overflow-wrap: anywhere;
+  align-items: center;
+  justify-content: flex-end;
+}
+.signal-overview-row .signal-pattern-label {
   font-size: 11px;
   color: var(--text-muted);
-}
-.simulation-panel .signal-delivery-summary code {
-  font-size: 12px;
-  color: var(--text-body);
-}
-.simulation-panel .output-actions {
-  display: flex;
-  gap: var(--spacing-sm);
-  margin-top: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .simulation-panel .publishing-buttons {
   display: flex;
@@ -276,30 +296,27 @@
   margin-top: var(--spacing-xl);
 }
 .simulation-help,
-.simulation-payload-preview > p,
 .signal-dialog .preview-section p,
 .device-dialog p {
   font-size: 12px;
   color: var(--text-muted);
   line-height: 1.6;
 }
-.simulation-payload-preview {
-  margin-top: var(--spacing-xl);
-  border-top: 1px solid var(--border-light);
-  padding-top: var(--spacing-xl);
-}
-.simulation-payload-preview h4 {
-  font-size: 14px;
-}
-.payload-example {
-  margin: var(--spacing-md) 0;
-}
-.simulation-payload-preview code {
+.signal-dialog .preview-topic {
+  display: block;
   overflow-wrap: anywhere;
   color: var(--text-body);
   font-size: 12px;
 }
-.simulation-payload-preview pre,
+.signal-dialog .last-published {
+  margin-top: var(--spacing-lg);
+}
+.signal-dialog .preview-section {
+  margin-top: var(--spacing-lg);
+}
+.signal-dialog .form-actions .remove-signal {
+  margin-right: auto;
+}
 .signal-dialog pre {
   background: var(--bg-subtle);
   border: 1px solid var(--border-light);
@@ -391,22 +408,6 @@
   min-width: 0;
   padding: var(--spacing-sm) 0;
 }
-.signal-waveform svg {
-  max-height: 152px;
-  display: block;
-  width: 100%;
-  height: auto;
-}
-.signal-waveform .wave-axis line {
-  stroke: var(--border-color);
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-}
-.signal-waveform .wave-axis text {
-  fill: var(--text-muted);
-  font-size: 14px;
-  font-family: var(--font-mono);
-}
 .signal-waveform figcaption {
   font-size: 11px;
   color: var(--text-muted);
@@ -445,6 +446,3 @@
     flex-wrap: wrap;
   }
 }
-
-.signal-waveform-compact svg { max-height: 88px; }
-.signal-waveform-compact .wave-axis text { font-size: 11px; }

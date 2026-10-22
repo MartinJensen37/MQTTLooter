@@ -38,7 +38,6 @@ vi.mock('../src/renderer/src/components/SimulationPanel/simulationPanel/DeviceCo
       >
         Edit simulation
       </button>
-      <span>{device.outputs.map((o) => o.currentValue).join(',')}</span>
     </>
   ),
 }));
@@ -293,7 +292,6 @@ describe('renderer state', () => {
         payload: '{"out1":{"value":1},"out2":{"value":2}}',
       }),
     );
-    expect(container.textContent).toContain('1,2');
     await click('Edit simulation');
     await act(async () => vi.advanceTimersByTimeAsync(100));
     expect(publish).toHaveBeenLastCalledWith(

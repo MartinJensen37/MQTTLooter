@@ -1,23 +1,8 @@
-import type { DeviceOutput } from './types';
-
-/** Display string for an output's current value (quotes strings, appends units). */
-export function formatOutputValue(output: DeviceOutput): string {
-  const value = output.currentValue;
-  switch (output.dataType) {
-    case 'string':
-    case 'enum':
-      return `"${value}"`;
-    case 'boolean':
-      return value ? 'true' : 'false';
-    case 'number':
-      return `${value}${output.unit || ''}`;
-    default:
-      return String(value);
-  }
-}
-
-/** Pretty-print a preview payload, or 'N/A' when empty. */
-export function formatPreviewValue(previewValue: any): string {
-  if (!previewValue) return 'N/A';
-  return JSON.stringify(previewValue, null, 2);
+/** Compact interval label; exact milliseconds remain available in the editor. */
+export function formatInterval(milliseconds?: number): string {
+  if (!Number.isFinite(milliseconds)) return 'Invalid';
+  const value = milliseconds!;
+  if (value >= 3600000 && value % 3600000 === 0) return `${value / 3600000} h`;
+  if (value >= 60000 && value % 60000 === 0) return `${value / 60000} min`;
+  return `${value / 1000} s`;
 }
