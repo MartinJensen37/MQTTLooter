@@ -59,6 +59,10 @@ const broker = net.createServer((socket) => {
       send({ cmd: 'publish', topic: 'binary', payload: binaryPayload, qos: 0, retain: true });
     } else if (packet.cmd === 'publish') {
       published.push(packet);
+      if (packet.qos === 1) send({ cmd: 'puback', messageId: packet.messageId });
+      if (packet.qos === 2) send({ cmd: 'pubrec', messageId: packet.messageId });
+    } else if (packet.cmd === 'pubrel') {
+      send({ cmd: 'pubcomp', messageId: packet.messageId });
     } else if (packet.cmd === 'pingreq') send({ cmd: 'pingresp' });
   });
   parser.on('error', (error) => socket.destroy(error));
@@ -255,8 +259,98 @@ async function run() {
   );
   assert.equal(await evaluate("localStorage.getItem('mqtt-recordings')"), null);
   assert.deepEqual(errors, []);
+  // Exercise the real simulator editor and MQTT acknowledgements.
+  await evaluate("document.querySelector('.connection-card .toggle-btn').click()");
+  await waitFor(
+    () =>
+      evaluate("document.querySelector('.connection-status-text')?.textContent === 'connected'"),
+    'simulator connection',
+  );
+  await evaluate(
+    "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', bubbles: true }))",
+  );
+  await evaluate('document.querySelector(\'[title="Add Simulated Device"]\').click()');
+  const field = async (selector, value) =>
+    evaluate(`(() => {
+    const element = document.querySelector(${JSON.stringify(selector)});
+    const prototype = element.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, 'value').set.call(element, ${JSON.stringify(value)});
+    element.dispatchEvent(new Event(element.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
+  })()`);
+  const clickButton = async (scope, label) =>
+    evaluate(
+      `[...document.querySelectorAll(${JSON.stringify(scope + ' button')})].find(button => button.textContent.trim() === ${JSON.stringify(label)}).click()`,
+    );
+  await field('[aria-labelledby="add-device-title"] select', 'machine');
+  await field('#sim-device-name', 'Smoke machine');
+  await field('#sim-device-topic', 'smoke/device');
+  await field('[aria-labelledby="add-device-title"] input[type="number"]', '100');
+  await clickButton('[aria-labelledby="add-device-title"]', 'Create Device');
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.simulation-panel .outputs-section')?.textContent.includes('Signals (3)')",
+      ),
+    'machine signals',
+  );
+  const simulationPackets = () => published.filter((packet) => packet.topic === 'smoke/device');
+  await field('.device-settings select', '1');
+  await clickButton('.simulation-panel', 'Publish Once');
+  await waitFor(() => simulationPackets().length === 1, 'simulator QoS 1 publish');
+  assert.equal(simulationPackets()[0].qos, 1);
+  assert.equal(JSON.parse(simulationPackets()[0].payload.toString()).cycles.value, 0);
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.simulation-panel .device-config-header [role=status]')?.textContent === 'Stopped'",
+      ),
+    'publish completion',
+  );
+  await field('.device-settings select', '2');
+  await clickButton('.simulation-panel', 'Publish Once');
+  await waitFor(() => simulationPackets().length === 2, 'simulator QoS 2 publish');
+  assert.equal(simulationPackets()[1].qos, 2);
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.simulation-panel .device-config-header [role=status]')?.textContent === 'Stopped'",
+      ),
+    'QoS 2 completion',
+  );
+  await clickButton('.simulation-panel', 'Start Loop');
+  await waitFor(() => simulationPackets().length >= 4, 'simulator loop');
+  await evaluate(
+    "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1', bubbles: true }))",
+  );
+  const beforeTabSwitch = simulationPackets().length;
+  await waitFor(() => simulationPackets().length > beforeTabSwitch, 'loop survives tab switch');
+  await evaluate(
+    "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', bubbles: true }))",
+  );
+  await clickButton('.simulation-panel', 'Stop Loop');
+  const stoppedCount = simulationPackets().length;
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(simulationPackets().length, stoppedCount);
+  assert.equal(JSON.parse(simulationPackets()[2].payload.toString()).cycles.value, 0);
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  fs.writeFileSync(
+    path.join(workspace, '.tmp', 'electron-simulator.png'),
+    (await window.webContents.capturePage()).toPNG(),
+  );
+  window.setSize(800, 600);
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  const layout = await evaluate(`(() => {
+    const panel = document.querySelector('.simulation-panel');
+    return { width: panel.clientWidth, scroll: panel.scrollWidth, editor: document.querySelector('.device-config-panel').getBoundingClientRect().width };
+  })()`);
+  assert.ok(layout.scroll <= layout.width + 2 && layout.editor > 450, JSON.stringify(layout));
+  fs.writeFileSync(
+    path.join(workspace, '.tmp', 'electron-simulator-small.png'),
+    (await window.webContents.capturePage()).toPNG(),
+  );
+  assert.deepEqual(errors, []);
   console.log(
-    'Electron smoke passed: MQTT 5, binary display/export/publish, recording migration/save/reload, disconnect history and sandbox.',
+    'Electron smoke passed: MQTT 5, binary payloads, recording recovery, simulator construction/QoS 1+2/loop, responsive layout and sandbox.',
   );
 }
 

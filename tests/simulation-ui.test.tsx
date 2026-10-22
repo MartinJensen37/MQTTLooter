@@ -1,0 +1,195 @@
+// @vitest-environment jsdom
+import React, { act, StrictMode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import SimulationPanel from '../src/renderer/src/components/SimulationPanel/SimulationPanel';
+import EditOutputModal from '../src/renderer/src/components/SimulationPanel/simulationPanel/EditOutputModal';
+
+let root: Root;
+let container: HTMLDivElement;
+const click = async (name: string) => {
+  const button = [...container.querySelectorAll('button')].find(
+    (item) =>
+      (item.getAttribute('aria-label') ||
+        item.getAttribute('title') ||
+        item.textContent?.trim()) === name,
+  );
+  expect(button, name).toBeTruthy();
+  await act(async () => button!.click());
+};
+const input = async (label: string, value: string) => {
+  const element = [...container.querySelectorAll('label')].find((item) =>
+    item.textContent?.startsWith(label),
+  );
+  const field =
+    element?.querySelector('input, select') ?? container.querySelector(`#${element?.htmlFor}`);
+  expect(field, label).toBeTruthy();
+  await act(async () => {
+    const prototype =
+      field!.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(field, value);
+    field!.dispatchEvent(
+      new Event(field!.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }),
+    );
+  });
+};
+const seed = (id: string) =>
+  localStorage.setItem(
+    `mqtt-simulation-devices-${id}`,
+    JSON.stringify([
+      {
+        id: 1,
+        name: `Device ${id}`,
+        topic: id,
+        publishInterval: 100,
+        isPublishing: true,
+        outputs: [
+          {
+            id: 1,
+            name: 'value',
+            dataType: 'number',
+            generator: 'static',
+            config: { value: 0 },
+            decimalPrecision: 0,
+            includeTimestamp: false,
+          },
+        ],
+      },
+    ]),
+  );
+beforeEach(() => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  vi.useFakeTimers();
+  localStorage.clear();
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+});
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+it('constructs a preset, previews its named payload and cancels new signals without adding them', async () => {
+  await act(async () =>
+    root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={vi.fn()} />),
+  );
+  await click('Add Simulated Device');
+  await input('Start from', 'environment');
+  await input('Device Name:', 'Room');
+  await input('MQTT Topic:', 'room');
+  await click('Create Device');
+  expect(container.textContent).toContain('Signals (3)');
+  expect(container.querySelector('.simulation-payload-preview')?.textContent).toContain(
+    '"temperature"',
+  );
+  await click('Add Signal');
+  await input('Signal name', 'temperature');
+  expect(container.textContent).toContain('Signal names must be unique');
+  expect(
+    [...container.querySelectorAll('button')].find((button) => button.textContent === 'Save Signal')
+      ?.disabled,
+  ).toBe(true);
+  await click('Cancel');
+  expect(container.textContent).toContain('Signals (3)');
+  await click('Duplicate device');
+  const devices = JSON.parse(localStorage.getItem('mqtt-simulation-devices-a')!);
+  expect(devices).toHaveLength(2);
+  expect(devices[1]).toMatchObject({
+    name: 'Room copy',
+    payloadFormat: 'named',
+    isPublishing: false,
+  });
+  expect(devices[0].id).not.toBe(devices[1].id);
+});
+
+it('keeps zero precision and probability, rejects duplicate names and edits enum sequences', async () => {
+  const save = vi.fn();
+  const output = {
+    id: 1,
+    name: 'signal',
+    dataType: 'number',
+    generator: 'static',
+    config: { value: 0 },
+    decimalPrecision: 0,
+    includeTimestamp: false,
+  };
+  await act(async () =>
+    root.render(
+      <EditOutputModal
+        output={output}
+        otherOutputs={[{ ...output, id: 2, name: 'taken' }]}
+        onClose={vi.fn()}
+        onSave={save}
+      />,
+    ),
+  );
+  expect((container.querySelector('input[type="number"]') as HTMLInputElement).value).toBe('0');
+  await input('Signal name', 'taken');
+  expect(container.textContent).toContain('Signal names must be unique');
+  await input('Signal name', 'signal');
+  await input('Data type', 'boolean');
+  await input('Generator', 'probability');
+  await input('True probability', '0');
+  expect(container.querySelector('pre')?.textContent).toContain('false');
+  await click('Save Signal');
+  expect(save.mock.calls[0][0].config.trueProbability).toBe(0);
+  await input('Data type', 'enum');
+  await input('Generator', 'pattern');
+  await input('Time per step', '250');
+  expect(container.querySelectorAll('.signal-list-row')).toHaveLength(3);
+  await click('Save Signal');
+  expect(save.mock.calls[1][0].config).toMatchObject({
+    sequence: ['idle', 'running', 'idle'],
+    intervalMs: 250,
+  });
+});
+
+it('does not persist live samples, stops on disconnect, and isolates connection changes', async () => {
+  seed('a');
+  seed('b');
+  const publish = vi.fn().mockResolvedValue(undefined);
+  const props = { connectionId: 'a', isConnected: true, onPublishMessage: publish };
+  await act(async () =>
+    root.render(
+      <StrictMode>
+        <SimulationPanel {...props} />
+      </StrictMode>,
+    ),
+  );
+  await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
+  await click('Start Loop');
+  const saved = localStorage.getItem('mqtt-simulation-devices-a');
+  const writes = vi.spyOn(Storage.prototype, 'setItem');
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  expect(publish).toHaveBeenCalledTimes(3);
+  expect(writes).not.toHaveBeenCalled();
+  expect(saved).not.toContain('currentValue');
+  await act(async () =>
+    root.render(
+      <StrictMode>
+        <SimulationPanel {...props} isConnected={false} />
+      </StrictMode>,
+    ),
+  );
+  await act(async () =>
+    root.render(
+      <StrictMode>
+        <SimulationPanel {...props} />
+      </StrictMode>,
+    ),
+  );
+  await act(async () => vi.advanceTimersByTimeAsync(500));
+  expect(publish).toHaveBeenCalledTimes(3);
+  await act(async () =>
+    root.render(
+      <StrictMode>
+        <SimulationPanel {...props} connectionId="b" />
+      </StrictMode>,
+    ),
+  );
+  expect(container.textContent).toContain('Device b');
+  expect(JSON.parse(localStorage.getItem('mqtt-simulation-devices-a')!)[0].name).toBe('Device a');
+});

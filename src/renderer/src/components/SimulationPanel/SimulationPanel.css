@@ -638,3 +638,35 @@
     width: 100%;
   }
 }
+/* Device construction and signal editing */
+.simulation-panel { container-type: inline-size; }
+.simulation-panel .device-sidebar { flex-shrink: 0; }
+.simulation-panel .device-config-panel { min-width: 0; }
+.simulation-panel .device-summary { display: block; color: var(--gray-600); margin-top: 4px; overflow-wrap: anywhere; }
+.simulation-panel .device-item { align-items: flex-start; }
+.simulation-panel .device-info { min-width: 0; }
+.simulation-panel .device-info > div { min-width: 0; }
+.simulation-panel .device-config-header { flex-wrap: wrap; gap: 10px; }
+.simulation-panel .device-settings { border: 1px solid var(--gray-200); border-radius: 8px; margin: 16px 0; padding: 16px; min-width: 0; }
+.signal-parameters { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin: 12px 0; }
+.signal-parameters label { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 13px; }
+.signal-parameters fieldset { grid-column: 1 / -1; min-width: 0; }
+.signal-list-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.signal-list-row input { min-width: 0; }
+.simulation-panel .output-item { flex-wrap: wrap; gap: 12px; }
+.simulation-panel .output-info { flex-wrap: wrap; gap: 10px; min-width: 0; overflow-wrap: anywhere; }
+.simulation-panel .simulation-help { color: var(--gray-600); font-size: 12px; line-height: 1.6; }
+.simulation-payload-preview pre, .signal-dialog pre { padding: 12px; background: var(--gray-100); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 300px; overflow: auto; }
+.signal-dialog { max-height: 90vh; overflow-y: auto; }
+.simulation-panel [role="alert"], .signal-dialog [role="alert"] { color: var(--danger); line-height: 1.5; }
+@container (max-width: 650px) {
+  .simulation-panel .simulation-content { flex-direction: column; overflow-y: auto; }
+  .simulation-panel .device-sidebar { width: 100%; max-height: 210px; border-right: 0; border-bottom: 1px solid var(--gray-200); }
+  .simulation-panel .device-config-panel { flex: 1 0 auto; padding: 12px; overflow: visible; }
+}
+
+.signal-waveform { margin: 12px 0; color: var(--primary-blue); }
+.signal-waveform svg { width: 100%; max-height: 100px; }
+.signal-waveform figcaption { font-size: 12px; color: var(--gray-600); }
+
+.signal-parameters label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './SimulationPanel.css';
-import { generateValue } from '../../utils/valueGenerators';
+import { SimulationEngine, type SimulationSample } from '../../services/SimulationEngine';
+import { loadDevices, nextId, presetOutputs } from './simulationPanel/model';
 import type { SimulatedDevice, DeviceOutput } from './simulationPanel/types';
 import DeviceConfigPanel from './simulationPanel/DeviceConfigPanel';
 import AddDeviceModal from './simulationPanel/AddDeviceModal';
@@ -14,97 +15,112 @@ interface SimulationPanelProps {
   selectedTopic?: any;
 }
 
-function SimulationPanel({
+function SimulationWorkspace({
   connectionId,
   onPublishMessage,
   isConnected,
   selectedTopic,
   showFeedback,
 }: SimulationPanelProps) {
-  const [simulatedDevices, setSimulatedDevices] = useState<SimulatedDevice[]>(() => {
+  const [loaded] = useState(() => {
     try {
-      const saved = JSON.parse(
-        localStorage.getItem(`mqtt-simulation-devices-${connectionId}`) || '[]',
-      );
-      return saved.map((device: SimulatedDevice) => ({ ...device, isPublishing: false }));
-    } catch {
-      return [];
+      return {
+        devices: loadDevices(localStorage.getItem(`mqtt-simulation-devices-${connectionId}`)),
+        error: '',
+      };
+    } catch (error) {
+      return {
+        devices: [],
+        error: `Saved devices could not be loaded: ${(error as Error).message} Original settings have been kept.`,
+      };
     }
   });
+  const [simulatedDevices, setSimulatedDevices] = useState<SimulatedDevice[]>(loaded.devices);
+  const [samples, setSamples] = useState<Record<number, SimulationSample>>({});
+  const [busy, setBusy] = useState<Record<number, boolean>>({});
+  const engineRef = useRef<SimulationEngine | null>(null);
+  const callbacks = useRef({ onPublishMessage, showFeedback });
+  callbacks.current = { onPublishMessage, showFeedback };
   const [selectedDevice, setSelectedDevice] = useState<number | null>(null);
   const [showAddDevice, setShowAddDevice] = useState(false);
   const [showEditOutput, setShowEditOutput] = useState(false);
   const [editingOutput, setEditingOutput] = useState<DeviceOutput | null>(null);
 
-  const publishIntervalsRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
-
-  const publishOnceRef = useRef<(id: number) => void>(() => {});
-  const schedule = simulatedDevices
-    .filter((d) => d.isPublishing)
-    .map((d) => `${d.id}:${Math.max(100, d.publishInterval)}`)
-    .join(',');
+  useEffect(() => {
+    const engine = new SimulationEngine({
+      publish: (message) => callbacks.current.onPublishMessage(message),
+      sample: (id, sample) => setSamples((previous) => ({ ...previous, [id]: sample })),
+      busy: (id, value) => setBusy((previous) => ({ ...previous, [id]: value })),
+      error: (id, message) => {
+        setSimulatedDevices((previous) =>
+          previous.map((device) =>
+            device.id === id ? { ...device, isPublishing: false } : device,
+          ),
+        );
+        callbacks.current.showFeedback?.(`Simulation stopped: ${message}`, 'error');
+      },
+    });
+    engineRef.current = engine;
+    return () => {
+      engine.dispose();
+      engineRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
+    engineRef.current?.sync(simulatedDevices, isConnected);
+    if (!isConnected && simulatedDevices.some((device) => device.isPublishing)) {
+      setSimulatedDevices((previous) =>
+        previous.map((device) => ({ ...device, isPublishing: false })),
+      );
+    }
+  }, [simulatedDevices, isConnected]);
+
+  useEffect(() => {
+    if (loaded.error) return;
     try {
       localStorage.setItem(
         `mqtt-simulation-devices-${connectionId}`,
-        JSON.stringify(simulatedDevices),
+        JSON.stringify(
+          simulatedDevices.map((device) => ({
+            ...device,
+            isPublishing: false,
+            outputs: device.outputs.map((output) => ({ ...output, currentValue: undefined })),
+          })),
+        ),
       );
     } catch {
-      showFeedback?.('Simulation settings could not be saved locally.', 'error');
+      callbacks.current.showFeedback?.('Simulation settings could not be saved locally.', 'error');
     }
-  }, [simulatedDevices, connectionId, showFeedback]);
-
-  useEffect(() => {
-    if (!isConnected || !schedule) return;
-    const intervals = publishIntervalsRef.current;
-    for (const entry of schedule.split(',')) {
-      const [id, interval] = entry.split(':').map(Number);
-      intervals[id] = setInterval(() => publishOnceRef.current(id), interval);
-    }
-    return () => {
-      Object.values(intervals).forEach(clearInterval);
-      Object.keys(intervals).forEach((id) => delete intervals[id]);
-    };
-  }, [isConnected, schedule]);
+  }, [simulatedDevices, connectionId, loaded.error]);
 
   const createNewDevice = (deviceData: {
     name: string;
     topic: string;
-    publishInterval?: number;
+    publishInterval: number;
+    preset?: string;
   }) => {
-    const newDevice: SimulatedDevice = {
-      id: Date.now(),
-      name: deviceData.name,
-      topic: deviceData.topic,
-      publishInterval: deviceData.publishInterval || 5000,
+    const device: SimulatedDevice = {
+      ...deviceData,
+      id: nextId(simulatedDevices),
       isPublishing: false,
-      outputs: [
-        {
-          id: Date.now(),
-          name: 'temperature',
-          dataType: 'number',
-          generator: 'normal',
-          unit: '°C',
-          decimalPrecision: 2,
-          includeTimestamp: true,
-          config: { mean: 21.5, stdDev: 1.5, min: 18, max: 25 },
-          currentValue: 21.5,
-        },
-      ],
+      outputs: presetOutputs(deviceData.preset ?? 'sensor'),
+      qos: 0,
+      retain: false,
+      payloadFormat: 'named',
     };
-
-    setSimulatedDevices((prev) => [...prev, newDevice]);
-    setSelectedDevice(newDevice.id);
+    setSimulatedDevices((previous) => [...previous, device]);
+    setSelectedDevice(device.id);
     setShowAddDevice(false);
   };
 
   const deleteDevice = (deviceId: number) => {
-    if (publishIntervalsRef.current[deviceId]) {
-      clearInterval(publishIntervalsRef.current[deviceId]);
-      delete publishIntervalsRef.current[deviceId];
-    }
-
+    engineRef.current?.stop(deviceId);
+    setSamples((previous) => {
+      const next = { ...previous };
+      delete next[deviceId];
+      return next;
+    });
     setSimulatedDevices((prev) => prev.filter((d) => d.id !== deviceId));
 
     if (selectedDevice === deviceId) {
@@ -121,74 +137,35 @@ function SimulationPanel({
     );
   };
 
-  const generatePayload = (device: SimulatedDevice): string => {
-    const payload: Record<string, any> = {};
-
-    const outputs = device.outputs.map((output) => {
-      const value = generateValue(output);
-
-      const outputPayload: any = { value };
-      if (output.dataType === 'number' && output.unit && output.unit.trim()) {
-        outputPayload.unit = output.unit.trim();
-      }
-      if (output.includeTimestamp !== false) {
-        outputPayload.timestamp = new Date().toISOString();
-      }
-      payload[output.name] = outputPayload;
-      return { ...output, currentValue: value };
-    });
-    updateDevice(device.id, { outputs });
-
-    // Flatten when there's a single output.
-    const outputNames = Object.keys(payload);
-    if (outputNames.length === 1) return JSON.stringify(payload[outputNames[0]]);
-    return JSON.stringify(payload);
+  const publishOnce = (deviceId: number) => {
+    void engineRef.current?.publishOnce(deviceId);
   };
-
-  const publishOnce = async (deviceId: number) => {
-    const device = simulatedDevices.find((d) => d.id === deviceId);
-    if (!device || !isConnected) return;
-    try {
-      await onPublishMessage({
-        topic: device.topic,
-        payload: generatePayload(device),
-        qos: 0,
-        retain: false,
-      });
-    } catch (error) {
-      updateDevice(deviceId, { isPublishing: false });
-      showFeedback?.(`Simulation publish failed: ${(error as Error).message}`, 'error');
-    }
-  };
-
-  useEffect(() => {
-    publishOnceRef.current = publishOnce;
-  });
 
   const togglePublishing = (deviceId: number) => {
     const device = simulatedDevices.find((d) => d.id === deviceId);
     if (device && (device.isPublishing || isConnected)) {
+      if (device.isPublishing) engineRef.current?.stop(deviceId);
       updateDevice(deviceId, { isPublishing: !device.isPublishing });
     }
   };
 
   const addOutput = (deviceId: number) => {
-    const newOutput: DeviceOutput = {
-      id: Date.now(),
-      name: 'new_sensor',
+    const device = simulatedDevices.find((item) => item.id === deviceId);
+    if (!device) return;
+    let name = 'signal';
+    let index = 1;
+    while (device.outputs.some((output) => output.name === name)) name = `signal_${index++}`;
+    const output: DeviceOutput = {
+      id: nextId(device.outputs),
+      name,
       dataType: 'number',
-      generator: 'normal',
-      unit: '',
+      generator: 'static',
+      config: { value: 0 },
       decimalPrecision: 2,
       includeTimestamp: true,
-      config: { mean: 50, stdDev: 10, min: 0, max: 100 },
-      currentValue: 50,
     };
-
-    const device = simulatedDevices.find((d) => d.id === deviceId);
-    if (device) {
-      updateDevice(deviceId, { outputs: [...device.outputs, newOutput] });
-    }
+    setEditingOutput(output);
+    setShowEditOutput(true);
   };
 
   const removeOutput = (deviceId: number, outputId: number) => {
@@ -198,16 +175,40 @@ function SimulationPanel({
     }
   };
 
-  const selectedDeviceData = getSelectedDeviceData();
+  const selectedConfig = getSelectedDeviceData();
+  const selectedDeviceData = selectedConfig && {
+    ...selectedConfig,
+    outputs: selectedConfig.outputs.map((output) => ({
+      ...output,
+      currentValue: samples[selectedConfig.id]?.values[output.id],
+    })),
+  };
+  const duplicateDevice = () => {
+    if (!selectedConfig) return;
+    const copy = {
+      ...selectedConfig,
+      id: nextId(simulatedDevices),
+      name: `${selectedConfig.name} copy`,
+      isPublishing: false,
+      outputs: selectedConfig.outputs.map((output) => ({
+        ...output,
+        config: structuredClone(output.config),
+      })),
+    };
+    setSimulatedDevices((previous) => [...previous, copy]);
+    setSelectedDevice(copy.id);
+  };
 
   return (
     <div className="simulation-panel">
+      {loaded.error && <p role="alert">{loaded.error}</p>}
       <div className="simulation-content">
         {/* Device sidebar */}
         <div className="device-sidebar">
           <div className="device-sidebar-header">
             <h3>Simulated Devices</h3>
             <button
+              disabled={!!loaded.error}
               onClick={() => setShowAddDevice(true)}
               className="btn btn-sm btn-primary"
               title="Add Simulated Device"
@@ -230,12 +231,31 @@ function SimulationPanel({
                   key={device.id}
                   className={`device-item ${selectedDevice === device.id ? 'selected' : ''}`}
                   onClick={() => setSelectedDevice(device.id)}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selectedDevice === device.id}
+                  onKeyDown={(event) => {
+                    if (
+                      event.target === event.currentTarget &&
+                      (event.key === 'Enter' || event.key === ' ')
+                    ) {
+                      event.preventDefault();
+                      setSelectedDevice(device.id);
+                    }
+                  }}
                 >
                   <div className="device-info">
                     <i
                       className={`fas fa-${device.isPublishing ? 'broadcast-tower' : 'microchip'} device-icon ${device.isPublishing ? 'publishing' : ''}`}
                     ></i>
-                    <span className="device-name">{device.name}</span>
+                    <div>
+                      <span className="device-name">{device.name}</span>
+                      <small className="device-summary">
+                        {device.outputs.length} signals /{' '}
+                        {device.isPublishing ? 'Running' : 'Stopped'}
+                      </small>
+                      <small className="device-summary">{device.topic}</small>
+                    </div>
                   </div>
                   <div className="device-actions">
                     <button
@@ -260,6 +280,10 @@ function SimulationPanel({
         <div className="device-config-panel">
           {selectedDeviceData ? (
             <DeviceConfigPanel
+              key={selectedDeviceData.id}
+              busy={!!busy[selectedDeviceData.id]}
+              lastPayload={samples[selectedDeviceData.id]?.payload}
+              onDuplicate={duplicateDevice}
               device={selectedDeviceData}
               onUpdateDevice={updateDevice}
               onPublishOnce={publishOnce}
@@ -296,15 +320,18 @@ function SimulationPanel({
       {showEditOutput && editingOutput && selectedDeviceData && (
         <EditOutputModal
           output={editingOutput}
+          otherOutputs={selectedConfig!.outputs}
           onClose={() => {
             setShowEditOutput(false);
             setEditingOutput(null);
           }}
           onSave={(updatedOutput: any) => {
             updateDevice(selectedDeviceData.id, {
-              outputs: selectedDeviceData.outputs.map((o) =>
-                o.id === editingOutput.id ? { ...o, ...updatedOutput } : o,
-              ),
+              outputs: selectedConfig!.outputs.some((output) => output.id === editingOutput.id)
+                ? selectedConfig!.outputs.map((output) =>
+                    output.id === editingOutput.id ? { ...output, ...updatedOutput } : output,
+                  )
+                : [...selectedConfig!.outputs, updatedOutput],
             });
             setShowEditOutput(false);
             setEditingOutput(null);
@@ -315,4 +342,6 @@ function SimulationPanel({
   );
 }
 
-export default SimulationPanel;
+export default function SimulationPanel(props: SimulationPanelProps) {
+  return <SimulationWorkspace key={props.connectionId ?? 'none'} {...props} />;
+}

@@ -1,19 +1,23 @@
-import React, { useState } from 'react';
+import { useMemo } from 'react';
 import type { SimulatedDevice, DeviceOutput } from './types';
+import { GENERATOR_CONFIGS } from './constants';
+import { validateDevice } from './model';
+import { sampleDevice } from '../../../services/SimulationEngine';
 import { formatOutputValue } from './formatters';
-
 interface Props {
   device: SimulatedDevice;
-  onUpdateDevice: (deviceId: number, updates: any) => void;
-  onPublishOnce: (deviceId: number) => void;
-  onTogglePublishing: (deviceId: number) => void;
-  onAddOutput: (deviceId: number) => void;
-  onRemoveOutput: (deviceId: number, outputId: number) => void;
+  onUpdateDevice: (id: number, updates: Partial<SimulatedDevice>) => void;
+  onPublishOnce: (id: number) => void;
+  onTogglePublishing: (id: number) => void;
+  onAddOutput: (id: number) => void;
+  onRemoveOutput: (id: number, outputId: number) => void;
   isConnected: boolean;
   onEditOutput: (output: DeviceOutput) => void;
+  busy?: boolean;
+  lastPayload?: string;
+  onDuplicate?: () => void;
 }
-
-function DeviceConfigPanel({
+export default function DeviceConfigPanel({
   device,
   onUpdateDevice,
   onPublishOnce,
@@ -22,181 +26,187 @@ function DeviceConfigPanel({
   onRemoveOutput,
   isConnected,
   onEditOutput,
+  busy,
+  lastPayload,
+  onDuplicate,
 }: Props) {
-  const [intervalDropdownOpen, setIntervalDropdownOpen] = useState(false);
-
-  const handleEditOutput = (output: DeviceOutput) => {
-    if (device.isPublishing) {
-      onTogglePublishing(device.id);
+  const errors = validateDevice(device);
+  const example = useMemo(() => {
+    try {
+      return sampleDevice(device, 0, undefined, () => 0.5, '2026-01-01T00:00:00.000Z').payload;
+    } catch {
+      return '';
     }
-    onEditOutput(output);
-  };
-
+  }, [device]);
   return (
     <div className="device-config panel">
       <div className="device-config-header">
-        <h3>{device.name}</h3>
-        <div className="device-status">
-          <span className={`status-indicator ${device.isPublishing ? 'publishing' : 'stopped'}`}>
-            <i className={`fas fa-${device.isPublishing ? 'broadcast-tower' : 'stop-circle'}`}></i>
-            {device.isPublishing ? 'Publishing' : 'Stopped'}
-          </span>
-        </div>
+        <h3>{device.name || 'Unnamed device'}</h3>
+        <span role="status">
+          {busy ? 'Publishing...' : device.isPublishing ? 'Running' : 'Stopped'}
+        </span>
+        <button className="btn btn-sm" onClick={onDuplicate}>
+          Duplicate device
+        </button>
       </div>
-
-      {/* Outputs */}
-      <div className="outputs-section">
+      <fieldset className="device-settings">
+        <legend>Device and destination</legend>
+        <div className="signal-parameters">
+          <label>
+            Device name
+            <input
+              className="form-input"
+              value={device.name}
+              onChange={(e) => onUpdateDevice(device.id, { name: e.target.value })}
+            />
+          </label>
+          <label>
+            MQTT topic
+            <input
+              className="form-input"
+              value={device.topic}
+              onChange={(e) => onUpdateDevice(device.id, { topic: e.target.value })}
+            />
+          </label>
+          <label>
+            Publish interval (ms)
+            <input
+              className="form-input"
+              type="number"
+              min="100"
+              max="86400000"
+              value={Number.isFinite(device.publishInterval) ? device.publishInterval : ''}
+              onChange={(e) =>
+                onUpdateDevice(device.id, { publishInterval: e.target.valueAsNumber })
+              }
+            />
+          </label>
+          <label>
+            QoS
+            <select
+              className="form-input"
+              value={device.qos ?? 0}
+              onChange={(e) =>
+                onUpdateDevice(device.id, { qos: Number(e.target.value) as 0 | 1 | 2 })
+              }
+            >
+              {[0, 1, 2].map((qos) => (
+                <option key={qos}>{qos}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Payload structure
+            <select
+              className="form-input"
+              value={device.payloadFormat ?? 'auto'}
+              onChange={(e) =>
+                onUpdateDevice(device.id, { payloadFormat: e.target.value as 'auto' | 'named' })
+              }
+            >
+              <option value="named">Named signals (stable keys)</option>
+              <option value="auto">Flatten a single signal (legacy)</option>
+            </select>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={device.retain ?? false}
+              onChange={(e) => onUpdateDevice(device.id, { retain: e.target.checked })}
+            />{' '}
+            Retain message
+          </label>
+        </div>
+      </fieldset>
+      <section className="outputs-section">
         <div className="section-header">
-          <h4>
-            <i className="fas fa-box"></i> Outputs
-          </h4>
-          <button
-            onClick={() => onAddOutput(device.id)}
-            className="btn btn-sm btn-success"
-            title="Add Output"
-            style={{ borderRadius: 'var(--radius-pill)' }}
-          >
-            <i className="fas fa-plus"></i>
+          <h4>Signals ({device.outputs.length})</h4>
+          <button className="btn btn-sm btn-success" onClick={() => onAddOutput(device.id)}>
+            Add Signal
           </button>
         </div>
-
         <div className="outputs-list">
           {device.outputs.map((output) => (
-            <div key={output.id} className="output-item">
+            <div className="output-item" key={output.id}>
               <div className="output-info">
-                <span className="output-name">{output.name}:</span>
-                <span className="output-value">{formatOutputValue(output)}</span>
-                <span className="output-type">{output.dataType}</span>
-                {output.includeTimestamp !== false && (
-                  <span className="timestamp-indicator" title="Includes timestamp">
-                    <i className="fas fa-clock"></i>
-                  </span>
-                )}
+                <strong>{output.name}</strong>
+                <span>{GENERATOR_CONFIGS[output.generator]?.label}</span>
+                <small>
+                  {output.dataType}
+                  {output.unit ? ` / ${output.unit}` : ''}
+                </small>
+                <span className="output-value">
+                  {output.currentValue === undefined
+                    ? 'Not published yet'
+                    : formatOutputValue(output)}
+                </span>
               </div>
               <div className="output-actions">
                 <button
-                  onClick={() => handleEditOutput(output)}
-                  className="btn btn-sm btn-secondary"
-                  title="Edit output"
-                  style={{ borderRadius: 'var(--radius-pill)' }}
+                  className="btn btn-sm"
+                  onClick={() => onEditOutput(output)}
+                  aria-label={`Edit ${output.name}`}
                 >
-                  <i className="fas fa-edit"></i>
+                  Edit
                 </button>
                 <button
-                  onClick={() => onRemoveOutput(device.id, output.id)}
                   className="btn btn-sm btn-danger"
-                  title="Remove output"
                   disabled={device.outputs.length <= 1}
-                  style={{ borderRadius: 'var(--radius-pill)' }}
+                  onClick={() => onRemoveOutput(device.id, output.id)}
+                  aria-label={`Remove ${output.name}`}
                 >
-                  <i className="fas fa-trash"></i>
+                  Remove
                 </button>
               </div>
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Publishing controls */}
-      <div className="publishing-controls">
-        <div className="interval-control">
-          <label>
-            <i className="fas fa-clock"></i> Publish Interval:
-          </label>
-          <div className="custom-select-wrapper">
-            <button
-              type="button"
-              className="custom-select-button"
-              onClick={() => setIntervalDropdownOpen(!intervalDropdownOpen)}
-            >
-              <span className="select-value">
-                {device.publishInterval === 1000
-                  ? '1s'
-                  : device.publishInterval === 2000
-                    ? '2s'
-                    : device.publishInterval === 5000
-                      ? '5s'
-                      : device.publishInterval === 10000
-                        ? '10s'
-                        : device.publishInterval === 30000
-                          ? '30s'
-                          : device.publishInterval === 60000
-                            ? '1m'
-                            : '5s'}
-              </span>
-              <i className={`fas fa-chevron-down ${intervalDropdownOpen ? 'rotated' : ''}`}></i>
-            </button>
-            {intervalDropdownOpen && (
-              <div className="custom-select-dropdown">
-                {[
-                  { ms: 1000, label: '1s' },
-                  { ms: 2000, label: '2s' },
-                  { ms: 5000, label: '5s' },
-                  { ms: 10000, label: '10s' },
-                  { ms: 30000, label: '30s' },
-                  { ms: 60000, label: '1m' },
-                ].map(({ ms, label }) => (
-                  <button
-                    key={ms}
-                    type="button"
-                    className={`dropdown-option ${device.publishInterval === ms ? 'selected' : ''}`}
-                    onClick={() => {
-                      onUpdateDevice(device.id, { publishInterval: ms });
-                      setIntervalDropdownOpen(false);
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="publishing-buttons">
-          <button
-            onClick={() => onTogglePublishing(device.id)}
-            className={`btn btn-md ${device.isPublishing ? 'btn-danger stop' : 'btn-success start'}`}
-            disabled={!isConnected}
-            style={{ borderRadius: 'var(--radius-pill)' }}
-          >
-            <i className={`fas fa-${device.isPublishing ? 'stop' : 'play'}`}></i>
-            {device.isPublishing ? 'Stop Loop' : 'Start Loop'}
-          </button>
-
-          <button
-            onClick={() => onPublishOnce(device.id)}
-            className="btn btn-md btn-primary"
-            disabled={!isConnected}
-            style={{ borderRadius: 'var(--radius-pill)' }}
-          >
-            <i className="fas fa-paper-plane"></i>
-            Publish Once
-          </button>
-        </div>
-      </div>
-
-      {/* Topic */}
-      <div className="form-group topic-section">
-        <label>
-          <i className="fas fa-tag"></i> MQTT Topic:
-        </label>
-        <input
-          type="text"
-          value={device.topic}
-          onChange={(e) => onUpdateDevice(device.id, { topic: e.target.value })}
-          placeholder="sensors/room/temperature"
-          className="form-input topic-input"
-        />
-      </div>
-
-      {!isConnected && (
-        <div className="badge badge-warning connection-warning">
-          <i className="fas fa-exclamation-triangle"></i>
-          Connection not active. Publishing is disabled.
-        </div>
+      </section>
+      {!!errors.length && (
+        <ul role="alert">
+          {errors.map((error, index) => (
+            <li key={index}>{error}</li>
+          ))}
+        </ul>
       )}
+      <div className="publishing-buttons">
+        <button
+          className={`btn btn-md ${device.isPublishing ? 'btn-danger' : 'btn-success'}`}
+          disabled={!device.isPublishing && (!isConnected || !!errors.length)}
+          onClick={() => onTogglePublishing(device.id)}
+        >
+          {device.isPublishing ? 'Stop Loop' : 'Start Loop'}
+        </button>
+        <button
+          className="btn btn-md btn-primary"
+          disabled={!isConnected || device.isPublishing || busy || !!errors.length}
+          onClick={() => onPublishOnce(device.id)}
+        >
+          Publish Once
+        </button>
+      </div>
+      <p className="simulation-help">
+        One publish at a time per device. The interval starts after each publish completes; slow
+        brokers do not build a queue. Settings apply to the next sample.
+      </p>
+      {!isConnected && (
+        <p role="status">Connect to publish. Signals can still be configured and previewed.</p>
+      )}
+      <section className="simulation-payload-preview">
+        <h4>Payload example</h4>
+        <p>First sample with representative random values and an example timestamp.</p>
+        <pre>
+          {example
+            ? JSON.stringify(JSON.parse(example), null, 2)
+            : 'Fix the settings above to preview the payload.'}
+        </pre>
+        {lastPayload && (
+          <details>
+            <summary>Last successful publish</summary>
+            <pre>{JSON.stringify(JSON.parse(lastPayload), null, 2)}</pre>
+          </details>
+        )}
+      </section>
     </div>
   );
 }
-
-export default React.memo(DeviceConfigPanel);

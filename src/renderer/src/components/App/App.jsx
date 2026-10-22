@@ -190,11 +190,19 @@ function App() {
     return (
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
         <SplitPane
+          className={activeTab === 'simulation' ? 'simulation-workspace' : ''}
           direction="horizontal"
+          resizable={activeTab !== 'simulation'}
+          dividerSize={activeTab === 'simulation' ? 0 : 1}
+          dividerStyle={activeTab === 'simulation' ? { display: 'none' } : undefined}
           onResize={(sizes) => setTopicTreeWidth(sizes[0])}
           dividerClassName="resizer-divider"
         >
-          <Pane minSize={50} defaultSize={topicTreeWidth}>
+          <Pane
+            className="topic-browser-pane"
+            minSize={activeTab === 'simulation' ? 0 : 50}
+            size={activeTab === 'simulation' ? 0 : topicTreeWidth}
+          >
             <div className="topic-tree-panel">
               <TopicTreeComponent
                 connectionId={selectedConnection}

@@ -25,7 +25,7 @@ npm run pack             # Unpacked Windows application in dist-builder/win-unpa
 npm run dist             # Windows NSIS installer in dist-builder/
 ```
 
-The Electron smoke test uses hidden windows, isolated storage under `.tmp/`, and a loopback broker. It does not connect to saved user brokers or modify the user's app data. Its screenshot is written to `.tmp/electron-smoke.png`.
+The Electron smoke test uses hidden windows, isolated storage under `.tmp/`, and a loopback broker. It does not connect to saved user brokers or modify the user's app data. Screenshots are written to `.tmp/electron-smoke.png`, `.tmp/electron-simulator.png`, and `.tmp/electron-simulator-small.png`.
 
 ## Features and behavior
 
@@ -41,7 +41,7 @@ The Electron smoke test uses hidden windows, isolated storage under `.tmp/`, and
 - Recording directly from live MQTT events, independent of the selected topic. A recording stops on disconnect, connection switch, or the 10,000-message / 2 MiB capture limit. Saved recordings can be exported and imported (up to 10 MiB per import).
 - Stopped captures, imports, renames and deletions are saved through the main process to `recordings.json` in Electron's user-data directory. Saves replace the file atomically, with a visible status and retry button. Existing localStorage recordings migrate automatically and are removed only after a successful disk write. The library currently loads into memory and is capped at 64 MiB / 1,000 recordings; export and remove older captures when needed.
 - Playback with speed, stepping, and topic filters. Republish is an explicit option, off by default; enabling it sends messages to the selected broker with their recorded QoS and retain flags.
-- Device simulation with configurable outputs and intervals. Saved devices load stopped. Running intervals use the latest device settings and stop on disconnect or unmount.
+- Device simulation with temperature, room and machine presets, named signals, live previews, waveform plots and JSON payload examples. Generators include square, triangle, sawtooth, counter and random walk alongside existing distributions and sequences. Devices support QoS 0/1/2 and retain; publishing waits for completion before scheduling the next interval, with at most one pending publish per device. Saved devices load stopped, and loops stop on disconnect or unmount. See [the simulator guide](docs/SIMULATION.md) for timing and payload compatibility.
 - Resizable topic panel, collapsible connection sidebar, and F1-F4 panel shortcuts.
 
 Connection credentials and certificates are currently stored in renderer localStorage along with connection settings. Active captures remain in memory until stopped; closing or reloading during a capture can lose it. Wait for the recording save status before closing. Failed saves remain available for retry or export from memory. The app allows one running instance per user-data directory to keep recording writes coordinated. See the review notes before treating this as a production data-capture tool.

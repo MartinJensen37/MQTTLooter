@@ -20,4 +20,7 @@ export interface SimulatedDevice {
   publishInterval: number;
   isPublishing: boolean;
   outputs: DeviceOutput[];
+  qos?: 0 | 1 | 2;
+  retain?: boolean;
+  payloadFormat?: 'auto' | 'named';
 }
