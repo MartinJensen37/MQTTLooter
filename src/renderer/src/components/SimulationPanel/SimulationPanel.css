@@ -392,6 +392,7 @@
   padding: var(--spacing-sm) 0;
 }
 .signal-waveform svg {
+  max-height: 152px;
   display: block;
   width: 100%;
   height: auto;
@@ -403,7 +404,7 @@
 }
 .signal-waveform .wave-axis text {
   fill: var(--text-muted);
-  font-size: 22px;
+  font-size: 14px;
   font-family: var(--font-mono);
 }
 .signal-waveform figcaption {
@@ -444,3 +445,6 @@
     flex-wrap: wrap;
   }
 }
+
+.signal-waveform-compact svg { max-height: 88px; }
+.signal-waveform-compact .wave-axis text { font-size: 11px; }

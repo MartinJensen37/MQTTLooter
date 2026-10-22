@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import StableScrollViewport from '../StableScrollViewport';
 import TopicTreeNode from './TopicTreeNode';
 import './TopicTree.css';
 
-function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
+function TopicTreeWorkspace({ connectionId, onTopicSelect, topicTreeService }) {
   const [nodes, setNodes] = useState([]);
+  const [search, setSearch] = useState('');
+  const searchRef = useRef('');
+  searchRef.current = search;
   const [statistics, setStatistics] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -14,7 +18,7 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
 
   const loadNodes = useCallback(() => {
     try {
-      setNodes(topicTreeService.getTopicTreeNodes(connectionId, false));
+      setNodes(topicTreeService.getTopicTreeNodes(connectionId, false, searchRef.current));
       setStatistics(topicTreeService.getTopicTreeStatistics(connectionId));
       setIsLoading(false);
     } catch (err) {
@@ -95,7 +99,7 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
       const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
       const hasMessages = node.messageCount > 0;
 
-      if (node.hasChildren) {
+      if (node.hasChildren && !searchRef.current) {
         topicTreeService.toggleTopicNode(connectionId, node.fullPath);
       }
 
@@ -123,6 +127,7 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
   // Virtualize: only render visible topic rows (massive DOM savings)
   const rowVirtualizer = useVirtualizer({
     count: nodes.length,
+    getItemKey: (index) => nodes[index].fullPath,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 38,
     overscan: 15,
@@ -136,33 +141,6 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
     </p>
   );
 
-  if (isLoading) {
-    return (
-      <div className="topic-tree-container">
-        <div className="topic-tree-header">
-          <h3>Topic Tree</h3>
-          <div className="topic-tree-stats">Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (nodes.length === 0) {
-    return (
-      <div className="topic-tree-container">
-        <div className="topic-tree-header">
-          <h3>Topic Tree</h3>
-          <div className="topic-tree-stats">No topics yet — waiting for messages...</div>
-        </div>
-        <div className="topic-tree-empty">
-          {historyNotice}
-          <p>Connect to an MQTT broker and start receiving messages to see the topic tree.</p>
-          <p>Topics will appear here as messages are received.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="topic-tree-container">
       <div className="topic-tree-header">
@@ -170,6 +148,7 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
           <h3>Topic Tree</h3>
           <div className="topic-tree-controls">
             <button
+              disabled={!!search || !nodes.length}
               onClick={handleExpandAll}
               className="tree-control-btn expand-btn"
               title="Expand all topics"
@@ -177,6 +156,7 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
               <i className="fas fa-expand-arrows-alt"></i>
             </button>
             <button
+              disabled={!!search || !nodes.length}
               onClick={handleCollapseAll}
               className="tree-control-btn collapse-btn"
               title="Collapse all topics"
@@ -205,16 +185,71 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
             </span>
           </div>
         )}
+        <div className="topic-search">
+          <input
+            type="search"
+            className="form-input"
+            aria-label="Search topics"
+            placeholder="Search topic paths..."
+            value={search}
+            onChange={(event) => {
+              searchRef.current = event.target.value;
+              setSearch(event.target.value);
+              loadNodes();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                searchRef.current = '';
+                setSearch('');
+                loadNodes();
+              }
+            }}
+          />
+          {search && (
+            <button
+              className="btn btn-sm btn-secondary"
+              aria-label="Clear topic search"
+              onClick={() => {
+                searchRef.current = '';
+                setSearch('');
+                loadNodes();
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <div className="topic-search-status" role="status">
+          {search
+            ? `${nodes.filter((node) => node.searchMatch).length} matches / includes collapsed branches`
+            : 'Topics stay in first-seen order'}
+        </div>
         {historyNotice}
       </div>
 
-      <div className="topic-tree-content" ref={scrollRef}>
+      <StableScrollViewport
+        className="topic-tree-content"
+        viewportRef={scrollRef}
+        itemKeys={nodes.map((node) => node.fullPath)}
+        rowHeight={38}
+        viewKey={search}
+      >
+        {!nodes.length && (
+          <div className="topic-tree-empty">
+            {isLoading
+              ? 'Loading topics...'
+              : search
+                ? 'No topics match your search.'
+                : 'Waiting for messages. Topics will appear here as they arrive.'}
+          </div>
+        )}
         <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
           {rowVirtualizer.getVirtualItems().map((virtualRow) => {
             const node = nodes[virtualRow.index];
             return (
               <div
                 key={node.fullPath}
+                data-scroll-key={node.fullPath}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -233,9 +268,12 @@ function TopicTreeComponent({ connectionId, onTopicSelect, topicTreeService }) {
             );
           })}
         </div>
-      </div>
+      </StableScrollViewport>
     </div>
   );
 }
 
+function TopicTreeComponent(props) {
+  return <TopicTreeWorkspace key={props.connectionId ?? 'none'} {...props} />;
+}
 export default React.memo(TopicTreeComponent);

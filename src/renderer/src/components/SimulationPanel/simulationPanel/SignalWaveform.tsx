@@ -4,8 +4,21 @@ import { defaultConfig, validateOutput } from './model';
 import type { DeviceOutput } from './types';
 
 const axisNumber = (value: number) => Number(value.toPrecision(4)).toString();
-export default function SignalWaveform({ output }: { output: DeviceOutput }) {
+export default function SignalWaveform({
+  output,
+  compact = false,
+}: {
+  output: DeviceOutput;
+  compact?: boolean;
+}) {
   const { dataType, generator, config: suppliedConfig, decimalPrecision } = output;
+  const width = compact ? 400 : 680;
+  const height = compact ? 88 : 152;
+  const left = compact ? 48 : 72;
+  const right = width - 18;
+  const top = compact ? 8 : 12;
+  const bottom = compact ? 60 : 118;
+  const ticks = compact ? 2 : 4;
   const plot = useMemo(() => {
     const signal = {
       id: 0,
@@ -32,33 +45,43 @@ export default function SignalWaveform({ output }: { output: DeviceOutput }) {
             { elapsedMs: (duration * index) / 600, unrounded: true },
           ),
         );
-        return `${86 + index * 0.94},${170 - ((value - config.min) / range) * 150}`;
+        return `${left + (index / 600) * (right - left)},${bottom - ((value - config.min) / range) * (bottom - top)}`;
       }).join(' ');
       return { points, duration, min: config.min, max: config.max, frequency: config.frequency };
     } catch {
       return null;
     }
-  }, [dataType, generator, suppliedConfig, decimalPrecision]);
+  }, [dataType, generator, suppliedConfig, decimalPrecision, left, right, top, bottom]);
   if (!plot) return null;
   return (
-    <figure className="signal-waveform">
+    <figure className={`signal-waveform${compact ? ' signal-waveform-compact' : ''}`}>
       <svg
-        viewBox="0 0 680 210"
+        viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={`${output.generator} waveform, ${plot.min} to ${plot.max}${output.unit ? ` ${output.unit}` : ''}, ${plot.frequency > 0 ? 'three cycles' : 'constant'}`}
       >
-        {[0, 1, 2, 3, 4].map((index) => (
+        {Array.from({ length: ticks + 1 }, (_, index) => index).map((index) => (
           <g key={index} className="wave-axis">
-            <line x1="86" x2="650" y1={20 + index * 37.5} y2={20 + index * 37.5} />
-            <text x="76" y={24 + index * 37.5} textAnchor="end">
-              {axisNumber(plot.max - ((plot.max - plot.min) * index) / 4)}
+            <line
+              x1={left}
+              x2={right}
+              y1={top + (index * (bottom - top)) / ticks}
+              y2={top + (index * (bottom - top)) / ticks}
+            />
+            <text x={left - 8} y={top + (index * (bottom - top)) / ticks + 4} textAnchor="end">
+              {axisNumber(plot.max - ((plot.max - plot.min) * index) / ticks)}
             </text>
           </g>
         ))}
         {[0, 1, 2, 3].map((index) => (
           <g key={index} className="wave-axis">
-            <line x1={86 + index * 188} x2={86 + index * 188} y1="20" y2="170" />
-            <text x={86 + index * 188} y="194" textAnchor="middle">
+            <line
+              x1={left + (index * (right - left)) / 3}
+              x2={left + (index * (right - left)) / 3}
+              y1={top}
+              y2={bottom}
+            />
+            <text x={left + (index * (right - left)) / 3} y={height - 8} textAnchor="middle">
               {axisNumber((plot.duration * index) / 3000)} s
             </text>
           </g>

@@ -157,14 +157,13 @@
   border-radius: 6px;
   box-shadow: var(--shadow-md);
   margin-bottom: var(--spacing-sm);
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
   cursor: pointer;
 }
 
 .message-item:hover {
   border-color: var(--primary-blue);
   box-shadow: 0 4px 12px var(--primary-blue-light);
-  transform: translateY(-1px);
 }
 
 .message-header {
@@ -387,3 +386,5 @@
   border-radius: 4px;
   background: white;
 }
+
+.message-list { scrollbar-gutter: stable; }

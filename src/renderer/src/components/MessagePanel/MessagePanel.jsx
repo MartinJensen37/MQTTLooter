@@ -1,25 +1,28 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './MessagePanel.css';
+import StableScrollViewport from '../StableScrollViewport';
 import PayloadView from './PayloadView';
 
-function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName, showFeedback }) {
+function MessagePanel({
+  messages,
+  selectedTopic,
+  onClearMessages,
+  connectionName,
+  connectionId,
+  showFeedback,
+}) {
   const [sortBy, setSortBy] = useState('timestamp');
   const [sortOrder, setSortOrder] = useState('desc');
   const [showRetainedOnly, setShowRetainedOnly] = useState(false);
   const [showTopicExportMenu, setShowTopicExportMenu] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
 
-  const listRef = useRef(null);
-
-  useEffect(() => {
-    if (!autoScroll || !listRef.current) return;
-    listRef.current.scrollTop = sortOrder === 'desc' ? 0 : listRef.current.scrollHeight;
-  }, [messages, autoScroll, sortOrder]);
-
   const processedMessages = React.useMemo(() => {
     let filtered = showRetainedOnly ? messages.filter((m) => m.retain) : messages;
     if (sortBy === 'timestamp') {
-      return [...filtered].sort((a, b) =>
+      // History arrives newest-first. Reverse ties too when displaying oldest-first.
+      const ordered = sortOrder === 'asc' ? [...filtered].reverse() : [...filtered];
+      return ordered.sort((a, b) =>
         sortOrder === 'desc' ? b.timestamp - a.timestamp : a.timestamp - b.timestamp,
       );
     }
@@ -218,7 +221,7 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
                   autoScroll ? 'Auto-scroll ON — click to pin' : 'Auto-scroll OFF — click to follow'
                 }
               >
-                <i className={`fas ${autoScroll ? 'fa-arrow-down' : 'fa-thumbtack'}`}></i>
+                <i className={`fas ${autoScroll ? 'fa-arrow-up' : 'fa-thumbtack'}`}></i>
                 {autoScroll ? ' Following' : ' Pinned'}
               </button>
               <div className="message-export-wrapper custom-select-wrapper">
@@ -250,10 +253,16 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
         </div>
       )}
 
-      <div
+      <StableScrollViewport
         className="message-list"
-        ref={listRef}
-        style={{ overflowAnchor: autoScroll ? 'auto' : 'none' }}
+        viewKey={JSON.stringify([
+          connectionId,
+          selectedTopic?.topicPath,
+          sortOrder,
+          showRetainedOnly,
+        ])}
+        following={autoScroll}
+        onFollowingChange={setAutoScroll}
       >
         {processedMessages.length === 0 ? (
           <div className="no-messages">
@@ -278,6 +287,7 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
             {processedMessages.map((msg) => (
               <div
                 key={msg.id}
+                data-scroll-key={msg.id}
                 className="message-item"
                 onDoubleClick={(e) => copyPayload(msg.message, e)}
                 title={
@@ -326,7 +336,7 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
             ))}
           </>
         )}
-      </div>
+      </StableScrollViewport>
     </div>
   );
 }

@@ -135,9 +135,9 @@ class TopicTreeService {
     return this.topicTrees.get(connectionId);
   }
 
-  getTopicTreeNodes(connectionId: string, includeCollapsed = false) {
+  getTopicTreeNodes(connectionId: string, includeCollapsed = false, searchTerm = '') {
     const tree = this.topicTrees.get(connectionId);
-    return tree ? tree.getFlattenedNodes(includeCollapsed) : [];
+    return tree ? tree.getFlattenedNodes(includeCollapsed, searchTerm) : [];
   }
 
   toggleTopicNode(connectionId: string, topicPath: string): boolean {

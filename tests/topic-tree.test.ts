@@ -3,6 +3,33 @@ import TopicTree from '../src/renderer/src/services/models/TopicTree';
 import RingBuffer from '../src/renderer/src/utils/RingBuffer';
 
 describe('topic history', () => {
+  it('keeps sibling order stable as new topics arrive and traffic changes', () => {
+    const tree = new TopicTree('broker');
+    for (let i = 2000; i > 0; i--) tree.addMessage(`sensor/${i}`, 'value');
+    tree.expandToDepth(Infinity);
+    const before = tree.getFlattenedNodes().map((node) => node.fullPath);
+    tree.addMessage('sensor/0', 'new');
+    tree.addMessage('sensor/1000', 'updated');
+    tree.updateRates();
+    expect(tree.getFlattenedNodes().map((node) => node.fullPath)).toEqual([...before, 'sensor/0']);
+  });
+
+  it('searches full paths through collapsed branches without changing expansion state', () => {
+    const tree = new TopicTree('broker');
+    for (const topic of ['Room/Temperature', 'Room/Humidity', '/Room//Temperature', 'other'])
+      tree.addMessage(topic, 'payload-only-search');
+    const collapsed = tree.getFlattenedNodes().map((node) => node.fullPath);
+    const matches = tree.getFlattenedNodes(false, 'TEMPERATURE');
+    expect(matches.filter((node) => node.searchMatch).map((node) => node.fullPath)).toEqual([
+      'Room/Temperature',
+      '/Room//Temperature',
+    ]);
+    expect(matches.map((node) => node.fullPath)).toContain('/Room/');
+    expect(tree.getFlattenedNodes(false, 'payload-only-search')).toEqual([]);
+    expect(tree.getFlattenedNodes().map((node) => node.fullPath)).toEqual(collapsed);
+    expect(tree.getNode('Room')?.isExpanded).toBe(false);
+  });
+
   it('preserves empty topic levels and exact paths', () => {
     const tree = new TopicTree('broker');
     const topics = ['a/b', '/a/b', 'a//b', 'a/b/', '/', '//'];

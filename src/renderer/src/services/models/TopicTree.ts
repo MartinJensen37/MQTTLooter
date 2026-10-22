@@ -7,6 +7,7 @@ export type TopicNodeJSON = ReturnType<TopicNode['toJSON']>;
 export interface FlattenedNode extends TopicNodeJSON {
   depth: number;
   hasChildren: boolean;
+  searchMatch?: boolean;
 }
 
 class TopicTree {
@@ -139,7 +140,7 @@ class TopicTree {
     return this.topicLookup.get(topicPath) ?? this.findNodeByPath(topicPath) ?? undefined;
   }
 
-  getFlattenedNodes(includeCollapsed = false): FlattenedNode[] {
+  getFlattenedNodes(includeCollapsed = false, searchTerm = ''): FlattenedNode[] {
     const nodes: FlattenedNode[] = [];
 
     const traverse = (node: TopicNode, depth = 0) => {
@@ -148,17 +149,29 @@ class TopicTree {
       }
 
       // Recurse when expanded, when collapsed nodes are requested, or at the root.
-      if (node.isExpanded || includeCollapsed || node === this.root) {
-        const sortedChildren = Array.from(node.children.values()).sort((a, b) =>
-          a.name.localeCompare(b.name),
-        );
-        for (const child of sortedChildren) {
+      if (node.isExpanded || includeCollapsed || searchTerm || node === this.root) {
+        // First-seen sibling order keeps new traffic from re-sorting existing rows.
+        for (const child of node.children.values()) {
           traverse(child, node === this.root ? 0 : depth + 1);
         }
       }
     };
 
     traverse(this.root);
+    if (searchTerm) {
+      const query = searchTerm.toLowerCase();
+      const included = new Set<number>();
+      const ancestors: number[] = [];
+      nodes.forEach((node, index) => {
+        ancestors.length = node.depth;
+        ancestors.push(index);
+        node.searchMatch = node.fullPath.toLowerCase().includes(query);
+        if (node.searchMatch) ancestors.forEach((ancestor) => included.add(ancestor));
+      });
+      return nodes
+        .filter((_, index) => included.has(index))
+        .map((node) => ({ ...node, isExpanded: node.hasChildren }));
+    }
     return nodes;
   }
 

@@ -225,7 +225,7 @@ export default function DeviceConfigPanel({
                   </span>
                 </div>
               )}
-              <SignalWaveform output={output} />
+              <SignalWaveform output={output} compact />
               <div className="output-actions">
                 <button
                   className="btn btn-sm btn-secondary"

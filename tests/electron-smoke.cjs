@@ -381,9 +381,23 @@ async function run() {
     'individual signal topic',
   );
   assert.ok(published.some((packet) => packet.topic === 'smoke/device/state'));
+  await require('./electron-navigation.cjs')({
+    evaluate,
+    waitFor,
+    field,
+    send: (topic, payload) => {
+      for (const socket of sockets)
+        socket.write(
+          codec.generate(
+            { cmd: 'publish', topic, payload, qos: 0, retain: false },
+            { protocolVersion: 5 },
+          ),
+        );
+    },
+  });
   assert.deepEqual(errors, []);
   console.log(
-    'Electron smoke passed: MQTT 5, binary payloads, recording recovery, simulator construction/QoS 1+2/loop, responsive layout and sandbox.',
+    'Electron smoke passed: MQTT 5, binary payloads, recording recovery, simulator/QoS 1+2, topic search, anchored scrolling, responsive layout and sandbox.',
   );
 }
 

@@ -76,7 +76,9 @@
 .topic-tree-stats {
   display: flex;
   gap: var(--spacing-sm);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .stat-item {
@@ -99,7 +101,8 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 0;
+  padding: 0;
+  scrollbar-gutter: stable;
   font-size: 13px;
   scrollbar-width: thin;
   scrollbar-color: var(--gray-400) var(--gray-100);
@@ -264,3 +267,11 @@
   .tree-control-btn      { height: 24px; font-size: 10px; }
   .stat-item             { font-size: 10px; padding: 2px 7px; }
 }
+
+.topic-tree-stats .stat-item { white-space: nowrap; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.topic-tree-node { height: 100%; box-sizing: border-box; overflow: hidden; }
+.topic-tree-node .node-content { height: 100%; box-sizing: border-box; }
+.topic-search { display: flex; align-items: center; gap: var(--spacing-sm); margin-top: var(--spacing-md); }
+.topic-search .form-input { min-width: 0; }
+.topic-search-status { font-size: 11px; color: var(--text-muted); margin-top: var(--spacing-xs); min-height: 16px; }
+.tree-control-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
