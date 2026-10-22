@@ -1,5 +1,5 @@
 import TopicTree from './models/TopicTree';
-import { UI } from '../config';
+import { UI, HISTORY_PROFILES, HISTORY_BUDGET, type HistoryProfile } from '../config';
 import MQTTService from './MQTTService';
 import type { PayloadEncoding } from '../../../shared/payload';
 
@@ -25,7 +25,8 @@ export interface DisplayMessage {
   timestamp: number;
 }
 
-class TopicTreeService {
+export class TopicTreeService {
+  private profile: HistoryProfile = 'larger';
   private topicTrees = new Map<string, TopicTree>();
   private MQTTService: MQTTServiceInstance | null = null;
   private eventHandlers = new Map<string, Set<EventHandler>>();
@@ -35,7 +36,13 @@ class TopicTreeService {
   private _pendingUpdates = new Map<string, PendingUpdate>();
   private _UPDATE_THROTTLE_MS = 150;
 
-  constructor() {
+  constructor(private globalBudget = HISTORY_BUDGET.maxBytes) {
+    try {
+      const saved = localStorage.getItem('mqtt-history-profile');
+      if (saved === 'compact' || saved === 'larger') this.profile = saved;
+    } catch {
+      /* Storage can be unavailable in tests or restricted environments. */
+    }
     this.MQTTService = MQTTService;
     this.setupEventListeners();
     this.startRateCalculationTimer();
@@ -53,7 +60,7 @@ class TopicTreeService {
 
     let topicTree = this.topicTrees.get(connectionId);
     if (!topicTree) {
-      topicTree = new TopicTree(connectionId);
+      topicTree = new TopicTree(connectionId, { ...HISTORY_PROFILES[this.profile] });
       this.topicTrees.set(connectionId, topicTree);
       this.emitEvent('treeCreated', { connectionId, tree: topicTree });
     }
@@ -61,6 +68,13 @@ class TopicTreeService {
     const limitVersion = topicTree.limitVersion;
     topicTree.addMessage(topic, message, qos, retain, timestamp, encoding);
 
+    this.queueUpdate(connectionId, topicTree.limitVersion !== limitVersion ? undefined : topic);
+    this.enforceGlobalBudget();
+  }
+
+  private queueUpdate(connectionId: string, topic?: string): void {
+    const topicTree = this.topicTrees.get(connectionId);
+    if (!topicTree) return;
     // Throttle treeUpdated; track which topics changed so listeners can filter.
     if (!this._pendingUpdates.has(connectionId)) {
       const tree = topicTree;
@@ -81,17 +95,80 @@ class TopicTreeService {
     }
     const pending = this._pendingUpdates.get(connectionId)!;
     if (
-      topicTree.limitVersion !== limitVersion ||
+      topic === undefined ||
       pending.topics.size >= 128 ||
-      pending.topicChars + topic.length > 262144
+      pending.topicChars + (topic?.length ?? 0) > 262144
     ) {
       pending.allTopics = true;
       pending.topics.clear();
       pending.topicChars = 0;
     }
-    if (!pending.allTopics && !pending.topics.has(topic)) {
+    if (topic !== undefined && !pending.allTopics && !pending.topics.has(topic)) {
       pending.topics.add(topic);
       pending.topicChars += topic.length;
+    }
+  }
+
+  getHistorySettings() {
+    return {
+      profile: this.profile,
+      maxBytes: this.globalBudget,
+      retainedBytes: [...this.topicTrees.values()].reduce(
+        (sum, tree) => sum + tree.storageBytes,
+        0,
+      ),
+      maxPinnedTopics: HISTORY_BUDGET.maxPinnedTopics,
+    };
+  }
+
+  setHistoryProfile(profile: HistoryProfile): boolean {
+    if (profile !== 'compact' && profile !== 'larger') return false;
+    const limits = HISTORY_PROFILES[profile];
+    if (
+      [...this.topicTrees.values()].some(
+        (tree) =>
+          tree.protectedBytes > limits.maxBytes || tree.protectedNodeCount > limits.maxNodes,
+      )
+    )
+      return false;
+    this.profile = profile;
+    try {
+      localStorage.setItem('mqtt-history-profile', profile);
+    } catch {
+      /* Keep this session's setting. */
+    }
+    for (const [id, tree] of this.topicTrees) {
+      tree.setLimits({ ...limits });
+      this.queueUpdate(id);
+    }
+    this.enforceGlobalBudget();
+    this.emitEvent('historySettingsChanged', this.getHistorySettings());
+    return true;
+  }
+
+  selectTopic(connectionId: string, path: string | null): void {
+    this.topicTrees.get(connectionId)?.selectTopic(path);
+  }
+
+  toggleTopicPin(connectionId: string, path: string): boolean {
+    const changed = this.topicTrees.get(connectionId)?.pinTopic(path) ?? false;
+    if (changed) this.queueUpdate(connectionId);
+    return changed;
+  }
+
+  /** Free payloads before catalog entries, across every connection including inactive ones. */
+  private enforceGlobalBudget(): void {
+    let total = this.getHistorySettings().retainedBytes;
+    for (const stage of ['history', 'protectedHistory', 'metadata']) {
+      for (const [id, tree] of this.topicTrees) {
+        if (total <= this.globalBudget) return;
+        const before = tree.storageBytes;
+        const target = Math.max(0, before - (total - this.globalBudget));
+        if (stage === 'metadata') tree.trimMetadata(target);
+        else tree.trimHistory(target, tree.limits.maxMessages, stage === 'protectedHistory');
+        total += tree.storageBytes - before;
+        if (tree.storageBytes !== before) this.queueUpdate(id);
+      }
     }
   }
 

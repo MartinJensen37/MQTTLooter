@@ -388,3 +388,12 @@
 }
 
 .message-list { scrollbar-gutter: stable; }
+
+.message-panel .message-history-notice {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  font-size: 11px;
+  flex-shrink: 0;
+}

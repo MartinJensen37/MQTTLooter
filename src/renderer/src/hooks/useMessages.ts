@@ -20,13 +20,24 @@ export function useMessages(
 ) {
   // Counter bump to re-render when the tree updates.
   const [updateTick, setUpdateTick] = useState(0);
+  const selectedPath = selectedTopic?.topicPath ?? null;
+  useEffect(() => {
+    if (selectedConnection) TopicTreeService.selectTopic(selectedConnection, selectedPath);
+  }, [selectedConnection, selectedPath]);
 
   // Re-render only when the SELECTED topic received messages.
   useEffect(() => {
     if (!selectedConnection) return;
     const onTreeUpdate = (data: any) => {
       if (data.connectionId !== selectedConnection) return;
-      if (selectedTopic && (!data.topics || data.topics.includes(selectedTopic.topicPath))) {
+      if (
+        selectedTopic &&
+        (!data.topics ||
+          data.topics.some(
+            (path: string) =>
+              path === selectedTopic.topicPath || path.startsWith(`${selectedTopic.topicPath}/`),
+          ))
+      ) {
         setUpdateTick((t) => t + 1);
       }
     };
@@ -65,8 +76,18 @@ export function useMessages(
     return TopicTreeService.getTopicMessages(selectedConnection, selectedTopic.topicPath);
   }, [selectedConnection, selectedTopic, updateTick]);
 
+  const liveSelectedTopic = useMemo(() => {
+    void updateTick;
+    if (!selectedConnection || !selectedTopic) return null;
+    const node = TopicTreeService.getTopicTree(selectedConnection)?.getNode(
+      selectedTopic.topicPath,
+    );
+    return { ...selectedTopic, node: node?.toJSON() ?? null };
+  }, [selectedConnection, selectedTopic, updateTick]);
+
   return {
     connectionMessages,
     handleClearMessages,
+    liveSelectedTopic,
   };
 }

@@ -12,10 +12,6 @@ export const MQTT_DEFAULTS = {
   PROTOCOL_VERSION: 4,
 };
 
-export const MESSAGES = {
-  MAX_PER_TOPIC: 300,
-};
-
 export const MESSAGE_HISTORY = {
   MAX_ITEMS_PER_TOPIC: 300,
   MAX_BYTES_PER_TOPIC: 2 * 1024 * 1024, // 2MB
@@ -23,11 +19,18 @@ export const MESSAGE_HISTORY = {
 };
 
 export const CONNECTION_HISTORY = {
-  maxBytes: 32 * 1024 * 1024, // Budget for retained strings and message bookkeeping, not process RSS.
-  maxNodes: 5000,
+  maxBytes: 64 * 1024 * 1024, // Estimated retained storage, not process RSS.
+  maxNodes: 20000,
   maxMessages: 50000,
   maxDepth: 128,
 };
+
+export const HISTORY_PROFILES = {
+  compact: { ...CONNECTION_HISTORY, maxBytes: 32 * 1024 * 1024, maxNodes: 5000 },
+  larger: { ...CONNECTION_HISTORY },
+};
+export type HistoryProfile = keyof typeof HISTORY_PROFILES;
+export const HISTORY_BUDGET = { maxBytes: 128 * 1024 * 1024, maxPinnedTopics: 8 };
 
 export const UI = {
   RATE_UPDATE_INTERVAL_MS: 100,

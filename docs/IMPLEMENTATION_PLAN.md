@@ -2,7 +2,7 @@
 
 Audited 2026-10-22 against the repository through `1834631`. This is a plan, not a claim that the features below are implemented. It replaces the older suggested ordering in [REVIEW.md](REVIEW.md); that document remains the record of fixes and known limitations.
 
-Implementation update: phase 1 is complete. Signals use 40 px rows with timing pills and 100 x 24 px numeric/boolean patterns (text/enum generator labels). Payload previews, per-signal last publishes and removal are in the editor; chart rendering is shared. The original audit table below records the baseline. Next: phase 2, selected-topic protection and resource budgets.
+Implementation update (2026-10-23): phase 1 is complete. Signals use compact rows, editor-only payload details and shared chart rendering. Phase 2 now includes separate payload trimming and topic eviction, selected-path protection, eight session pins per connection, live selection metadata, Compact/Larger cache profiles and a shared 128 MiB estimated retained-storage cap. Model coverage includes a 50,000-topic flood. Transport IPC batching, queue backpressure and full-process responsiveness/RSS benchmarking remain open in phase 2; the memory settings are cache budgets, not a process-RAM guarantee. The original audit table below records the baseline.
 
 ## What is already covered
 
@@ -60,11 +60,11 @@ Suggested commits: `Simplify signal rows`, `Share plot styling`.
 
 ## 2. Keep inspected topics available under load
 
-Current defaults are 300 messages / 2 MiB raw payload per topic and 32 MiB estimated retained storage / 50,000 messages / 5,000 tree nodes per connection. Node counts include ancestors. Raising only the 300-message limit will not solve the disappearing-topic problem.
+At the initial audit, defaults were 300 messages / 2 MiB raw payload per topic and 32 MiB estimated retained storage / 50,000 messages / 5,000 tree nodes per connection. The implemented Larger profile now uses 64 MiB and 20,000 nodes; Compact retains 32 MiB and 5,000 nodes. Both share a 128 MiB cache cap across connections. Node counts include ancestors. The 300-message cap remains until paged disk history replaces it.
 
 - Separate the topic catalog, selected topic identity, latest-value cache and historical payload cache. Trim old payloads before removing topic metadata. Refresh selection from the live model instead of a stale node snapshot.
 - Protect the selected topic and its ancestor path; allow a bounded set of explicitly pinned topics. Preserve their identity while allowing old payloads to expire. Pins cannot reserve unlimited memory or bypass user deletion/retention policies.
-- Add resource profiles and an app-wide cap across connections. Benchmark an initial larger profile of 64 MiB retained cache per connection, up to 20,000 metadata nodes, within a 128 MiB aggregate retained-cache budget. These are tuning candidates, not promised process-RAM limits or changed defaults yet. Account for metadata and pending batches as well as payloads.
+- Resource profiles and a shared cache cap are implemented: Larger uses 64 MiB per connection and up to 20,000 metadata nodes, within a 128 MiB aggregate retained-cache budget; Compact keeps the previous limits. Metadata and payload bookkeeping are included in the estimate. Model/load checks verify those bounds; full-process memory measurements and bounded pending transport batches are still needed before claiming a process-RAM target.
 - Batch incoming IPC by elapsed time and byte/count thresholds. Keep exact sequence IDs and timestamps. Coalesce replaceable tree/rate updates separately from archival messages; do not discard history just because its UI update was coalesced.
 - Bound pending batches and decoding work; report received, stored, expired and dropped counts separately. Reserve prompt handling for connect/disconnect/cancel commands. Remove notification bursts and redundant hidden-panel updates.
 

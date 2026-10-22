@@ -1,5 +1,5 @@
 import TopicNode from './TopicNode';
-import { CONNECTION_HISTORY } from '../../config';
+import { CONNECTION_HISTORY, HISTORY_BUDGET } from '../../config';
 import type { PayloadEncoding } from '../../../../shared/payload';
 
 export type TopicNodeJSON = ReturnType<TopicNode['toJSON']>;
@@ -8,6 +8,7 @@ export interface FlattenedNode extends TopicNodeJSON {
   depth: number;
   hasChildren: boolean;
   searchMatch?: boolean;
+  pinned?: boolean;
 }
 
 class TopicTree {
@@ -17,6 +18,63 @@ class TopicTree {
   messageCount = 0;
   createdAt = Date.now();
   private sequence = 0;
+  private historyTopics = new Map<string, TopicNode>();
+  private selectedPath: string | null = null;
+  private pinnedPaths = new Set<string>();
+  private protectedNodes = new Set<TopicNode>();
+
+  get storageBytes() {
+    return this.retainedBytes;
+  }
+  get protectedBytes() {
+    return [...this.protectedNodes].reduce((sum, node) => sum + this.nodeBytes(node), 0);
+  }
+  get protectedNodeCount() {
+    return this.protectedNodes.size;
+  }
+  get pins() {
+    return [...this.pinnedPaths];
+  }
+
+  selectTopic(path: string | null): void {
+    this.selectedPath = path !== null && this.getNode(path) ? path : null;
+    this.updateProtection();
+  }
+
+  pinTopic(path: string): boolean {
+    if (this.pinnedPaths.has(path)) this.pinnedPaths.delete(path);
+    else {
+      if (!this.getNode(path) || this.pinnedPaths.size >= HISTORY_BUDGET.maxPinnedTopics)
+        return false;
+      this.pinnedPaths.add(path);
+    }
+    this.updateProtection();
+    return true;
+  }
+
+  private updateProtection(): void {
+    this.protectedNodes.clear();
+    for (const path of [
+      ...this.pinnedPaths,
+      ...(this.selectedPath === null ? [] : [this.selectedPath]),
+    ]) {
+      let node = this.getNode(path);
+      while (node && node !== this.root) {
+        this.protectedNodes.add(node);
+        node = node.parent ?? undefined;
+      }
+    }
+  }
+
+  setLimits(limits: typeof CONNECTION_HISTORY): boolean {
+    if (Object.values(limits).some((value) => !Number.isSafeInteger(value) || value < 1))
+      return false;
+    if (this.protectedBytes > limits.maxBytes || this.protectedNodeCount > limits.maxNodes)
+      return false;
+    Object.assign(this.limits, limits);
+    this.enforceLimits();
+    return true;
+  }
   private nodeCount = 0;
   private retainedBytes = 0;
   private retainedMessages = 0;
@@ -68,12 +126,9 @@ class TopicTree {
     // Map insertion order is least-recently-received first.
     this.topicLookup.delete(topic);
     this.topicLookup.set(topic, leafNode);
-    while (
-      this.retainedBytes > this.limits.maxBytes ||
-      this.retainedMessages > this.limits.maxMessages
-    ) {
-      if (!this.evictOldestTopic()) break;
-    }
+    this.historyTopics.delete(topic);
+    if (leafNode.messageHistory.count) this.historyTopics.set(topic, leafNode);
+    this.enforceLimits();
     return this.topicLookup.get(topic);
   }
 
@@ -109,11 +164,60 @@ class TopicTree {
     return currentNode;
   }
 
+  /** Trim payloads without deleting topic identity, counts or rate buckets. */
+  trimHistory(
+    maxBytes: number,
+    maxMessages = this.limits.maxMessages,
+    includeProtected = false,
+  ): void {
+    while (this.retainedBytes > maxBytes || this.retainedMessages > maxMessages) {
+      let entry: [string, TopicNode] | undefined;
+      for (const candidate of this.historyTopics) {
+        if (includeProtected || !this.protectedNodes.has(candidate[1])) {
+          entry = candidate;
+          break;
+        }
+      }
+      if (!entry) break;
+      const [path, node] = entry;
+      while (
+        node.messageHistory.count &&
+        (this.retainedBytes > maxBytes || this.retainedMessages > maxMessages)
+      ) {
+        const removed = node.trimOldestMessage()!;
+        this.retainedBytes -= removed.storageBytes;
+        this.retainedMessages--;
+        this.discardedMessages++;
+        this.limitVersion++;
+      }
+      if (!node.messageHistory.count) this.historyTopics.delete(path);
+    }
+  }
+
+  private enforceLimits(): void {
+    this.trimHistory(this.limits.maxBytes);
+    this.trimHistory(this.limits.maxBytes, this.limits.maxMessages, true);
+    this.trimMetadata(this.limits.maxBytes);
+  }
+
+  trimMetadata(maxBytes: number): void {
+    while (this.retainedBytes > maxBytes || this.nodeCount > this.limits.maxNodes) {
+      if (!this.evictOldestTopic()) break;
+    }
+  }
+
   private evictOldestTopic(): boolean {
-    const entry = this.topicLookup.entries().next().value;
+    let entry: [string, TopicNode] | undefined;
+    for (const candidate of this.topicLookup) {
+      if (!this.protectedNodes.has(candidate[1])) {
+        entry = candidate;
+        break;
+      }
+    }
     if (!entry) return false;
     const [path, node] = entry;
     this.topicLookup.delete(path);
+    this.historyTopics.delete(path);
     this.discardedMessages += node.messageHistory.count;
     this.retainedMessages -= node.messageHistory.count;
     this.retainedBytes -= node.messageHistory.storageUsage;
@@ -121,11 +225,11 @@ class TopicTree {
     this.evictedTopics++;
     this.limitVersion++;
     let current = node;
-    // Preserve parents that still own direct messages or descendants.
     while (
       current.parent &&
       current.children.size === 0 &&
-      !this.topicLookup.has(current.fullPath)
+      !this.topicLookup.has(current.fullPath) &&
+      !this.protectedNodes.has(current)
     ) {
       this.nodeCount--;
       this.retainedBytes -= this.nodeBytes(current);
@@ -145,7 +249,12 @@ class TopicTree {
 
     const traverse = (node: TopicNode, depth = 0) => {
       if (node !== this.root) {
-        nodes.push({ ...node.toJSON(), depth, hasChildren: node.children.size > 0 });
+        nodes.push({
+          ...node.toJSON(),
+          depth,
+          hasChildren: node.children.size > 0,
+          pinned: this.pinnedPaths.has(node.fullPath),
+        });
       }
 
       // Recurse when expanded, when collapsed nodes are requested, or at the root.
@@ -235,7 +344,9 @@ class TopicTree {
       retainedMessages: this.retainedMessages,
       discardedMessages: this.discardedMessages,
       evictedTopics: this.evictedTopics,
-      limits: this.limits,
+      limits: { ...this.limits },
+      pinnedTopics: this.pins,
+      selectedTopic: this.selectedPath,
       leafNodes,
       totalMessages: this.messageCount,
       totalRate: this.root.getTotalMessageRate(),
@@ -251,6 +362,10 @@ class TopicTree {
   clear(): void {
     this.root = new TopicNode('', '');
     this.topicLookup.clear();
+    this.historyTopics.clear();
+    this.pinnedPaths.clear();
+    this.selectedPath = null;
+    this.protectedNodes.clear();
     this.messageCount = 0;
     this.nodeCount = 0;
     this.retainedBytes = 0;
@@ -277,6 +392,7 @@ class TopicTree {
     this.retainedBytes -= node.messageHistory.storageUsage;
     this.retainedMessages -= node.messageHistory.count;
     node.clearMessages();
+    this.historyTopics.delete(topicPath);
     this.messageCount = Math.max(0, this.messageCount - previousCount);
     return true;
   }

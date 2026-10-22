@@ -35,6 +35,7 @@ class TopicNode {
 
   messageCount = 0;
   directMessageCount = 0;
+  discardedHistory = 0;
   private sequence = 0;
   private rateBuckets = new Map<number, number>();
   private totalMessageRate = 0;
@@ -93,6 +94,7 @@ class TopicNode {
 
     // Account for the UTF-8 payload, rather than UTF-16 character count.
     const payloadLen = payloadBytes(message.payload, message.encoding).byteLength;
+    const beforeCount = this.messageHistory.count;
     const accepted = this.messageHistory.add({
       id,
       encoding: message.encoding ?? 'utf8',
@@ -106,6 +108,7 @@ class TopicNode {
     });
     // No separate unbounded latest-payload cache when history rejects a large message.
     this.lastMessage = accepted ? message : null;
+    this.discardedHistory += beforeCount + 1 - this.messageHistory.count;
 
     const bucket = Math.floor(timestamp / RATE_BUCKET_MS) * RATE_BUCKET_MS;
     this.rateBuckets.set(bucket, (this.rateBuckets.get(bucket) ?? 0) + 1);
@@ -260,6 +263,7 @@ class TopicNode {
           }
         : null,
       lastMessageTime: this.lastMessageTime,
+      lastMessageId: this.lastMessage ? (this.messageHistory.last()?.id ?? null) : null,
       isLeaf: this.hasDirectMessages && this.children.size === 0,
       hasDirectMessages: this.hasDirectMessages,
       isExpanded: this.isExpanded,
@@ -271,6 +275,7 @@ class TopicNode {
       adaptiveWindow: Math.round((this.adaptiveTimeWindow / 1000) * 10) / 10, // seconds
       averageInterval: Math.round(this.averageInterval),
       bufferCount: this.messageHistory ? this.messageHistory.count : 0,
+      discardedHistory: this.discardedHistory,
     };
   }
 
@@ -279,6 +284,7 @@ class TopicNode {
 
     this.messageCount -= previousCount;
     this.directMessageCount = 0;
+    this.discardedHistory = 0;
     this.lastMessage = null;
     this.lastMessageTime = null;
     this.messageHistory.clear();
@@ -293,6 +299,13 @@ class TopicNode {
     this.adaptiveTimeWindow = 5000;
 
     this.propagateMessageCountReduction(previousCount);
+  }
+
+  trimOldestMessage(): StoredMessage | undefined {
+    const removed = this.messageHistory.removeOldest();
+    if (removed) this.discardedHistory++;
+    if (!this.messageHistory.count) this.lastMessage = null;
+    return removed;
   }
 
   propagateMessageCountReduction(countToReduce: number): void {

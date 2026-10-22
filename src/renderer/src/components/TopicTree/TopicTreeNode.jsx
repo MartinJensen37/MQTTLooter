@@ -51,6 +51,11 @@ function TopicTreeNode({ node, onClick, isSelected }) {
           <span className="node-expand-icon">{getExpandIcon()}</span>
           <span className="node-name">{node.name || '(empty)'}</span>
           <div className="node-bubbles">
+            {node.pinned && (
+              <span title="Pinned topic">
+                <i className="fas fa-thumbtack" aria-label="Pinned" />
+              </span>
+            )}
             {hasRetainedMessage && (
               <span className="retained-bubble" title="Has retained message">
                 <i className="fas fa-save"></i> Retained

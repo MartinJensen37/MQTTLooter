@@ -58,6 +58,9 @@ function PublishingPanel({
   const [showTemplates, setShowTemplates] = useState(false);
   const [autoLoadSelectedTopic, setAutoLoadSelectedTopic] = useState(true);
   const [retainedMessageRemoved, setRetainedMessageRemoved] = useState(false);
+  const selectedPath = selectedTopic?.topicPath ?? selectedTopic?.topic ?? null;
+  const selectedRetain = selectedTopic?.node?.lastMessage?.retain === true;
+  const selectedMessageId = selectedTopic?.node?.lastMessageId;
 
   useEffect(() => {
     setMessageTemplates(templateService.getAllTemplates());
@@ -82,18 +85,18 @@ function PublishingPanel({
 
   // Auto-load the selected topic into the form when enabled.
   useEffect(() => {
-    if (autoLoadSelectedTopic && selectedTopic) {
-      setTopic(selectedTopic.topicPath || selectedTopic.topic || '');
+    if (autoLoadSelectedTopic && selectedPath !== null) {
+      setTopic(selectedPath);
     }
     setRetainedMessageRemoved(false);
-  }, [autoLoadSelectedTopic, selectedTopic]);
+  }, [autoLoadSelectedTopic, selectedPath]);
 
   // Reset the retained-removed flag when a retained message is detected.
   useEffect(() => {
-    if (selectedTopic?.node?.lastMessage?.retain === true) {
+    if (selectedRetain) {
       setRetainedMessageRemoved(false);
     }
-  }, [selectedTopic?.node?.lastMessage, connectionId, isConnected]);
+  }, [selectedMessageId, selectedRetain, connectionId, isConnected]);
 
   const handleTemplateSelect = (templateId: string) => {
     const template = templateService.getTemplate(templateId);

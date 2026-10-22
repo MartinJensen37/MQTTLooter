@@ -41,7 +41,7 @@ function App() {
     handleConnectionDelete,
   } = useConnections(showFeedback, selectedTopic, setSelectedTopic);
 
-  const { connectionMessages, handleClearMessages } = useMessages(
+  const { connectionMessages, handleClearMessages, liveSelectedTopic } = useMessages(
     selectedConnection,
     selectedTopic,
     showFeedback,
@@ -85,7 +85,14 @@ function App() {
     const handleError = (data) => {
       showFeedback(`MQTT error: ${data.error || data.message || 'Unknown error'}`, 'error');
     };
-    const handleTreeCleared = () => setSelectedTopic(null);
+    const handleTreeCleared = ({ connectionId }) => {
+      setSelectedTopic((previous) => (previous?.connectionId === connectionId ? null : previous));
+      setLastSelectedTopics((previous) => {
+        const next = { ...previous };
+        delete next[connectionId];
+        return next;
+      });
+    };
     const handlers = {
       connected: handleConnected,
       disconnected: handleDisconnected,
@@ -98,11 +105,12 @@ function App() {
       Object.entries(handlers).forEach(([event, handler]) => MQTTService.off('*', event, handler));
       TopicTreeService.off('treeCleared', handleTreeCleared);
     };
-  }, [setConnections, setTopicTreeReady, showFeedback]);
+  }, [setConnections, setTopicTreeReady, setLastSelectedTopics, showFeedback]);
 
   // ── Small handlers ───────────────────────────────────────────────────────
-  const handleTopicSelect = (topicPath, node) => {
-    const topic = { topicPath, node, connectionId: selectedConnection };
+  const handleTopicSelect = (topicPath) => {
+    TopicTreeService.selectTopic(selectedConnection, topicPath);
+    const topic = { topicPath, connectionId: selectedConnection };
     setSelectedTopic(topic);
     setLastSelectedTopics((prev) => ({ ...prev, [selectedConnection]: topic }));
   };
@@ -135,7 +143,7 @@ function App() {
         <MessagePanel
           connectionId={selectedConnection}
           messages={connectionMessages}
-          selectedTopic={selectedTopic}
+          selectedTopic={liveSelectedTopic}
           connectionName={getConnectionName()}
           onClearMessages={handleClearMessages}
           showFeedback={showFeedback}
@@ -147,14 +155,14 @@ function App() {
           connectionId={selectedConnection}
           onPublishMessage={handlePublishMessage}
           isConnected={isConnected}
-          selectedTopic={selectedTopic}
+          selectedTopic={liveSelectedTopic}
           showFeedback={showFeedback}
         />
       </div>
       <div className={`tab-content ${activeTab === 'recording' ? 'active' : 'hidden'}`}>
         <RecordingPanel
           connectionName={getConnectionName()}
-          selectedTopic={selectedTopic}
+          selectedTopic={liveSelectedTopic}
           onPublishMessage={handlePublishMessage}
           isConnected={isConnected}
           activeConnectionId={selectedConnection}
@@ -167,7 +175,7 @@ function App() {
           connectionId={selectedConnection}
           onPublishMessage={handlePublishMessage}
           isConnected={isConnected}
-          selectedTopic={selectedTopic}
+          selectedTopic={liveSelectedTopic}
           showFeedback={showFeedback}
         />
       </div>
@@ -207,6 +215,7 @@ function App() {
             <div className="topic-tree-panel">
               <TopicTreeComponent
                 connectionId={selectedConnection}
+                selectedPath={selectedTopic?.topicPath ?? null}
                 onTopicSelect={handleTopicSelect}
                 topicTreeService={TopicTreeService}
               />

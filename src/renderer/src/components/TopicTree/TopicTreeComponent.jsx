@@ -2,15 +2,18 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import StableScrollViewport from '../StableScrollViewport';
 import TopicTreeNode from './TopicTreeNode';
+import HistoryControls from './HistoryControls';
 import './TopicTree.css';
 
-function TopicTreeWorkspace({ connectionId, onTopicSelect, topicTreeService }) {
+function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTreeService }) {
   const [nodes, setNodes] = useState([]);
   const [search, setSearch] = useState('');
   const searchRef = useRef('');
   searchRef.current = search;
   const [statistics, setStatistics] = useState(null);
-  const [selectedNode, setSelectedNode] = useState(null);
+  const [historySettings, setHistorySettings] = useState(() =>
+    topicTreeService.getHistorySettings(),
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   const scrollRef = useRef(null);
@@ -20,6 +23,7 @@ function TopicTreeWorkspace({ connectionId, onTopicSelect, topicTreeService }) {
     try {
       setNodes(topicTreeService.getTopicTreeNodes(connectionId, false, searchRef.current));
       setStatistics(topicTreeService.getTopicTreeStatistics(connectionId));
+      setHistorySettings(topicTreeService.getHistorySettings());
       setIsLoading(false);
     } catch (err) {
       console.error('Error loading topic tree nodes:', err);
@@ -38,7 +42,6 @@ function TopicTreeWorkspace({ connectionId, onTopicSelect, topicTreeService }) {
   useEffect(() => {
     if (!connectionId || !topicTreeService) return;
     setIsLoading(true);
-    setSelectedNode(null);
     loadNodes();
 
     const handleTreeUpdated = (data) => {
@@ -55,14 +58,12 @@ function TopicTreeWorkspace({ connectionId, onTopicSelect, topicTreeService }) {
       if (data.connectionId !== connectionId) return;
       setNodes([]);
       setStatistics(null);
-      setSelectedNode(null);
     };
 
     const handleTreeRemoved = (data) => {
       if (data.connectionId !== connectionId) return;
       setNodes([]);
       setStatistics(null);
-      setSelectedNode(null);
       setIsLoading(false);
     };
 
@@ -73,6 +74,7 @@ function TopicTreeWorkspace({ connectionId, onTopicSelect, topicTreeService }) {
       }
     };
 
+    topicTreeService.on('historySettingsChanged', scheduleLoad);
     topicTreeService.on('treeUpdated', handleTreeUpdated);
     topicTreeService.on('nodeToggled', handleNodeToggled);
     topicTreeService.on('treeExpanded', handleTreeExpanded);
@@ -85,6 +87,7 @@ function TopicTreeWorkspace({ connectionId, onTopicSelect, topicTreeService }) {
         cancelAnimationFrame(pendingRaf.current);
         pendingRaf.current = null;
       }
+      topicTreeService.off('historySettingsChanged', scheduleLoad);
       topicTreeService.off('treeUpdated', handleTreeUpdated);
       topicTreeService.off('nodeToggled', handleNodeToggled);
       topicTreeService.off('treeExpanded', handleTreeExpanded);
@@ -103,12 +106,15 @@ function TopicTreeWorkspace({ connectionId, onTopicSelect, topicTreeService }) {
         topicTreeService.toggleTopicNode(connectionId, node.fullPath);
       }
 
-      if (hasMessages && (hasDirectMessages || node.hasChildren)) {
-        setSelectedNode(node.fullPath);
+      if (
+        (hasMessages && (hasDirectMessages || node.hasChildren)) ||
+        node.pinned ||
+        selectedPath === node.fullPath
+      ) {
         if (onTopicSelect) onTopicSelect(node.fullPath, node);
       }
     },
-    [connectionId, topicTreeService, onTopicSelect],
+    [connectionId, topicTreeService, onTopicSelect, selectedPath],
   );
 
   const handleExpandAll = useCallback(
@@ -133,7 +139,7 @@ function TopicTreeWorkspace({ connectionId, onTopicSelect, topicTreeService }) {
     overscan: 15,
   });
 
-  const historyNotice = statistics?.discardedMessages > 0 && (
+  const historyNotice = (statistics?.discardedMessages > 0 || statistics?.evictedTopics > 0) && (
     <p role="status" className="history-limit-notice">
       History limit: {statistics.discardedMessages} messages discarded; {statistics.evictedTopics}{' '}
       topics evicted. Retained history budget: {(statistics.retainedBytes / 1048576).toFixed(1)} /{' '}
@@ -224,6 +230,15 @@ function TopicTreeWorkspace({ connectionId, onTopicSelect, topicTreeService }) {
             ? `${nodes.filter((node) => node.searchMatch).length} matches / includes collapsed branches`
             : 'Topics stay in first-seen order'}
         </div>
+        <HistoryControls
+          connectionId={connectionId}
+          selectedPath={selectedPath}
+          statistics={statistics}
+          settings={historySettings}
+          service={topicTreeService}
+          onSelect={onTopicSelect}
+          onChange={loadNodes}
+        />
         {historyNotice}
       </div>
 
@@ -262,7 +277,7 @@ function TopicTreeWorkspace({ connectionId, onTopicSelect, topicTreeService }) {
                 <TopicTreeNode
                   node={node}
                   onClick={handleNodeClick}
-                  isSelected={selectedNode === node.fullPath}
+                  isSelected={selectedPath === node.fullPath}
                 />
               </div>
             );

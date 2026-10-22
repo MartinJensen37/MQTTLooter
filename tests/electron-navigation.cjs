@@ -138,4 +138,46 @@ module.exports = async function checkNavigation({ evaluate, waitFor, field, send
     'oldest-first history update',
   );
   assert.equal(await evaluate("document.querySelector('.message-list').scrollTop"), 0);
+  // Cache settings and pins use the real controls; pressure must not remove the inspected path.
+  await evaluate("document.querySelector('.topic-history-controls').open = true");
+  await field('[aria-label="History cache"]', 'compact');
+  await evaluate(
+    "[...document.querySelectorAll('.topic-history-controls button')].find(button => button.textContent === 'Pin selected topic').click()",
+  );
+  await waitFor(
+    () => evaluate("document.querySelector('.topic-pin-list')?.textContent.length > 0"),
+    'pin selected topic',
+  );
+  const protectedPath = anchor.key;
+  const beforePressure = await evaluate(
+    "parseInt(document.querySelectorAll('.topic-tree-stats .stat-item')[1].textContent, 10)",
+  );
+  for (let i = 0; i < 5500; i++) send(`pressure/${i}`, 'background');
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.history-limit-notice')?.textContent.includes('topics evicted')",
+      ),
+    'node pressure notice',
+  );
+  await waitFor(
+    () =>
+      evaluate(
+        `parseInt(document.querySelectorAll('.topic-tree-stats .stat-item')[1].textContent, 10) === ${beforePressure + 5500}`,
+      ),
+    'pressure flood processed',
+  );
+  await field('[aria-label="Search topics"]', protectedPath);
+  await waitFor(
+    () =>
+      evaluate(
+        `!![...document.querySelectorAll('.topic-tree-node.selected')].find(node => node.title === ${JSON.stringify(protectedPath)})`,
+      ),
+    'protected topic remains selected',
+  );
+  assert.ok(await evaluate("document.querySelectorAll('.message-item').length > 0"));
+  assert.equal(await evaluate("localStorage.getItem('mqtt-history-profile')"), 'compact');
+  await field('[aria-label="History cache"]', 'larger');
+  await evaluate("document.querySelector('.topic-history-controls').open = false");
+  await evaluate('document.querySelector(\'[aria-label="Clear topic search"]\').click()');
 };

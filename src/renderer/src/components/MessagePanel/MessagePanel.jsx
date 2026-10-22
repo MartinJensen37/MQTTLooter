@@ -253,6 +253,12 @@ function MessagePanel({
         </div>
       )}
 
+      {selectedTopic?.node?.discardedHistory > 0 && (
+        <p className="message-history-notice" role="status">
+          {selectedTopic.node.discardedHistory} older or oversized messages are unavailable under
+          the history limits. This topic remains selected.
+        </p>
+      )}
       <StableScrollViewport
         className="message-list"
         viewKey={JSON.stringify([

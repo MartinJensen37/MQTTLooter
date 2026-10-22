@@ -78,6 +78,14 @@ class RingBuffer<T extends { length?: number; storageBytes?: number }> {
     return this._items[this._end - 1];
   }
 
+  removeOldest(): T | undefined {
+    if (!this.count) return undefined;
+    const item = this._items[this._start];
+    this._dropFirst();
+    if (!this.count) this.clear();
+    return item;
+  }
+
   clear(): void {
     this._items = [];
     this._start = 0;

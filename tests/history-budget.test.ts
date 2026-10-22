@@ -47,11 +47,12 @@ describe('connection history budgets', () => {
   });
 
   it('bounds encoded storage, counts discarded messages, and never caches oversized payloads', () => {
-    const tree = new TopicTree('broker', limits({ maxBytes: 1000 }));
+    const tree = new TopicTree('broker', limits({ maxBytes: 1100 }));
     tree.addMessage('a', 'a'.repeat(200));
     tree.addMessage('b', 'b'.repeat(200));
-    expect(tree.getNode('a')).toBeUndefined();
-    expect(tree.getStatistics().retainedBytes).toBeLessThanOrEqual(1000);
+    expect(tree.getNode('a')?.messageHistory.count).toBe(0);
+    expect(tree.getNode('a')?.directMessageCount).toBe(1);
+    expect(tree.getStatistics().retainedBytes).toBeLessThanOrEqual(1100);
     tree.addMessage('b', 'x'.repeat(MESSAGE_HISTORY.MAX_BYTES_PER_TOPIC + 1));
     expect(tree.getNode('b')?.lastMessage).toBeNull();
     expect(tree.getStatistics()).toMatchObject({
@@ -61,11 +62,11 @@ describe('connection history budgets', () => {
     });
     tree.addMessage('huge/path', 'z'.repeat(1000));
     expect(tree.getStatistics()).toMatchObject({
-      retainedBytes: 0,
-      nodeCount: 0,
       retainedMessages: 0,
       discardedMessages: 4,
     });
+    expect(tree.getNode('huge/path')).toBeDefined();
+    expect(tree.getStatistics().retainedBytes).toBeLessThanOrEqual(1100);
   });
 
   it('bounds message count and keeps IDs unique across eviction and clearing', () => {
@@ -92,16 +93,92 @@ describe('connection history budgets', () => {
     });
   });
 
-  it('stays within all defaults during a 20000-topic retained flood', () => {
+  it('preserves selected and pinned paths including empty ancestors during node pressure', () => {
+    const tree = new TopicTree('broker', limits({ maxNodes: 6, maxMessages: 3 }));
+    tree.addMessage('/a/', 'inspected');
+    tree.addMessage('pinned', 'keep');
+    tree.selectTopic('/a/');
+    expect(tree.pinTopic('pinned')).toBe(true);
+    for (let i = 0; i < 100; i++) tree.addMessage(`noise/${i}`, 'new');
+    expect(tree.getNode('/a/')?.messageHistory.last()?.payload).toBe('inspected');
+    expect(tree.getNode('')?.fullPath).toBe('');
+    expect(tree.getNode('/a')?.fullPath).toBe('/a');
+    expect(tree.getNode('pinned')?.messageHistory.last()?.payload).toBe('keep');
+    expect(tree.getStatistics().nodeCount).toBeLessThanOrEqual(6);
+    tree.selectTopic(null);
+    tree.pinTopic('pinned');
+    for (let i = 100; i < 110; i++) tree.addMessage(`noise/${i}`, 'new');
+    expect(tree.getNode('/a/')).toBeUndefined();
+    expect(tree.getNode('pinned')).toBeUndefined();
+  });
+
+  it('expires protected payloads without losing selection, counts or rates', () => {
+    const tree = new TopicTree('broker', limits({ maxBytes: 1000 }));
+    tree.addMessage('selected', 'first', 0, false, 10000);
+    tree.selectTopic('selected');
+    tree.addMessage('selected', 'x'.repeat(500), 0, false, 10000);
+    tree.updateRates(10000);
+    const node = tree.getNode('selected')!;
+    expect(node.messageHistory.count).toBe(0);
+    expect(node.lastMessage).toBeNull();
+    expect(node.toJSON()).toMatchObject({ discardedHistory: 2, totalMessages: 2 });
+    expect(tree.getStatistics().totalRate).toBe(2);
+    expect(tree.getStatistics().selectedTopic).toBe('selected');
+    expect(tree.getStatistics().retainedBytes).toBeLessThanOrEqual(1000);
+    tree.clearTopicMessages('selected');
+    expect(node.discardedHistory).toBe(0);
+    tree.clear();
+    expect(tree.getNode('selected')).toBeUndefined();
+    expect(tree.getStatistics().selectedTopic).toBeNull();
+  });
+
+  it('rejects new paths when all nodes are protected and bounds pin count', () => {
+    const tree = new TopicTree('broker', limits({ maxNodes: 2 }));
+    tree.addMessage('a', 'a');
+    tree.addMessage('b', 'b');
+    tree.selectTopic('a');
+    tree.pinTopic('b');
+    tree.addMessage('c', 'rejected');
+    expect(tree.getStatistics()).toMatchObject({ nodeCount: 2, discardedMessages: 1 });
+    expect(tree.getNode('c')).toBeUndefined();
+    expect(tree.setLimits(limits({ maxNodes: 1 }))).toBe(false);
+    expect(tree.getStatistics().limits.maxNodes).toBe(2);
+    const pins = new TopicTree('pins');
+    for (let i = 0; i < 9; i++) {
+      pins.addMessage(`${i}`, 'value');
+      expect(pins.pinTopic(`${i}`)).toBe(i < 8);
+    }
+    expect(pins.pins).toHaveLength(8);
+    pins.clear();
+    expect(pins.pins).toEqual([]);
+  });
+
+  it('stays within all defaults during a 50000-topic retained flood while protecting inspection', () => {
     const tree = new TopicTree('broker');
     const payload = 'x'.repeat(4000);
-    for (let i = 0; i < 20000; i++) tree.addMessage(`devices/${i}/value`, payload, 0, true, i);
+    tree.addMessage('inspected/leaf', 'keep', 0, true, 0);
+    tree.selectTopic('inspected/leaf');
+    const started = performance.now();
+    for (let i = 0; i < 50000; i++) tree.addMessage(`devices/${i}/value`, payload, 0, true, i);
     const stats = tree.getStatistics();
     expect(stats.nodeCount).toBeLessThanOrEqual(CONNECTION_HISTORY.maxNodes);
     expect(stats.retainedBytes).toBeLessThanOrEqual(CONNECTION_HISTORY.maxBytes);
     expect(stats.retainedMessages).toBeLessThanOrEqual(CONNECTION_HISTORY.maxMessages);
-    expect(stats.discardedMessages + stats.retainedMessages).toBe(20000);
+    expect(stats.discardedMessages + stats.retainedMessages).toBe(50001);
     expect(stats.evictedTopics).toBeGreaterThan(0);
-    expect(tree.getNode('devices/19999/value')?.lastMessage?.retain).toBe(true);
+    expect(tree.getNode('devices/49999/value')?.lastMessage?.retain).toBe(true);
+    expect(tree.getNode('inspected/leaf')?.lastMessage?.payload).toBe('keep');
+    if (process.env.MQTT_LOAD_REPORT)
+      console.log(
+        JSON.stringify({
+          topicsReceived: 50001,
+          elapsedMs: Math.round(performance.now() - started),
+          retainedBytes: stats.retainedBytes,
+          nodes: stats.nodeCount,
+          retainedMessages: stats.retainedMessages,
+          discardedMessages: stats.discardedMessages,
+          processRss: process.memoryUsage().rss,
+        }),
+      );
   });
 });
