@@ -1,6 +1,40 @@
 import { DATA_TYPE_CONFIGS } from './constants';
 import type { DeviceOutput, SimulatedDevice } from './types';
 
+export const signalTopic = (device: SimulatedDevice, output: DeviceOutput) =>
+  typeof output.topic === 'string' && output.topic !== ''
+    ? output.topic
+    : `${device.topic}/${output.name.trim()}`;
+export const validTopic = (topic: string) =>
+  typeof topic === 'string' &&
+  !!topic &&
+  !/[+#]/.test(topic) &&
+  !topic.includes('\u0000') &&
+  new TextEncoder().encode(topic).length <= 65535;
+
+export function validateTiming(output: DeviceOutput): string[] {
+  const t = output.timing;
+  if (!t) return [];
+  const errors: string[] = [];
+  if (!['sync', 'fixed', 'random'].includes(t.mode)) errors.push('Choose a supported timing mode.');
+  if (
+    t.mode !== 'sync' &&
+    (!Number.isFinite(t.intervalMs) || t.intervalMs! < 100 || t.intervalMs! > 86400000)
+  )
+    errors.push('Signal period must be between 100 and 86,400,000 ms.');
+  if (!Number.isFinite(t.offsetMs ?? 0) || (t.offsetMs ?? 0) < 0 || (t.offsetMs ?? 0) > 86400000)
+    errors.push('Offset must be between 0 and 86,400,000 ms.');
+  if (!Number.isFinite(t.probability ?? 1) || (t.probability ?? 1) < 0 || (t.probability ?? 1) > 1)
+    errors.push('Publish probability must be between 0 and 1.');
+  if (
+    !Number.isFinite(t.jitterPercent ?? 20) ||
+    (t.jitterPercent ?? 20) < 0 ||
+    (t.jitterPercent ?? 20) > 100
+  )
+    errors.push('Interval variation must be between 0 and 100%.');
+  return errors;
+}
+
 export function defaultConfig(type: string, generator: string): Record<string, any> {
   switch (generator) {
     case 'static':
@@ -45,7 +79,12 @@ export function defaultConfig(type: string, generator: string): Record<string, a
 }
 
 export function validateOutput(output: DeviceOutput, others: DeviceOutput[] = []): string[] {
-  const errors: string[] = [];
+  const errors: string[] = validateTiming(output);
+  if (
+    output.topic !== undefined &&
+    (typeof output.topic !== 'string' || (output.topic !== '' && !validTopic(output.topic)))
+  )
+    errors.push('Use a publish topic without wildcards or NUL.');
   if (!output.name?.trim()) errors.push('Signal name is required.');
   if (others.some((other) => other.id !== output.id && other.name.trim() === output.name.trim()))
     errors.push('Signal names must be unique within a device.');
@@ -142,12 +181,7 @@ export function validateOutput(output: DeviceOutput, others: DeviceOutput[] = []
 export function validateDevice(device: SimulatedDevice): string[] {
   const errors: string[] = [];
   if (!device.name.trim()) errors.push('Device name is required.');
-  if (
-    !device.topic ||
-    /[+#]/.test(device.topic) ||
-    device.topic.includes('\u0000') ||
-    new TextEncoder().encode(device.topic).length > 65535
-  )
+  if (!validTopic(device.topic))
     errors.push('Use a nonempty publish topic without wildcards or NUL.');
   if (
     !Number.isFinite(device.publishInterval) ||
@@ -160,6 +194,12 @@ export function validateDevice(device: SimulatedDevice): string[] {
     errors.push('Retain must be true or false.');
   if (!['auto', 'named'].includes(device.payloadFormat ?? 'auto'))
     errors.push('Invalid payload format.');
+  if (!['combined', 'signals'].includes(device.publishMode ?? 'combined'))
+    errors.push('Invalid publishing mode.');
+  if (device.publishMode === 'signals')
+    for (const output of device.outputs)
+      if (!validTopic(signalTopic(device, output)))
+        errors.push(`${output.name}: Invalid resolved topic.`);
   if (!device.outputs.length) errors.push('Add at least one signal.');
   for (const output of device.outputs)
     errors.push(
@@ -210,6 +250,7 @@ export function loadDevices(raw: string | null): SimulatedDevice[] {
       qos: device.qos ?? 0,
       retain: device.retain ?? false,
       payloadFormat: device.payloadFormat ?? 'auto',
+      publishMode: device.publishMode ?? 'combined',
       outputs: device.outputs.map((output: DeviceOutput) => ({
         ...output,
         currentValue: undefined,

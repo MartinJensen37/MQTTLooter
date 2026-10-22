@@ -440,7 +440,7 @@ function PublishingPanel({
             <div className="form-group">
               <label htmlFor="publish-encoding">Payload encoding</label>
               <select
-                className="form-input"
+                className="custom-select-button form-select"
                 id="publish-encoding"
                 value={encoding}
                 disabled={isPublishing}

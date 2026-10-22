@@ -180,6 +180,39 @@
 .custom-select-button:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
 .custom-select-button:disabled { background: var(--bg-subtle); color: var(--text-muted); cursor: not-allowed; }
 
+/* Native selects reuse the same pill, spacing, focus and colors as custom menus. */
+select.form-select {
+  appearance: none;
+  display: block;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%236c757d' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  text-overflow: ellipsis;
+  border-radius: var(--radius-pill);
+}
+select.form-select-compact { display: inline-block; width: auto; height: 32px; padding-top: 5px; padding-bottom: 5px; }
+
+.form-range {
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to right, var(--primary) var(--range-progress, 0%), var(--bg-muted) var(--range-progress, 0%));
+  cursor: pointer;
+  margin: 12px 0;
+}
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--bg-surface);
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+}
+.form-range:focus-visible { outline: 3px solid var(--primary-light); outline-offset: 6px; }
+
 .select-value { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
 
 .custom-select-button i.fa-chevron-down { margin-left: var(--spacing-sm); transition: transform var(--transition-fast); color: var(--text-muted); }

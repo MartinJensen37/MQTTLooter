@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import type { SimulatedDevice, DeviceOutput } from './types';
 import { GENERATOR_CONFIGS } from './constants';
-import { validateDevice } from './model';
+import IntervalField from './IntervalField';
+import SignalWaveform from './SignalWaveform';
+import { signalTopic, validateDevice } from './model';
 import { sampleDevice } from '../../../services/SimulationEngine';
 import { formatOutputValue } from './formatters';
 interface Props {
@@ -15,6 +17,7 @@ interface Props {
   onEditOutput: (output: DeviceOutput) => void;
   busy?: boolean;
   lastPayload?: string;
+  lastTopic?: string;
   onDuplicate?: () => void;
 }
 export default function DeviceConfigPanel({
@@ -28,29 +31,46 @@ export default function DeviceConfigPanel({
   onEditOutput,
   busy,
   lastPayload,
+  lastTopic,
   onDuplicate,
 }: Props) {
+  const separate = device.publishMode === 'signals';
   const errors = validateDevice(device);
   const example = useMemo(() => {
     try {
-      return sampleDevice(device, 0, undefined, () => 0.5, '2026-01-01T00:00:00.000Z').payload;
+      const preview = (outputs = device.outputs) =>
+        JSON.parse(
+          sampleDevice(
+            { ...device, outputs, payloadFormat: separate ? 'auto' : device.payloadFormat },
+            0,
+            undefined,
+            () => 0.5,
+            '2026-01-01T00:00:00.000Z',
+          ).payload,
+        );
+      return separate
+        ? device.outputs.map((output) => ({
+            topic: signalTopic(device, output),
+            payload: preview([output]),
+          }))
+        : [{ topic: device.topic, payload: preview() }];
     } catch {
-      return '';
+      return [];
     }
-  }, [device]);
+  }, [device, separate]);
   return (
     <div className="device-config panel">
       <div className="device-config-header">
         <h3>{device.name || 'Unnamed device'}</h3>
-        <span role="status">
+        <span className={`simulation-status ${device.isPublishing ? 'running' : ''}`} role="status">
           {busy ? 'Publishing...' : device.isPublishing ? 'Running' : 'Stopped'}
         </span>
-        <button className="btn btn-sm" onClick={onDuplicate}>
+        <button className="btn btn-sm btn-secondary" onClick={onDuplicate}>
           Duplicate device
         </button>
       </div>
       <fieldset className="device-settings">
-        <legend>Device and destination</legend>
+        <legend>Device settings</legend>
         <div className="signal-parameters">
           <label>
             Device name
@@ -61,7 +81,7 @@ export default function DeviceConfigPanel({
             />
           </label>
           <label>
-            MQTT topic
+            {separate ? 'Default topic prefix' : 'MQTT topic'}
             <input
               className="form-input"
               value={device.topic}
@@ -69,22 +89,10 @@ export default function DeviceConfigPanel({
             />
           </label>
           <label>
-            Publish interval (ms)
-            <input
-              className="form-input"
-              type="number"
-              min="100"
-              max="86400000"
-              value={Number.isFinite(device.publishInterval) ? device.publishInterval : ''}
-              onChange={(e) =>
-                onUpdateDevice(device.id, { publishInterval: e.target.valueAsNumber })
-              }
-            />
-          </label>
-          <label>
             QoS
             <select
-              className="form-input"
+              className="custom-select-button form-select"
+              aria-label="QoS"
               value={device.qos ?? 0}
               onChange={(e) =>
                 onUpdateDevice(device.id, { qos: Number(e.target.value) as 0 | 1 | 2 })
@@ -96,18 +104,38 @@ export default function DeviceConfigPanel({
             </select>
           </label>
           <label>
-            Payload structure
+            Publishing mode
             <select
-              className="form-input"
-              value={device.payloadFormat ?? 'auto'}
-              onChange={(e) =>
-                onUpdateDevice(device.id, { payloadFormat: e.target.value as 'auto' | 'named' })
+              className="custom-select-button form-select"
+              value={device.publishMode ?? 'combined'}
+              disabled={device.isPublishing || busy}
+              onChange={(event) =>
+                onUpdateDevice(device.id, {
+                  publishMode: event.target.value as 'signals' | 'combined',
+                })
               }
             >
-              <option value="named">Named signals (stable keys)</option>
-              <option value="auto">Flatten a single signal (legacy)</option>
+              <option value="signals">One topic per signal</option>
+              <option value="combined">Combined device payload</option>
             </select>
           </label>
+          {!separate && (
+            <label>
+              Payload structure
+              <select
+                className="custom-select-button form-select"
+                value={device.payloadFormat ?? 'auto'}
+                onChange={(event) =>
+                  onUpdateDevice(device.id, {
+                    payloadFormat: event.target.value as 'auto' | 'named',
+                  })
+                }
+              >
+                <option value="named">Named signals</option>
+                <option value="auto">Flatten single signal (legacy)</option>
+              </select>
+            </label>
+          )}
           <label>
             <input
               type="checkbox"
@@ -117,7 +145,40 @@ export default function DeviceConfigPanel({
             Retain message
           </label>
         </div>
+        <IntervalField
+          value={device.publishInterval}
+          onChange={(publishInterval) => onUpdateDevice(device.id, { publishInterval })}
+        />
+        <p className="simulation-help">
+          {separate
+            ? 'Each signal has its own topic and schedule. Edit a signal to set an offset, period, interval variation or publish probability.'
+            : 'Compatibility mode: all signals share one topic and publish together. Stop the loop to switch to individual signal topics.'}
+        </p>
       </fieldset>
+      <div className="publishing-buttons">
+        <button
+          className={`btn btn-md ${device.isPublishing ? 'btn-danger' : 'btn-success'}`}
+          disabled={!device.isPublishing && (!isConnected || !!errors.length)}
+          onClick={() => onTogglePublishing(device.id)}
+        >
+          {device.isPublishing ? 'Stop Loop' : 'Start Loop'}
+        </button>
+        <button
+          className="btn btn-md btn-primary"
+          disabled={!isConnected || device.isPublishing || busy || !!errors.length}
+          onClick={() => onPublishOnce(device.id)}
+        >
+          Publish Once
+        </button>
+      </div>
+      <p className="simulation-help">
+        {separate
+          ? 'Signals share a clock, with at most one pending publish per signal. Busy ticks are skipped without a catch-up burst. Publish Once sends every signal.'
+          : 'One publish at a time per device. The interval starts after each publish completes; slow brokers do not build a queue.'}
+      </p>
+      {!isConnected && (
+        <p role="status">Connect to publish. Signals can still be configured and previewed.</p>
+      )}
       <section className="outputs-section">
         <div className="section-header">
           <h4>Signals ({device.outputs.length})</h4>
@@ -141,9 +202,33 @@ export default function DeviceConfigPanel({
                     : formatOutputValue(output)}
                 </span>
               </div>
+              {separate && (
+                <div className="signal-delivery-summary">
+                  <code>{signalTopic(device, output)}</code>
+                  <span>
+                    {output.timing?.mode === 'random'
+                      ? 'Random'
+                      : output.timing?.mode === 'fixed'
+                        ? 'Fixed'
+                        : 'Synchronized'}
+                    {' / '}
+                    {!output.timing || output.timing.mode === 'sync'
+                      ? device.publishInterval
+                      : output.timing.intervalMs}{' '}
+                    ms
+                    {' / '}offset {output.timing?.offsetMs ?? 0} ms
+                    {' / '}
+                    {Math.round((output.timing?.probability ?? 1) * 100)}% sends
+                    {output.timing?.mode === 'random'
+                      ? ` / +/- ${output.timing.jitterPercent ?? 20}% interval`
+                      : ''}
+                  </span>
+                </div>
+              )}
+              <SignalWaveform output={output} />
               <div className="output-actions">
                 <button
-                  className="btn btn-sm"
+                  className="btn btn-sm btn-secondary"
                   onClick={() => onEditOutput(output)}
                   aria-label={`Edit ${output.name}`}
                 >
@@ -169,40 +254,23 @@ export default function DeviceConfigPanel({
           ))}
         </ul>
       )}
-      <div className="publishing-buttons">
-        <button
-          className={`btn btn-md ${device.isPublishing ? 'btn-danger' : 'btn-success'}`}
-          disabled={!device.isPublishing && (!isConnected || !!errors.length)}
-          onClick={() => onTogglePublishing(device.id)}
-        >
-          {device.isPublishing ? 'Stop Loop' : 'Start Loop'}
-        </button>
-        <button
-          className="btn btn-md btn-primary"
-          disabled={!isConnected || device.isPublishing || busy || !!errors.length}
-          onClick={() => onPublishOnce(device.id)}
-        >
-          Publish Once
-        </button>
-      </div>
-      <p className="simulation-help">
-        One publish at a time per device. The interval starts after each publish completes; slow
-        brokers do not build a queue. Settings apply to the next sample.
-      </p>
-      {!isConnected && (
-        <p role="status">Connect to publish. Signals can still be configured and previewed.</p>
-      )}
       <section className="simulation-payload-preview">
-        <h4>Payload example</h4>
+        <h4>{separate ? 'Topic and payload examples' : 'Payload example'}</h4>
         <p>First sample with representative random values and an example timestamp.</p>
-        <pre>
-          {example
-            ? JSON.stringify(JSON.parse(example), null, 2)
-            : 'Fix the settings above to preview the payload.'}
-        </pre>
+        {example.length ? (
+          example.map((message, index) => (
+            <div className="payload-example" key={index}>
+              <code>{message.topic}</code>
+              <pre>{JSON.stringify(message.payload, null, 2)}</pre>
+            </div>
+          ))
+        ) : (
+          <p>Fix the settings above to preview the payload.</p>
+        )}
         {lastPayload && (
           <details>
             <summary>Last successful publish</summary>
+            {lastTopic && <code>{lastTopic}</code>}
             <pre>{JSON.stringify(JSON.parse(lastPayload), null, 2)}</pre>
           </details>
         )}

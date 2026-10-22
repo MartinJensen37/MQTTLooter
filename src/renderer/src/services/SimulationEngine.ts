@@ -1,13 +1,8 @@
-import { generateSignalSample } from '../utils/valueGenerators';
-import { defaultConfig, validateDevice } from '../components/SimulationPanel/simulationPanel/model';
+import { validateDevice } from '../components/SimulationPanel/simulationPanel/model';
 import type { SimulatedDevice } from '../components/SimulationPanel/simulationPanel/types';
-
-interface SignalState {
-  signature: string;
-  sampleIndex: number;
-  value: any;
-  startedAt: number;
-}
+import { sampleDevice, type SignalState, type SimulationCallbacks } from './SimulationSample';
+import { SignalScheduler } from './SignalScheduler';
+export { sampleDevice, type SimulationSample } from './SimulationSample';
 interface Session {
   startedAt: number;
   signals: Map<number, SignalState>;
@@ -17,64 +12,9 @@ interface Loop {
   interval: number;
   session: Session;
 }
-export interface SimulationSample {
-  payload: string;
-  values: Record<number, any>;
-}
-
-export function sampleDevice(
-  device: SimulatedDevice,
-  elapsedMs = 0,
-  previous = new Map<number, SignalState>(),
-  random = Math.random,
-  timestamp = new Date().toISOString(),
-) {
-  const errors = validateDevice(device);
-  if (errors.length) throw new Error(errors[0]);
-  const next = new Map<number, SignalState>();
-  const values: Record<number, any> = {};
-  const entries = device.outputs.map((output) => {
-    const signature = JSON.stringify([output.dataType, output.generator, output.config]);
-    const old = previous.get(output.id);
-    const state =
-      old?.signature === signature
-        ? old
-        : { signature, sampleIndex: 0, value: undefined, startedAt: elapsedMs };
-    const { value, rawValue } = generateSignalSample(
-      {
-        ...output,
-        config: { ...defaultConfig(output.dataType, output.generator), ...output.config },
-      },
-      {
-        elapsedMs: elapsedMs - state.startedAt,
-        sampleIndex: state.sampleIndex,
-        previousValue: state.value,
-        random,
-      },
-    );
-    next.set(output.id, { ...state, sampleIndex: state.sampleIndex + 1, value: rawValue });
-    values[output.id] = value;
-    return [
-      output.name.trim(),
-      {
-        value,
-        ...(output.dataType === 'number' && output.unit?.trim()
-          ? { unit: output.unit.trim() }
-          : {}),
-        ...(output.includeTimestamp !== false ? { timestamp } : {}),
-      },
-    ] as const;
-  });
-  const payload = JSON.stringify(
-    (device.payloadFormat ?? 'auto') === 'auto' && entries.length === 1
-      ? entries[0][1]
-      : Object.fromEntries(entries),
-  );
-  return { payload, values, next };
-}
-
-/** A bounded, completion-based scheduler: one in-flight publish per device, no backlog. */
+/** Routes individual signal clocks and legacy completion-based device loops. */
 export class SimulationEngine {
+  private signalScheduler: SignalScheduler;
   private devices: SimulatedDevice[] = [];
   private connected = false;
   private disposed = false;
@@ -82,33 +22,31 @@ export class SimulationEngine {
   private sessions = new Map<number, Session>();
   private pending = new Set<number>();
   constructor(
-    private callbacks: {
-      publish: (message: {
-        topic: string;
-        payload: string;
-        qos: number;
-        retain: boolean;
-      }) => Promise<void> | void;
-      sample: (id: number, sample: SimulationSample) => void;
-      error: (id: number, message: string) => void;
-      busy?: (id: number, busy: boolean) => void;
-    },
+    private callbacks: SimulationCallbacks,
     private now = () => performance.now(),
-  ) {}
+    random = Math.random,
+  ) {
+    this.signalScheduler = new SignalScheduler(callbacks, now, random);
+  }
 
   sync(devices: SimulatedDevice[], connected: boolean) {
+    this.signalScheduler.sync(
+      devices.filter((device) => device.publishMode === 'signals'),
+      connected,
+    );
+    devices = devices.filter((device) => device.publishMode !== 'signals');
     this.devices = devices;
     this.connected = connected;
     for (const id of this.sessions.keys())
-      if (!connected || !devices.some((device) => device.id === id)) this.stop(id);
+      if (!connected || !devices.some((device) => device.id === id)) this.stopCombined(id);
     for (const [id] of this.loops)
       if (!connected || !devices.some((device) => device.id === id && device.isPublishing))
-        this.stop(id);
+        this.stopCombined(id);
     if (!connected || this.disposed) return;
     for (const device of devices.filter((item) => item.isPublishing)) {
       const errors = validateDevice(device);
       if (errors.length) {
-        this.stop(device.id);
+        this.stopCombined(device.id);
         this.callbacks.error(device.id, errors[0]);
         continue;
       }
@@ -138,12 +76,18 @@ export class SimulationEngine {
   }
 
   stop(id: number) {
+    this.signalScheduler.stop(id);
+    this.stopCombined(id);
+  }
+
+  private stopCombined(id: number) {
     clearTimeout(this.loops.get(id)?.timer);
     this.loops.delete(id);
     this.sessions.delete(id);
   }
 
   async publishOnce(id: number) {
+    if (this.signalScheduler.has(id)) return this.signalScheduler.publishOnce(id);
     const device = this.devices.find((item) => item.id === id);
     if (!device || !this.connected || this.disposed || this.pending.has(id)) return;
     let session = this.sessions.get(id);
@@ -167,7 +111,7 @@ export class SimulationEngine {
       }
     } catch (error) {
       if (!this.disposed && this.sessions.get(id) === session) {
-        this.stop(id);
+        this.stopCombined(id);
         this.callbacks.error(id, (error as Error).message);
       }
     } finally {
@@ -178,6 +122,7 @@ export class SimulationEngine {
 
   dispose() {
     this.disposed = true;
-    for (const id of this.sessions.keys()) this.stop(id);
+    this.signalScheduler.dispose();
+    for (const id of this.sessions.keys()) this.stopCombined(id);
   }
 }

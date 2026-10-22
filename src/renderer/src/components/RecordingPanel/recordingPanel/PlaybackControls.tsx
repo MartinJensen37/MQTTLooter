@@ -127,7 +127,11 @@ function PlaybackControls({
 
         {/* Main controls */}
         <div className="recording-main-controls">
-          <button onClick={stepBackward} className="btn btn-md" disabled={currentIndex === 0}>
+          <button
+            onClick={stepBackward}
+            className="btn btn-md btn-secondary"
+            disabled={currentIndex === 0}
+          >
             <i className="fas fa-step-backward"></i>
           </button>
 
@@ -159,7 +163,7 @@ function PlaybackControls({
 
           <button
             onClick={stepForward}
-            className="btn btn-md"
+            className="btn btn-md btn-secondary"
             disabled={currentIndex >= currentPlayback.messages.length}
           >
             <i className="fas fa-step-forward"></i>
@@ -173,7 +177,7 @@ function PlaybackControls({
             <select
               value={playbackSpeed}
               onChange={(e) => setPlaybackSpeed(parseFloat(e.target.value))}
-              className="form-input"
+              className="custom-select-button form-select form-select-compact"
             >
               <option value={0.25}>0.25x</option>
               <option value={0.5}>0.5x</option>
@@ -188,7 +192,7 @@ function PlaybackControls({
             <select
               value={stepSize}
               onChange={(e) => setStepSize(parseInt(e.target.value))}
-              className="form-input"
+              className="custom-select-button form-select form-select-compact"
             >
               <option value={1}>1 msg</option>
               <option value={5}>5 msgs</option>

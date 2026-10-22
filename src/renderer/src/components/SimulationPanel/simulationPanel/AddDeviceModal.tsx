@@ -1,3 +1,4 @@
+import IntervalField from './IntervalField';
 import React, { useState } from 'react';
 import { PRESETS, presetOutputs, validateDevice } from './model';
 
@@ -24,6 +25,7 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }: Props) {
     publishInterval: interval,
     isPublishing: false,
     outputs: presetOutputs(preset),
+    publishMode: 'signals',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -40,7 +42,7 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }: Props) {
   return (
     <div className="modal-overlay">
       <div
-        className="modal-content"
+        className="modal-content device-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-device-title"
@@ -50,7 +52,11 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }: Props) {
       >
         <div className="modal-header">
           <h3 id="add-device-title">Add Simulated Device</h3>
-          <button onClick={onClose} className="modal-close-btn" aria-label="Close device editor">
+          <button
+            onClick={onClose}
+            className="btn btn-sm btn-ghost"
+            aria-label="Close device editor"
+          >
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -59,7 +65,7 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }: Props) {
           <label>
             Start from
             <select
-              className="form-input"
+              className="custom-select-button form-select"
               value={preset}
               onChange={(e) => setPreset(e.target.value)}
             >
@@ -92,30 +98,23 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }: Props) {
           </div>
 
           <div className="form-group">
-            <label htmlFor="sim-device-topic">MQTT Topic:</label>
+            <label htmlFor="sim-device-topic">Topic prefix:</label>
             <input
               id="sim-device-topic"
               type="text"
               value={deviceTopic}
               onChange={(e) => setDeviceTopic(e.target.value)}
-              placeholder="sensors/room/temperature"
+              placeholder="sensors/room"
               className="form-input"
               required
             />
           </div>
 
-          <label>
-            Publish interval (ms)
-            <input
-              className="form-input"
-              type="number"
-              min="100"
-              max="86400000"
-              required
-              value={Number.isFinite(interval) ? interval : ''}
-              onChange={(e) => setInterval(e.target.valueAsNumber)}
-            />
-          </label>
+          <p className="simulation-help">
+            Each signal publishes to its own topic, such as sensors/room/temperature. You can
+            override topics individually.
+          </p>
+          <IntervalField value={interval} onChange={setInterval} />
           {!!deviceName && !!deviceTopic && !!errors.length && <p role="alert">{errors[0]}</p>}
           <div className="form-actions">
             <button

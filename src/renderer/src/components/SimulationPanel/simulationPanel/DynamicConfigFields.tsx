@@ -53,6 +53,7 @@ export default function DynamicConfigFields({
                 <div className="signal-list-row" key={index}>
                   {dataType === 'boolean' ? (
                     <select
+                      className="custom-select-button form-select"
                       aria-label={`Step ${index + 1}`}
                       value={String(item)}
                       onChange={(e) => changeItem(field, index, e.target.value === 'true')}
@@ -92,7 +93,7 @@ export default function DynamicConfigFields({
                   )}
                   <button
                     type="button"
-                    className="btn btn-sm"
+                    className="btn btn-sm btn-secondary"
                     aria-label={`Remove step ${index + 1}`}
                     onClick={() =>
                       onConfigChange(
@@ -107,7 +108,7 @@ export default function DynamicConfigFields({
               ))}
               <button
                 type="button"
-                className="btn btn-sm"
+                className="btn btn-sm btn-secondary"
                 onClick={() =>
                   onConfigChange(field, [
                     ...items,
@@ -130,7 +131,7 @@ export default function DynamicConfigFields({
               Value
               {dataType === 'boolean' ? (
                 <select
-                  className="form-input"
+                  className="custom-select-button form-select"
                   value={String(values.value)}
                   onChange={(e) => onConfigChange('value', e.target.value === 'true')}
                 >

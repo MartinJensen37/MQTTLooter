@@ -2,17 +2,25 @@ import { useState, useEffect, useRef } from 'react';
 import { DATA_TYPE_CONFIGS, GENERATOR_CONFIGS } from './constants';
 import { defaultConfig, validateOutput } from './model';
 import { generateSignalSample } from '../../../utils/valueGenerators';
-import type { DeviceOutput } from './types';
+import type { DeviceOutput, SimulatedDevice } from './types';
+import SignalTimingFields from './SignalTimingFields';
 import DynamicConfigFields from './DynamicConfigFields';
 import SignalWaveform from './SignalWaveform';
 
 interface Props {
   output: DeviceOutput;
   otherOutputs?: DeviceOutput[];
+  device?: SimulatedDevice;
   onClose: () => void;
   onSave: (output: DeviceOutput) => void;
 }
-export default function EditOutputModal({ output, otherOutputs = [], onClose, onSave }: Props) {
+export default function EditOutputModal({
+  output,
+  otherOutputs = [],
+  device,
+  onClose,
+  onSave,
+}: Props) {
   const [form, setForm] = useState<DeviceOutput>({
     ...output,
     decimalPrecision: output.decimalPrecision ?? 2,
@@ -105,7 +113,11 @@ export default function EditOutputModal({ output, otherOutputs = [], onClose, on
       >
         <div className="modal-header">
           <h3 id="signal-title">Configure signal</h3>
-          <button className="modal-close-btn" aria-label="Close signal editor" onClick={onClose}>
+          <button
+            className="btn btn-sm btn-ghost"
+            aria-label="Close signal editor"
+            onClick={onClose}
+          >
             Close
           </button>
         </div>
@@ -129,7 +141,7 @@ export default function EditOutputModal({ output, otherOutputs = [], onClose, on
             <label>
               Data type
               <select
-                className="form-input"
+                className="custom-select-button form-select"
                 value={form.dataType}
                 onChange={(e) => changeType(e.target.value)}
               >
@@ -143,7 +155,7 @@ export default function EditOutputModal({ output, otherOutputs = [], onClose, on
             <label>
               Generator
               <select
-                className="form-input"
+                className="custom-select-button form-select"
                 value={form.generator}
                 onChange={(e) =>
                   update({
@@ -184,6 +196,10 @@ export default function EditOutputModal({ output, otherOutputs = [], onClose, on
               </>
             )}
           </div>
+          {device?.publishMode === 'signals' && (
+            <SignalTimingFields output={form} device={device} onChange={update} />
+          )}
+          <h4 className="signal-section-title">Value generator</h4>
           <DynamicConfigFields
             dataType={form.dataType}
             generator={form.generator}
@@ -219,7 +235,7 @@ export default function EditOutputModal({ output, otherOutputs = [], onClose, on
             </pre>
           </div>
           <div className="form-actions">
-            <button type="button" className="btn btn-md" onClick={onClose}>
+            <button type="button" className="btn btn-md btn-secondary" onClick={onClose}>
               Cancel
             </button>
             <button className="btn btn-md btn-primary" type="submit" disabled={!!errors.length}>

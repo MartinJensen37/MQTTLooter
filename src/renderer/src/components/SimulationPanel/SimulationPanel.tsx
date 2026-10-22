@@ -49,7 +49,14 @@ function SimulationWorkspace({
   useEffect(() => {
     const engine = new SimulationEngine({
       publish: (message) => callbacks.current.onPublishMessage(message),
-      sample: (id, sample) => setSamples((previous) => ({ ...previous, [id]: sample })),
+      sample: (id, sample) =>
+        setSamples((previous) => ({
+          ...previous,
+          [id]: {
+            ...sample,
+            values: { ...previous[id]?.values, ...sample.values },
+          },
+        })),
       busy: (id, value) => setBusy((previous) => ({ ...previous, [id]: value })),
       error: (id, message) => {
         setSimulatedDevices((previous) =>
@@ -108,6 +115,7 @@ function SimulationWorkspace({
       qos: 0,
       retain: false,
       payloadFormat: 'named',
+      publishMode: 'signals',
     };
     setSimulatedDevices((previous) => [...previous, device]);
     setSelectedDevice(device.id);
@@ -283,6 +291,7 @@ function SimulationWorkspace({
               key={selectedDeviceData.id}
               busy={!!busy[selectedDeviceData.id]}
               lastPayload={samples[selectedDeviceData.id]?.payload}
+              lastTopic={samples[selectedDeviceData.id]?.topic}
               onDuplicate={duplicateDevice}
               device={selectedDeviceData}
               onUpdateDevice={updateDevice}
@@ -321,6 +330,7 @@ function SimulationWorkspace({
         <EditOutputModal
           output={editingOutput}
           otherOutputs={selectedConfig!.outputs}
+          device={selectedConfig}
           onClose={() => {
             setShowEditOutput(false);
             setEditingOutput(null);

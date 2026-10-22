@@ -11,6 +11,14 @@ export interface DeviceOutput {
   includeTimestamp?: boolean;
   config: any;
   currentValue?: any;
+  topic?: string;
+  timing?: {
+    mode: 'sync' | 'fixed' | 'random';
+    intervalMs?: number;
+    offsetMs?: number;
+    jitterPercent?: number;
+    probability?: number;
+  };
 }
 
 export interface SimulatedDevice {
@@ -23,4 +31,5 @@ export interface SimulatedDevice {
   qos?: 0 | 1 | 2;
   retain?: boolean;
   payloadFormat?: 'auto' | 'named';
+  publishMode?: 'combined' | 'signals';
 }

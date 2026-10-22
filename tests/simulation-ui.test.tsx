@@ -22,7 +22,7 @@ const input = async (label: string, value: string) => {
     item.textContent?.startsWith(label),
   );
   const field =
-    element?.querySelector('input, select') ?? container.querySelector(`#${element?.htmlFor}`);
+    element?.querySelector('input, select') ?? document.getElementById(element?.htmlFor ?? '');
   expect(field, label).toBeTruthy();
   await act(async () => {
     const prototype =
@@ -79,11 +79,11 @@ it('constructs a preset, previews its named payload and cancels new signals with
   await click('Add Simulated Device');
   await input('Start from', 'environment');
   await input('Device Name:', 'Room');
-  await input('MQTT Topic:', 'room');
+  await input('Topic prefix:', 'room');
   await click('Create Device');
   expect(container.textContent).toContain('Signals (3)');
   expect(container.querySelector('.simulation-payload-preview')?.textContent).toContain(
-    '"temperature"',
+    'room/temperature',
   );
   await click('Add Signal');
   await input('Signal name', 'temperature');
@@ -100,6 +100,7 @@ it('constructs a preset, previews its named payload and cancels new signals with
   expect(devices[1]).toMatchObject({
     name: 'Room copy',
     payloadFormat: 'named',
+    publishMode: 'signals',
     isPublishing: false,
   });
   expect(devices[0].id).not.toBe(devices[1].id);
@@ -145,6 +146,53 @@ it('keeps zero precision and probability, rejects duplicate names and edits enum
     sequence: ['idle', 'running', 'idle'],
     intervalMs: 250,
   });
+});
+
+it('edits per-signal topics and schedules, previews three cycles, and publishes separate messages', async () => {
+  const publish = vi.fn().mockResolvedValue(undefined);
+  await act(async () =>
+    root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={publish} />),
+  );
+  await click('Add Simulated Device');
+  await input('Start from', 'environment');
+  await input('Device Name:', 'Room');
+  await input('Topic prefix:', 'room');
+  await click('Create Device');
+  await click('Edit temperature');
+  await input('Signal topic', 'custom/temperature');
+  await input('Timing mode', 'fixed');
+  await input('Signal period (ms)', '2500');
+  await input('Time offset (ms)', '250');
+  await input('Publish probability (%)', '25');
+  await input('Generator', 'sine');
+  const plot = container.querySelector('.signal-dialog svg');
+  expect(plot?.getAttribute('aria-label')).toContain('three cycles');
+  expect(plot?.textContent).toContain('100');
+  expect(plot?.textContent).toContain('0');
+  await click('Save Signal');
+  const saved = JSON.parse(localStorage.getItem('mqtt-simulation-devices-a')!)[0];
+  expect(saved.outputs[0]).toMatchObject({
+    topic: 'custom/temperature',
+    timing: {
+      mode: 'fixed',
+      intervalMs: 2500,
+      offsetMs: 250,
+      probability: 0.25,
+    },
+  });
+  await click('Publish Once');
+  expect(publish.mock.calls.map(([message]) => message.topic)).toEqual([
+    'custom/temperature',
+    'room/humidity',
+    'room/occupied',
+  ]);
+  expect(JSON.parse(publish.mock.calls[0][0].payload)).toHaveProperty('value');
+  expect(container.querySelectorAll('.output-value')).toHaveLength(3);
+  expect(
+    [...container.querySelectorAll('.output-value')].every(
+      (value) => value.textContent !== 'Not published yet',
+    ),
+  ).toBe(true);
 });
 
 it('does not persist live samples, stops on disconnect, and isolates connection changes', async () => {

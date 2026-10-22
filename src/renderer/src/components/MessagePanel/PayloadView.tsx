@@ -9,6 +9,7 @@ function PayloadView({ value, encoding = 'utf8' }: { value: string; encoding?: P
       <label>
         View{' '}
         <select
+          className="custom-select-button form-select form-select-compact"
           aria-label="Payload view"
           value={view}
           onChange={(e) => setView(e.target.value as 'text' | 'hex')}

@@ -144,6 +144,7 @@ function MessagePanel({ messages, selectedTopic, onClearMessages, connectionName
         <label>
           Order{' '}
           <select
+            className="custom-select-button form-select form-select-compact"
             value={sortOrder}
             onChange={(e) => {
               setSortBy('timestamp');

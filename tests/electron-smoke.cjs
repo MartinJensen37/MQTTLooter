@@ -293,12 +293,13 @@ async function run() {
       ),
     'machine signals',
   );
-  const simulationPackets = () => published.filter((packet) => packet.topic === 'smoke/device');
-  await field('.device-settings select', '1');
+  const simulationPackets = () =>
+    published.filter((packet) => packet.topic === 'smoke/device/cycles');
+  await field('.device-settings select[aria-label="QoS"]', '1');
   await clickButton('.simulation-panel', 'Publish Once');
   await waitFor(() => simulationPackets().length === 1, 'simulator QoS 1 publish');
   assert.equal(simulationPackets()[0].qos, 1);
-  assert.equal(JSON.parse(simulationPackets()[0].payload.toString()).cycles.value, 0);
+  assert.equal(JSON.parse(simulationPackets()[0].payload.toString()).value, 0);
   await waitFor(
     () =>
       evaluate(
@@ -306,7 +307,7 @@ async function run() {
       ),
     'publish completion',
   );
-  await field('.device-settings select', '2');
+  await field('.device-settings select[aria-label="QoS"]', '2');
   await clickButton('.simulation-panel', 'Publish Once');
   await waitFor(() => simulationPackets().length === 2, 'simulator QoS 2 publish');
   assert.equal(simulationPackets()[1].qos, 2);
@@ -331,7 +332,7 @@ async function run() {
   const stoppedCount = simulationPackets().length;
   await new Promise((resolve) => setTimeout(resolve, 300));
   assert.equal(simulationPackets().length, stoppedCount);
-  assert.equal(JSON.parse(simulationPackets()[2].payload.toString()).cycles.value, 0);
+  assert.equal(JSON.parse(simulationPackets()[2].payload.toString()).value, 0);
   await new Promise((resolve) => setTimeout(resolve, 250));
   fs.writeFileSync(
     path.join(workspace, '.tmp', 'electron-simulator.png'),
@@ -348,6 +349,38 @@ async function run() {
     path.join(workspace, '.tmp', 'electron-simulator-small.png'),
     (await window.webContents.capturePage()).toPNG(),
   );
+  // Configure an individual topic and random schedule through the real editor.
+  window.setSize(1400, 900);
+  await evaluate('document.querySelector(\'[aria-label="Edit speed"]\').click()');
+  await field('.signal-dialog .signal-topic-field input', 'smoke/custom-speed');
+  await field('.signal-dialog .signal-delivery select', 'random');
+  await field('.signal-dialog .signal-delivery .interval-field input[type="number"]', '200');
+  assert.ok(
+    await evaluate(
+      "document.querySelector('.signal-dialog svg').getAttribute('aria-label').includes('three cycles')",
+    ),
+  );
+  await evaluate(
+    "document.querySelector('.signal-dialog .signal-waveform').scrollIntoView({block:'center'})",
+  );
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  fs.writeFileSync(
+    path.join(workspace, '.tmp', 'electron-signal-editor.png'),
+    (await window.webContents.capturePage()).toPNG(),
+  );
+  await clickButton('.signal-dialog', 'Save Signal');
+  const settings = await evaluate(
+    "JSON.parse(localStorage.getItem('mqtt-simulation-devices-smoke'))",
+  );
+  assert.equal(settings[0].outputs[0].topic, 'smoke/custom-speed');
+  assert.equal(settings[0].outputs[0].timing.mode, 'random');
+  assert.equal(settings[0].outputs[0].timing.intervalMs, 200);
+  await clickButton('.simulation-panel', 'Publish Once');
+  await waitFor(
+    () => published.some((packet) => packet.topic === 'smoke/custom-speed'),
+    'individual signal topic',
+  );
+  assert.ok(published.some((packet) => packet.topic === 'smoke/device/state'));
   assert.deepEqual(errors, []);
   console.log(
     'Electron smoke passed: MQTT 5, binary payloads, recording recovery, simulator construction/QoS 1+2/loop, responsive layout and sandbox.',
