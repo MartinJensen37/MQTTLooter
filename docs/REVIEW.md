@@ -54,4 +54,4 @@ This pass followed the main/preload/renderer message path, connection lifecycle,
 - The smoke broker is deliberately minimal. It does not establish interoperability with every broker or validate TLS, WebSocket, installer signing, or installer upgrade/uninstall behavior.
 - Dependency audit results are time-dependent. Run both `npm audit` and `npm audit --omit=dev`; Electron ships with the app even though npm lists it as a development dependency.
 
-Suggested next implementation: encrypted connection storage and active-capture checkpoints, followed by transport backpressure and a budget across connections. These address the largest remaining correctness and resource risks before adding more UI features.
+The [remaining implementation plan](IMPLEMENTATION_PLAN.md) supersedes the earlier suggested ordering. It consolidates the user's backlog with the verified fixes above, including topic protection, transport budgets, disk history, active-capture checkpoints and credential storage alongside the UI work.

@@ -1,0 +1,174 @@
+# Remaining implementation plan
+
+Audited 2026-10-22 against the repository through `1834631`. This is a plan, not a claim that the features below are implemented. It replaces the older suggested ordering in [REVIEW.md](REVIEW.md); that document remains the record of fixes and known limitations.
+
+## What is already covered
+
+| Request | Current status | Remaining work |
+| --- | --- | --- |
+| Stable topic tree and topic search | Implemented: virtualization, first-seen sibling order, anchored scrolling, search through collapsed branches. | Restore selected highlighting across connection switches; retain selected topic identity under storage pressure. |
+| Message scrolling and sorting | Implemented: follow the top in either sort order; preserve visible message and offset while scrolled down; consistent same-timestamp ordering. | Preserve these semantics when history becomes paged. An explicitly deleted/expired anchor needs a visible fallback. |
+| Simulator stop on disconnect | Implemented, including manual restart after reconnect/reload. | Keep regression coverage as scheduling and layouts change. |
+| Per-signal destinations and timing | Implemented: individual topics, synchronized/fixed/random periods, offsets and publish probability. | Timing visualization and clearer overview. |
+| Interval slider down to 0.1 s | Implemented, with an exact number field. | Reuse existing control. |
+| Extra waveforms | Sine, square, triangle, sawtooth, counter and random walk implemented alongside existing generators. | Explicit ramp, step and first-order step response; composable message fields. |
+| Small waveform previews | Implemented: smaller overview/editor charts, three cycles, labeled axes. | Replace overview charts with tiny patterns in single-line rows. |
+| Incoming topic plots | Not implemented. | Numeric/JSON-field extraction, shared plot display, history queries. |
+| Message-content search | Not implemented. | Search beyond loaded pages, with explicit scope and cancellation. |
+| Payload inspection | Text/hex, bounded previews, byte-preserving copy/export implemented. | Resizable inspector, pretty JSON, plain log view and adaptive previews. |
+| Templates and schemas | Template expansion and basic nested validation implemented; timestamp/UUID placeholders exist. | Full supported JSON Schema dialect, correct typed substitutions, schema-driven construction and simulation fields. |
+| Plain simulator payloads | Not implemented; current payload structures are JSON. | Explicit raw-text/scalar mode and compatible field rules. |
+| MQTT 5 properties | Connection settings and main-process publish support exist; incoming packets contain properties. | Preserve properties in renderer history/storage; inspection and advanced publishing controls. |
+| Memory and throttling | Bounded history, rate buckets and batched UI updates implemented. | Transport batching, app-wide budgets, topic protection, disk-backed history. |
+| Recordings in a database | Not implemented. Saved recordings use an atomic JSON disk library. | Streaming capture, durable checkpoints, lazy loading and migration. |
+| Responsive disconnect control | MQTT clients already run in main; sidebar is in the shared renderer. | Bound work in both processes, move storage/decoding to workers, measure disconnect responsiveness. |
+| Multiple tiled panels | Not implemented; current tabs preserve mounted workspaces. | Dockable layout with explicit panel lifecycle and persistence. |
+| Protobuf / Sparkplug B | Not implemented. | Schema-selected decoding first; Sparkplug B remains an optional later feature. |
+| Password visibility | Not implemented. | Accessible show/hide buttons for password and key passphrase. |
+| CSS cleanup and refactoring | Shared tokens/controls and simulator scoping exist; older globals and broad JS types remain. | Incremental cleanup in touched features, scoped styles, typed service boundaries. |
+| Lazy loading | Topic rows are virtualized. | Lazy panel modules, history pages, recording metadata/payloads and decoder assets. |
+| Documentation | README, simulator guide and review notes exist. | Update with each feature and add usage examples for storage, plots and timing. |
+| TLS / WebSocket verification | Configuration exists; automated desktop coverage currently uses loopback MQTT TCP. | Real-broker integration matrix, failure cases and release testing. |
+
+Keep the completed saved profiles, clear-history action, sidebar collapse, notifications, dropdown controls and template import. Retained-message removal currently prioritizes the selected topic over the publishing form; preserve that behavior. Do not rebuild these features solely because they appear in the old backlog.
+
+## Findings from MQTT Explorer
+
+Reviewed upstream revision `35f31973c456a024a37450f5961e4610dc9a9ce0`, rather than assuming its behavior from screenshots:
+
+- Topic nodes have a small bounded ring history, configured for 100 messages and a 20,000-unit payload-length budget. Latest message and node metadata are separate from that history. This supports separating topic existence from payload retention in our model. [TreeNode](https://github.com/thomasnordquist/MQTT-Explorer/blob/35f31973c456a024a37450f5961e4610dc9a9ce0/backend/src/Model/TreeNode.ts), [RingBuffer](https://github.com/thomasnordquist/MQTT-Explorer/blob/35f31973c456a024a37450f5961e4610dc9a9ce0/backend/src/Model/RingBuffer.ts).
+- Incoming tree changes are collected and merged on a 300 ms cycle. Its pending-change buffer has a roughly 100 MB estimated limit and stops accepting additions when full. These are useful batching patterns, not evidence of unlimited or lossless capture. [Tree](https://github.com/thomasnordquist/MQTT-Explorer/blob/35f31973c456a024a37450f5961e4610dc9a9ce0/backend/src/Model/Tree.ts), [ChangeBuffer](https://github.com/thomasnordquist/MQTT-Explorer/blob/35f31973c456a024a37450f5961e4610dc9a9ce0/backend/src/Model/ChangeBuffer.ts).
+- An open chart subscribes to its topic, starts from available history, keeps a separate 500-message buffer and throttles redraws to 300 ms. Plotting supports scalar values or selected JSON paths. We should similarly separate chart refresh frequency and retained samples from message arrival. [TopicChart](https://github.com/thomasnordquist/MQTT-Explorer/blob/35f31973c456a024a37450f5961e4610dc9a9ce0/app/src/components/ChartPanel/TopicChart.tsx), [TopicPlot](https://github.com/thomasnordquist/MQTT-Explorer/blob/35f31973c456a024a37450f5961e4610dc9a9ce0/app/src/components/TopicPlot.tsx).
+
+These inspected paths use memory buffers, not SQLite. They do not establish performance on our workload. Implement our own components using these architectural ideas. No upstream code has been copied; its [license file](https://github.com/thomasnordquist/MQTT-Explorer/blob/35f31973c456a024a37450f5961e4610dc9a9ce0/LICENSE.md) identifies Attribution-NoDerivatives and additional attribution requirements, so direct source reuse is not assumed.
+
+## 1. Simplify the simulator overview
+
+Keep the device list and device editor. A device remains a named group of signals with shared defaults and clock; a node-graph editor adds little value until signal dependencies exist.
+
+- Replace signal cards with one approximately 36-40 px row: name, interval pill, sync-mode pill, small pattern at the right. Keep an unobtrusive edit affordance; put delete and detailed configuration in the signal editor.
+- Long names truncate with an accessible full label. Interval and mode are text as well as color. Use shared button, pill, field and select styling; check keyboard access and the minimum window width.
+- Use an approximately 100 x 24 px sparkline without axes/caption in the row. Show three cycles for periodic signals, a representative seeded pattern for random generators, and a compact type/pattern indicator for other values. Do not animate every row or advance live generator state to draw previews.
+- Move destination, parameters, current value, payload example and last-publish details into the individual signal editor. Remove payload blocks from the overview. Keep labeled axes and three cycles in the expanded editor. Combined-device mode can expose its complete payload in a dedicated details section, not the signal list.
+- Extract a small shared plot frame/axis/theme layer from `SignalWaveform`; keep simulator sampling separate from rendering so incoming plots can supply their own points later.
+
+Acceptance: many signals fit in a compact list; rows remain one line at 800 px window width; opening a signal exposes all details; scrolling the overview does not trigger publishing or mutate a counter/random walk.
+
+Suggested commits: `Simplify signal rows`, `Share plot styling`.
+
+## 2. Keep inspected topics available under load
+
+Current defaults are 300 messages / 2 MiB raw payload per topic and 32 MiB estimated retained storage / 50,000 messages / 5,000 tree nodes per connection. Node counts include ancestors. Raising only the 300-message limit will not solve the disappearing-topic problem.
+
+- Separate the topic catalog, selected topic identity, latest-value cache and historical payload cache. Trim old payloads before removing topic metadata. Refresh selection from the live model instead of a stale node snapshot.
+- Protect the selected topic and its ancestor path; allow a bounded set of explicitly pinned topics. Preserve their identity while allowing old payloads to expire. Pins cannot reserve unlimited memory or bypass user deletion/retention policies.
+- Add resource profiles and an app-wide cap across connections. Benchmark an initial larger profile of 64 MiB retained cache per connection, up to 20,000 metadata nodes, within a 128 MiB aggregate retained-cache budget. These are tuning candidates, not promised process-RAM limits or changed defaults yet. Account for metadata and pending batches as well as payloads.
+- Batch incoming IPC by elapsed time and byte/count thresholds. Keep exact sequence IDs and timestamps. Coalesce replaceable tree/rate updates separately from archival messages; do not discard history just because its UI update was coalesced.
+- Bound pending batches and decoding work; report received, stored, expired and dropped counts separately. Reserve prompt handling for connect/disconnect/cancel commands. Remove notification bursts and redundant hidden-panel updates.
+
+Acceptance: a local retained flood cannot silently remove the selected topic, pinning remains bounded, history trimming is visible, and disconnect works during sustained traffic. Test multiple connections and very large/empty payloads, not just message counts.
+
+Suggested commits: `Preserve selected topics`, `Add history budgets`, `Batch message updates`.
+
+## 3. Add disk-backed history and streaming recordings
+
+In-memory SQLite still consumes RAM and disappears when closed; moving it into main would move the memory cost without solving retention. Use a local disk-backed SQLite database owned by a main-managed worker, with bounded memory caches. Choose the SQLite binding after a small spike checks the installed Electron runtime, transactions, cancellation and Windows packaging. [SQLite in-memory databases](https://www.sqlite.org/inmemorydb.html).
+
+```mermaid
+flowchart LR
+  MQTT[MQTT clients] --> Ingest[Bounded ingestion batches]
+  Ingest --> Store[Storage worker]
+  Store --> DB[(SQLite on disk)]
+  Store --> Updates[Coalesced topic updates]
+  Updates --> UI[Renderer cache and visible panels]
+  UI --> Queries[Paged and cancellable queries]
+  Queries --> Store
+  UI --> Control[Main connection controls]
+  Control --> MQTT
+```
+
+- Define a history service first: append batch, page messages, search topics/content, query numeric series, retention, clear and export. Use session/connection identity plus monotonic sequence numbers; cursor pagination must remain stable when new messages arrive or timestamps tie.
+- Store exact topic paths, raw payload bytes, receive timestamps, QoS, retain and normalized MQTT 5 properties, including binary correlation data. Keep topic metadata separate; index topic/session/sequence and time queries. Do not use display truncation as stored data.
+- Renderer caches contain visible tree branches, current message pages and requested numeric series. Older messages load on demand; 300 becomes an initial page/cache choice rather than the total retained-history limit. Uncached topics remain searchable through the catalog.
+- Use transaction batches and evaluate WAL for concurrent reads. Bound query lifetimes, page cache, write queue and WAL growth; checkpoint outside UI work. WAL has its own maintenance and concurrency constraints. [SQLite WAL](https://www.sqlite.org/wal.html).
+- Provide session-only disk history as the initial default, with an explicit option to retain across restarts. Define cleanup after crashes and retention by age and total disk bytes, including database/WAL overhead. Export and deletion must show their scope. Start by testing a 1 GiB disk quota; finalize the default from measurements.
+- On queue overflow or disk failure, stop durable capture visibly and expose the gap; keep browsing under a bounded policy. Never claim lossless recording after a discard. A later explicit strict-capture option may disconnect instead. MQTT QoS is not a guarantee that the app stored a message.
+- Stream active recordings into the same store with recording membership and checkpoints; list metadata without reading every payload. Migrate the current JSON library idempotently, verify counts/bytes and retain a recovery copy until migration succeeds. Stream exports and playback pages.
+- Validate IPC requests and cancel obsolete queries when panels, topics or connections change. Storage and expensive parsing stay off main's connection-control event loop. If transport parsing itself proves a bottleneck, move MQTT clients into a supervised worker in a separate measured change.
+
+Acceptance: browse/export more than 300 messages per topic with bounded renderer memory; restart recovery, partial-batch failure, disk-full, retention, migration retry, duplicate timestamps and binary round trips pass. Retention never leaves selection pointing at a removed UI object; expired history is identified. Verify the packaged Windows app, not only Node tests.
+
+Suggested commits: `Add history storage`, `Page message history`, `Stream recordings`.
+
+## 4. Plot incoming data and improve inspection
+
+- Add Plot beside topic/payload inspection. Begin with numeric text and finite numeric JSON fields; use escaped field-path segments so dots/slashes in keys are unambiguous. Missing, invalid or binary values become gaps, never zero. Decoder outputs can feed the same interface later.
+- Reuse the plot frame, colors, axes and formatting from phase 1. The data adapter differs: simulation supplies generated points; incoming plots supply timestamped stored samples. Default to receive time, preserving sequence order for ties; optional payload timestamps must be explicitly selected and validated.
+- Support several selected series, a legend, hover values, time-range selection, zoom, pause/resume and remove. Pause freezes the visible range while capture continues. Do not connect disconnected sessions or missing-data gaps with misleading lines.
+- Query only the visible time range. Downsample in the worker to a pixel-related point budget using extrema-preserving buckets; show sample/aggregation information. Keep bounded live-series buffers and redraw at roughly 5-10 Hz, independently of ingestion.
+- Add a resizable payload inspector with raw text, pretty JSON and hex; copy/export retain original bytes. Fetch large payloads on demand. Adapt collapsed preview length to available width without rendering whole payloads.
+- Add message-content search across stored history with topic/time/encoding scope, cancellable paged results and clear truncation/retention notices. Start with literal text search; evaluate indexing from real query costs. Binary search is an explicit hex mode. Add a plain-text log view and bounded selection/export for copying multiple messages.
+- Preserve MQTT 5 properties end-to-end and display correlation data, response topic, content type, expiry and user properties when present.
+
+Acceptance: replay a known waveform through a local broker and compare generated versus incoming plots; test spikes after aggregation, invalid JSON, numeric strings, arrays, missing fields, burst timestamps and paused views. Search finds messages outside the loaded page and cancels promptly.
+
+Suggested commits: `Plot topic values`, `Improve payload inspection`, `Search stored messages`, `Show MQTT 5 properties`.
+
+## 5. Visualize message timing and probability
+
+Add a collapsible **Publish timeline** below the device's signal list. This visualizes when messages may be sent; the small waveform shows what value a signal generates. Keep those meanings distinct.
+
+- One row per signal on a shared time axis. Fixed schedules use narrow event ticks, synchronized ticks align vertically, and offsets shift them. Add a bottom aggregate showing expected messages per time bin to expose bursts.
+- Use a fixed default 10-second horizon with selectable shorter/longer windows and a hard maximum (initially 60 seconds), at most 256 time bins, and virtualized rows. Long-period signals show their next eligible time even if it is outside the window. Zoom changes bin width, not the schedule.
+- For fixed opportunities with probability `p`, tick opacity represents `p`; for a bin containing `k` independent opportunities, probability of at least one send is `1 - (1 - p)^k`. Tooltips show the numeric likelihood, interval and assumptions, so meaning does not depend on color alone.
+- Random interval variation currently draws bounded delays and clamps them to 100 ms. Model those actual rules, including offsets and the clamp. Draw per-bin likelihood bands with a consistent legend. Use a bounded, seeded sampling calculation in a worker for multi-event random schedules; label estimates and cache results until settings/horizon change. Do not advance the live RNG or advertise an illustrative sample as a prediction.
+- Do not simply hide every bin below 1%: a signal with 1% publish chance should remain understandable. The time horizon is the primary bound. An optional next-success view can use 99% cumulative coverage with a clearly marked omitted tail; this is different from a density/opacity cutoff.
+- Even fixed periods can have an unbounded wait for a successful send when opportunities may be skipped. For independent probability `0 < p < 1`, 99% coverage takes `ceil(log(0.01) / log(1-p))` opportunities. Handle `p=0` as never and `p=1` as the first opportunity; cap display duration regardless. This probability concerns scheduler decisions, not network delivery or acknowledgement.
+- Planned previews assume the connection is available and publishes do not stall. Optional actual-event markers show accepted publishes and skipped/busy ticks during a run; their counters distinguish timing probability from backpressure and network failure. Combined mode must indicate its completion-dependent timing.
+
+Acceptance: compare preview ticks against fake-clock scheduler traces; test alignment, offsets, zero jitter, 100 ms clamp, 0/1/100% chance and long periods. Seeded random estimates must agree with known fixed/chance cases within stated tolerances, remain stable on re-render and complete within a bounded workload.
+
+This phase depends on the schedule model and phase 1's visual components, not SQLite, so it can land while phase 3 is being developed.
+
+Suggested commits: `Preview publish schedules`, `Show timing probabilities`.
+
+## 6. Complete payload construction and publishing
+
+- Introduce typed field sources shared by publisher and simulator: literal, timestamp, UUID, counter/ramp, step, first-order step response and existing generators. Define reset, time origin and UUID lifetime (per message or stable per device) explicitly. Allow several sources in one nested payload without evaluating arbitrary code.
+- Add raw-text/scalar output with an exact byte preview; JSON-only metadata wrapping must not silently appear in basic mode. Preserve existing saved-device formats through a versioned migration.
+- Adopt a maintained standards-compliant JSON Schema validator for a declared dialect. Resolve local references and validate generated values as their real types; separate schema import, example generation and validation errors. Test nested arrays/objects, required fields, enums, bounds and combinators.
+- Add MQTT 5 publisher fields for response topic, correlation bytes, user properties, content type and expiry, with version-aware validation. Topic aliases require broker-negotiated limits and reset on reconnect; expose them only with correct lifecycle handling.
+- Add password/passphrase visibility controls. Complete existing credential-storage work before external release: move secrets from renderer localStorage to main-managed OS-backed storage with migration and a clear fallback policy.
+
+Acceptance: saved templates/devices remain compatible; schema types survive expansion; raw bytes match the preview; MQTT 3 connections do not receive MQTT 5-only properties; aliases and correlation data pass real-broker tests.
+
+Suggested commits: `Build typed payload fields`, `Validate message schemas`, `Add publish properties`, `Improve credential controls`.
+
+## 7. Workspaces, decoding and focused cleanup
+
+- Add resizable tiled panels after panel data contracts and subscriptions are independent of tab visibility. Start with two panes, then saved layouts. Scope topic/connection selection per pane and define whether a pane follows global selection or is pinned.
+- Lazy-load heavy panel modules, chart tooling and decoder schemas. Unmounting a hidden editor must not accidentally start/stop simulation or recording; move their lifetime to explicit services before changing mounting behavior.
+- A sidebar DOM component cannot simply run in a worker. Keep the main-managed control path responsive through bounded updates and workers first. If load tests still show an unusable disconnect button, add a small separate control-window renderer or native disconnect action, justified by measurements.
+- Add a decoder registry preserving original bytes: text/JSON/hex first, then user-provided protobuf descriptors and message types mapped to topic filters. Decode off the UI thread with size/depth limits and readable errors; do not guess protobuf schemas. Plot decoded numeric fields through phase 4's adapter.
+- Keep Sparkplug B optional until protobuf support exists. A useful Sparkplug view needs birth/death state, metric aliases and sequence/session handling, not just a protobuf decoder or extra tab.
+- Refactor one feature boundary at a time: consolidate duplicate limits/search helpers, remove confirmed unused functions/styles, type IPC/history/scheduler contracts, and scope remaining CSS. Reuse common controls and tokens throughout. Avoid a broad rewrite that obscures behavior changes.
+
+Acceptance: two panes retain independent selection/scroll, layout persistence survives restart, closing a pane releases subscriptions, and expensive decoding cannot block connection controls. Run visual checks at narrow/wide sizes and keyboard/focus checks for all new controls.
+
+Suggested commits: `Add tiled workspaces`, `Load panels on demand`, `Decode protobuf payloads`; separate small cleanup commits by component.
+
+## 8. Validation and release gates
+
+Every phase includes targeted regression tests, typecheck/lint/build where relevant, and documentation updates. Current baseline: 70 tests plus a built Electron smoke test with an isolated loopback broker. This is functional coverage, not yet a high-throughput benchmark.
+
+- Build a repeatable local-broker load harness: retained floods at 5,000, 20,000 and 50,000 topics; mixed payload sizes; deep/empty topic levels; slow acknowledgements; reconnects; multiple connections; recording and plotting together. Measure main/renderer/worker RSS, queue sizes, storage throughput, UI latency and dropped counts separately.
+- Initial performance targets to validate on the development machine: 50,000-topic discovery, 5,000 small messages/second for 60 seconds, p95 input feedback under 100 ms and disconnect initiation under 500 ms. Record hardware and payload sizes; revise targets with evidence. Acceptance also requires memory to plateau at configured caches and overload to remain explicit. Do not stress-publish to public brokers.
+- Add real-broker MQTT 3.1.1/5, WS/WSS paths, TLS trust/hostname failures, client certificates, authentication failures, QoS 1/2, session expiry and reconnect tests. Verify MQTT 5 binary properties and simulator stop/restart semantics.
+- Exercise storage corruption/recovery, active-capture restart, disk exhaustion, long-running retention and migration. Validate installer packaging/upgrades separately from the hidden Electron smoke test.
+- Keep README and simulator documentation accurate as each slice ships. Add a short test checklist and diagnostics export without credentials/payloads by default. Distribute a build for user testing only as an explicit release step; collect broker/load details and reproducible failures.
+
+## Delivery order
+
+Start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
+
+Each commit should contain one reviewable change with a short simple message and no co-author trailer. Do not mark the larger storage, plotting or timing work complete based only on scaffolding or a static preview.

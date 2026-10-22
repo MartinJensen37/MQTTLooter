@@ -60,4 +60,4 @@ src/renderer/src/
 tests/              Regression tests and Electron smoke test
 ```
 
-The current review, remaining limitations, and suggested next work are in [docs/REVIEW.md](docs/REVIEW.md).
+The current review and remaining limitations are in [docs/REVIEW.md](docs/REVIEW.md). The audited backlog, implementation order and acceptance criteria are in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md).
