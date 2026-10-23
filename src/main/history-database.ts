@@ -1,3 +1,4 @@
+import { NumericSampler, type NumericQuery } from '../shared/numeric-series';
 import { DatabaseSync } from 'node:sqlite';
 import {
   DISK_HISTORY,
@@ -25,7 +26,7 @@ export class HistoryDatabase {
     this.db.exec(`PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA cache_size=-8192;
       PRAGMA temp_store=FILE; PRAGMA foreign_keys=ON; PRAGMA secure_delete=ON;`);
     const version = Number(this.db.prepare('PRAGMA user_version').get()!.user_version);
-    if (version > 1) {
+    if (version > 2) {
       this.db.close();
       throw new Error('History database uses a newer schema');
     }
@@ -46,7 +47,8 @@ export class HistoryDatabase {
       );
       CREATE INDEX IF NOT EXISTS topic_messages ON messages(topic_id, id);
       CREATE INDEX IF NOT EXISTS message_time ON messages(timestamp);
-      PRAGMA user_version=1;
+      CREATE INDEX IF NOT EXISTS topic_message_time ON messages(topic_id, timestamp, id);
+      PRAGMA user_version=2;
     `);
     this.recount();
   }
@@ -203,6 +205,41 @@ export class HistoryDatabase {
       });
     }
     return result;
+  }
+
+  series(query: NumericQuery) {
+    const sampler = new NumericSampler(query);
+    const rows = this.db
+      .prepare(
+        `SELECT m.id, m.timestamp, m.session_id,
+      CASE WHEN length(m.payload)<=65536 THEN m.payload ELSE NULL END payload
+      FROM messages m JOIN topics t ON t.id=m.topic_id
+      WHERE t.connection_id=? AND t.path=? AND m.timestamp>=? AND m.timestamp<=?
+      ORDER BY m.timestamp DESC, m.id DESC LIMIT 20001`,
+      )
+      .iterate(
+        query.connectionId,
+        query.topic,
+        Math.max(query.from, Date.now() - this.limits.maxAgeMs),
+        query.to,
+      );
+    const started = performance.now();
+    let scanned = 0;
+    let bytes = 0;
+    let truncated = false;
+    for (const row of rows) {
+      const payload = row.payload as Uint8Array | null;
+      if (
+        ++scanned > 20000 ||
+        (bytes += payload?.byteLength ?? 0) > 8 * 1024 * 1024 ||
+        performance.now() - started > 75
+      ) {
+        truncated = true;
+        break;
+      }
+      sampler.add(Number(row.timestamp), Number(row.id), String(row.session_id), payload);
+    }
+    return sampler.result(truncated);
   }
 
   topics(connectionId: string, search: string): { path: string }[] {

@@ -66,6 +66,19 @@ async function run() {
     'AP8=',
   );
   await client.request({ action: 'persist', enabled: true });
+  const series = await client.request({
+    action: 'series',
+    query: {
+      connectionId: 'broker',
+      topic: 'a//b',
+      paths: [[]],
+      from: message.timestamp - 1000,
+      to: message.timestamp,
+      maxPoints: 16,
+    },
+  });
+  assert.equal(series.series[0].gaps, 1);
+  assert.equal(series.series[0].points.length, 0);
   await client.close();
   assert.equal(existsSync(join(directory, 'history.sqlite')), true);
   client = start();

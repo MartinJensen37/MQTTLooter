@@ -43,6 +43,7 @@ const mqttEvents = createEventHandler('mqtt');
 contextBridge.exposeInMainWorld('electronAPI', {
   history: {
     status: () => ipcRenderer.invoke('history-status'),
+    series: (query: unknown) => ipcRenderer.invoke('history-series', query),
     page: (query: unknown) => ipcRenderer.invoke('history-page', query),
     topics: (connectionId: string, search: string) =>
       ipcRenderer.invoke('history-topics', connectionId, search),

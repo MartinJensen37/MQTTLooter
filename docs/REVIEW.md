@@ -74,6 +74,14 @@ Remaining limits: the live tree is still a separate bounded cache; export is pag
 
 Validation: 92 tests plus typecheck and lint pass. Built Electron coverage browses 650 messages through the real source/topic/page controls, checks invalid cursors and scoped deletion, and retains the earlier pressure tests. The worker suite passes under Node, Electron 45, and the Windows packaged executable using the worker inside `app.asar`; it verifies binary/MQTT 5 round trips, restart persistence, crash-session cleanup and corruption reporting. `npm run pack` passes. This validates unpacked Windows packaging, not an installer upgrade or sustained-load benchmark.
 
+### 2026-10-23: incoming plots
+
+Logging now plots retained numeric payloads and up to four JSON fields through the shared simulator chart. A storage-worker query uses the new topic/time index and bounded numeric parsing, with first/last/min/max aggregation to preserve spikes. The UI supports time ranges, zoom, pause, field removal and hover/keyboard sample inspection. Hidden tabs stop plot polling. Each successful MQTT CONNACK starts a new transport session, so automatic reconnects also break chart segments.
+
+Limits are explicit: 20,000 scanned records, 8 MiB of scanned payloads, a 75 ms scan target, 64 KiB per parsed payload and 512 displayed points per field. Missing or invalid values break entire affected buckets conservatively; charts do not synthesize zeroes. Numbers use floating-point precision and axes are shared. Durable capture-gap records, payload timestamps, independent axes and full-process performance measurements remain open.
+
+Validation: 103 regression tests pass with two workers, including spike retention, invalid/binary samples, reconnect boundaries, schema-index upgrade, extreme numeric axes, pause/zoom and hidden-tab cleanup. The default fully parallel run timed out in the existing 50,000-topic test under concurrent checks; the reduced-concurrency rerun passed without changing its timeout. Typecheck, lint and the production build pass. The Electron smoke exercises live JSON fields, pause while capture continues, resume and zoom against the local broker. Windows unpacked packaging and the worker inside `app.asar` pass, including the numeric-query API. This does not establish sustained throughput or installer upgrade behavior.
+
 ### 2026-10-23: inspection controls
 
 Added bounded Pretty JSON without numeric reserialization, a vertically resizable inspector, width-adaptive collapsed previews and a selectable/copyable plain log. Formatting does not change copy/export payloads; truncation is explicit. Broker password and private-key passphrase use the same accessible show/hide control and existing button styles. Secret persistence remains unchanged.

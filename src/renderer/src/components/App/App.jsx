@@ -141,6 +141,7 @@ function App() {
     <div className="tab-content-container">
       <div className={`tab-content ${activeTab === 'logging' ? 'active' : 'hidden'}`}>
         <MessagePanel
+          active={activeTab === 'logging'}
           connectionId={selectedConnection}
           messages={connectionMessages}
           selectedTopic={liveSelectedTopic}

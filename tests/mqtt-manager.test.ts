@@ -88,9 +88,16 @@ describe('MQTT lifecycle', () => {
     client.emit('connect', {});
     await result;
     expect(client.options.reconnectPeriod).toBe(500);
+    const received = vi.fn();
+    manager.on('message', received);
+    client.emit('message', 'value', Buffer.from('1'), { qos: 0 });
+    client.emit('message', 'value', Buffer.from('2'), { qos: 0 });
     client.emit('close');
     client.emit('reconnect');
     client.emit('connect', {});
+    client.emit('message', 'value', Buffer.from('3'), { qos: 0 });
+    expect(received.mock.calls.map(([message]) => message.sequence)).toEqual([1, 2, 1]);
+    expect(received.mock.calls[0][0].sessionId).not.toBe(received.mock.calls[2][0].sessionId);
     expect(client.subscribe).toHaveBeenCalledTimes(2);
     expect(client.listenerCount('message')).toBe(1);
   });

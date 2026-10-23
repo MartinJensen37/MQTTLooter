@@ -184,6 +184,32 @@ for (const [channel, handler] of Object.entries({
       throw new Error('Invalid history query');
     return historyService!.request({ action: 'page', query });
   },
+  'history-series': (query: any) => {
+    if (
+      !query ||
+      !validId(query.connectionId) ||
+      !validTopic(query.topic) ||
+      !Number.isSafeInteger(query.from) ||
+      !Number.isSafeInteger(query.to) ||
+      query.from < 0 ||
+      query.to < query.from ||
+      query.to - query.from > 86400000 ||
+      !Number.isSafeInteger(query.maxPoints) ||
+      query.maxPoints < 16 ||
+      query.maxPoints > 1024 ||
+      !Array.isArray(query.paths) ||
+      query.paths.length < 1 ||
+      query.paths.length > 4 ||
+      query.paths.some(
+        (path: unknown) =>
+          !Array.isArray(path) ||
+          path.length > 16 ||
+          path.some((segment) => typeof segment !== 'string' || segment.length > 1024),
+      )
+    )
+      throw new Error('Invalid numeric history query');
+    return historyService!.request({ action: 'series', query });
+  },
   'history-topics': (connectionId: unknown, search: unknown) => {
     if (!validId(connectionId) || !validTopic(search)) throw new Error('Invalid topic search');
     return historyService!.request({ action: 'topics', connectionId, search });

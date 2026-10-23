@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { HistoryDatabase } from '../src/main/history-database';
 import { DISK_HISTORY } from '../src/shared/history';
@@ -143,4 +144,67 @@ it('fails a database-full transaction without retaining a partial batch', () => 
   expect(database.page({ connectionId: 'broker', topic: 'a//b' }, now).messages).toEqual([]);
   database.append([message(1)], now);
   expect(database.status().retainedMessages).toBe(1);
+});
+
+it('queries numeric fields from stored bytes and preserves spikes beyond the live cache', () => {
+  database.append(
+    Array.from({ length: 1000 }, (_, index) => ({
+      ...message(index + 1),
+      timestamp: now - 1000 + index,
+      message: JSON.stringify({ temperature: index === 500 ? 999 : index }),
+    })),
+    now,
+  );
+  database.append([{ ...message(1001), timestamp: now, message: 'AP+A', encoding: 'base64' }], now);
+  const result = database.series({
+    connectionId: 'broker',
+    topic: 'a//b',
+    paths: [['temperature']],
+    from: now - 1000,
+    to: now,
+    maxPoints: 32,
+  });
+  expect(result.series[0].points.length).toBeLessThanOrEqual(32);
+  expect(result.series[0].points.some((point) => point.x === now - 500 && point.y === 999)).toBe(
+    true,
+  );
+  expect(result.series[0].gaps).toBe(1);
+  expect(result.availablePaths).toContainEqual(['temperature']);
+  const empty = database.series({
+    connectionId: 'other',
+    topic: 'a//b',
+    paths: [[]],
+    from: now - 1000,
+    to: now,
+    maxPoints: 32,
+  });
+  expect(empty.scanned).toBe(0);
+});
+
+it('bounds dense plot queries and upgrades the version-one index without losing data', () => {
+  database.append(
+    Array.from({ length: 20005 }, (_, index) => ({
+      ...message(index + 1),
+      message: String(index),
+    })),
+    now,
+  );
+  database.close();
+  const old = new DatabaseSync(join(directory, 'test.sqlite'));
+  old.exec('DROP INDEX topic_message_time; PRAGMA user_version=1;');
+  old.close();
+  database = new HistoryDatabase(join(directory, 'test.sqlite'));
+  expect(database.status().retainedMessages).toBe(20005);
+  const result = database.series({
+    connectionId: 'broker',
+    topic: 'a//b',
+    paths: [[]],
+    from: now - 1000,
+    to: now,
+    maxPoints: 16,
+  });
+  expect(result.truncated).toBe(true);
+  expect(result.scanned).toBeLessThanOrEqual(20000);
+  expect(result.series[0].points.map((point) => point.y)).toContain(20004);
+  expect(result.series[0].points.length).toBeLessThanOrEqual(16);
 });

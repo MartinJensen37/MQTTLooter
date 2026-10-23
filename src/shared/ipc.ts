@@ -50,8 +50,13 @@ export type MqttEventCallback = (data: any) => void;
 export interface ElectronAPI {
   history: {
     status(): Promise<IpcResult<import('./history').HistoryStatus>>;
-    page(query: import('./history').HistoryQuery): Promise<IpcResult<import('./history').HistoryPage>>;
-    topics(connectionId: string, search: string): Promise<IpcResult<{path: string}[]>>;
+    series(
+      query: import('./numeric-series').NumericQuery,
+    ): Promise<IpcResult<import('./numeric-series').NumericResult>>;
+    page(
+      query: import('./history').HistoryQuery,
+    ): Promise<IpcResult<import('./history').HistoryPage>>;
+    topics(connectionId: string, search: string): Promise<IpcResult<{ path: string }[]>>;
     clear(connectionId: string, topic?: string): Promise<IpcResult>;
     persist(enabled: boolean): Promise<IpcResult>;
     resume(): Promise<IpcResult>;

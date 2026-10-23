@@ -39,6 +39,9 @@ parentPort!.on(
           database.append(request.messages);
           data = status();
           break;
+        case 'series':
+          data = database.series(request.query);
+          break;
         case 'page':
           data = database.page(request.query);
           break;
@@ -60,7 +63,7 @@ parentPort!.on(
           break;
         case 'close':
           clearInterval(maintenance);
-        database.close();
+          database.close();
           if (!persistent) cleanSession();
           parentPort!.postMessage({ requestId, data: null });
           parentPort!.close();

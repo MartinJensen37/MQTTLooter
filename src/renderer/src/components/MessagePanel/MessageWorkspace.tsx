@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import MessagePanel from './MessagePanel';
+import IncomingPlot from './IncomingPlot';
 import type { HistoryPage, HistoryQuery, HistoryStatus } from '../../../../shared/history';
 import TopicTreeService from '../../services/TopicTreeService';
 import './MessageWorkspace.css';
@@ -10,6 +11,7 @@ export default function MessageWorkspace(props: any) {
 
 function Workspace(props: any) {
   const [stored, setStored] = useState(false);
+  const [plotOpen, setPlotOpen] = useState(false);
   const [status, setStatus] = useState<HistoryStatus>();
   const [page, setPage] = useState<HistoryPage>();
   const [cursors, setCursors] = useState<Partial<HistoryQuery>[]>([{}]);
@@ -120,6 +122,14 @@ function Workspace(props: any) {
   return (
     <div className="message-workspace">
       <div className="message-history-toolbar">
+        <button
+          className="btn btn-sm btn-secondary"
+          aria-expanded={plotOpen}
+          disabled={!connectionId || (stored ? topic : selectedPath) === undefined}
+          onClick={() => setPlotOpen((value) => !value)}
+        >
+          {plotOpen ? 'Hide incoming plot' : 'Plot incoming values'}
+        </button>
         <label>
           Source{' '}
           <select
@@ -273,6 +283,14 @@ function Workspace(props: any) {
         <p role="alert" className="message-storage-notice">
           {error}
         </p>
+      )}
+      {plotOpen && connectionId && (stored ? topic : selectedPath) !== undefined && (
+        <IncomingPlot
+          active={props.active}
+          key={`${connectionId}:${stored ? topic : selectedPath}`}
+          connectionId={connectionId}
+          topic={stored ? topic : selectedPath}
+        />
       )}
       <MessagePanel
         {...props}

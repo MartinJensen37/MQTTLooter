@@ -205,6 +205,8 @@ class MQTTConnection extends EventEmitter {
           clearTimeout(this.connectionTimeout);
           this.cancelConnect = null;
           this.isConnected = true;
+          this.sessionId = randomUUID();
+          this.sequence = 0;
           this.reconnectAttempts = 0;
           this.client.options.reconnectPeriod = this.config.reconnectPeriod ?? 1000;
           this.connectionStats.connectionStartTime = Date.now();

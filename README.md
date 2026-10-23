@@ -80,6 +80,14 @@ History is session-only by default: it is removed on normal exit, or on the next
 
 **Clear Messages** in Disk history removes that topic's stored and cached messages. Live-cache clearing remains a cache-only action. Exports currently cover the displayed page; streaming whole-history export and database-backed recording migration are still planned. Saved recordings remain in their existing JSON library.
 
+### Plotting incoming values
+
+Select a topic in Logging and choose **Plot incoming values**. The plot reads retained disk history, so it can show more than the live cache's 300 messages. It also works for topics selected through **Source > Disk history**. Numeric text plots directly; for JSON, the first discovered numeric field is selected automatically. Add up to four fields using the field menu or a JSON Pointer such as `/sensors/0/value`. A literal slash in a key is `~1`, and a tilde is `~0`; dots need no escaping. JSON numeric strings, booleans and missing values are gaps, not zero.
+
+Use **Window**, **Earlier/Later** and **+/−** to inspect a time range. **Pause plot** freezes that range while capture continues; **Resume live plot** returns to current time. Hover over the chart or move **Inspect time** with the keyboard to read the nearest retained sample and its receive timestamp. Fields share a Y scale; remove a field with its adjacent button. Leaving Logging stops queries and preserves the plot's settings.
+
+Extrema-preserving buckets retain short spikes with at most 512 points per field. Invalid values and reconnect boundaries break lines conservatively. Queries scan at most 20,000 messages, 8 MiB of payloads or a 75 ms work target; a notice appears when older samples are omitted. Narrow the window to inspect that range. Payloads larger than 64 KiB and invalid UTF-8 are skipped as gaps. Plotted numbers use JavaScript floating-point precision. Disk retention and capture gaps still apply; a chart cannot recover expired or dropped data.
+
 ### Inspecting and copying payloads
 
 Message cards offer Text, Hex and Pretty JSON. JSON formatting is bounded and preserves numeric spelling (including integers beyond JavaScript's safe range), strings and duplicate keys. Formatting changes the preview only; copy/export retains the original payload. Expand **Inspect payload** and drag its lower edge to resize it. Collapsed previews adapt to panel width.
