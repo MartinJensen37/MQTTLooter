@@ -10,6 +10,7 @@ function MessagePanel({
   connectionName,
   connectionId,
   showFeedback,
+  storedPage = false,
 }) {
   const [sortBy, setSortBy] = useState('timestamp');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -286,8 +287,10 @@ function MessagePanel({
           <>
             {selectedTopic && processedMessages.length >= 300 && (
               <div className="message-limit-notice">
-                <i className="fas fa-info-circle"></i> Showing up to 300 most recent messages for
-                this topic.
+                <i className="fas fa-info-circle"></i>{' '}
+                {storedPage
+                  ? 'Showing one page of stored history. Use Older page to continue.'
+                  : 'Showing up to 300 most recent messages for this topic.'}
               </div>
             )}
             {processedMessages.map((msg) => (

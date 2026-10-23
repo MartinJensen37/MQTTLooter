@@ -9,13 +9,14 @@ import {
 
 /** One acknowledged batch at a time bounds Electron's otherwise unbounded IPC queue. */
 export class MessageDelivery {
-  private queue: ({ message: IncomingPublish; bytes: number } | undefined)[] = [];
+  private queue: ({ message: IncomingPublish; bytes: number; ordinal: number } | undefined)[] = [];
   private head = 0;
   private bytes = 0;
-  private inFlight: { batch: MessageBatch; bytes: number } | null = null;
+  private inFlight: { batch: MessageBatch; bytes: number; firstOrdinal: number } | null = null;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private immediate = false;
   private nextBatchId = 0;
+  private ordinal = 0;
   private counts = new Map<string, DeliveryCounts>();
 
   constructor(
@@ -39,10 +40,31 @@ export class MessageDelivery {
       counts.dropped++;
       return false;
     }
-    this.queue.push({ message, bytes });
+    this.queue.push({ message, bytes, ordinal: ++this.ordinal });
     this.bytes += bytes;
     this.schedule();
     return true;
+  }
+
+  discard(connectionId: string): void {
+    let counts = this.counts.get(connectionId);
+    if (!counts) {
+      counts = { received: 0, processed: 0, dropped: 0 };
+      this.counts.set(connectionId, counts);
+    }
+    counts.received++;
+    counts.dropped++;
+  }
+
+  checkpoint(): number {
+    return this.ordinal;
+  }
+
+  hasPendingThrough(checkpoint: number): boolean {
+    return Boolean(
+      (this.inFlight && this.inFlight.firstOrdinal <= checkpoint) ||
+      (this.queue[this.head] && this.queue[this.head]!.ordinal <= checkpoint),
+    );
   }
 
   private schedule(): void {
@@ -64,6 +86,7 @@ export class MessageDelivery {
 
   private flush(): void {
     if (this.inFlight) return;
+    const firstOrdinal = this.queue[this.head]?.ordinal ?? 0;
     const messages: IncomingPublish[] = [];
     let bytes = 0;
     while (this.head < this.queue.length && messages.length < this.limits.batchMessages) {
@@ -85,7 +108,7 @@ export class MessageDelivery {
       messages,
       dropped: Object.fromEntries([...this.counts].map(([id, counts]) => [id, counts.dropped])),
     };
-    this.inFlight = { batch, bytes };
+    this.inFlight = { batch, bytes, firstOrdinal };
     this.send(batch);
   }
 

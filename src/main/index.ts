@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'path';
 import { MQTTConnectionManager } from './mqtt-connection-manager';
 import { RecordingStore } from './recording-store';
+import { HistoryService } from './history-service';
 import { MessageDelivery } from './message-delivery';
 import type { IncomingPublish } from '../shared/traffic';
 
@@ -16,6 +17,9 @@ const messageDelivery = new MessageDelivery((batch) => {
 const recordingStore = new RecordingStore(join(app.getPath('userData'), 'recordings.json'));
 // One main process owns the library; renderer revisions prevent stale snapshots within it.
 const primaryInstance = app.requestSingleInstanceLock();
+const historyService = primaryInstance
+  ? new HistoryService(join(app.getPath('userData'), 'history'))
+  : null;
 if (!primaryInstance) app.quit();
 app.on('second-instance', () => {
   if (mainWindow?.isMinimized()) mainWindow.restore();
@@ -127,7 +131,10 @@ function setupMQTTEventForwarding() {
     'subscribed',
     'unsubscribed',
   ];
-  mqttManager.on('message', (message: IncomingPublish) => messageDelivery.enqueue(message));
+  mqttManager.on('message', (message: IncomingPublish) => {
+    historyService?.append(message);
+    messageDelivery.enqueue(message);
+  });
   events.forEach((event) => {
     mqttManager.on(event, (data: unknown) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -158,6 +165,48 @@ handleIPC('mqtt-ack-batch', (_event, batchId) => {
   return { success: true };
 });
 handleIPC('mqtt-traffic-status', () => ({ success: true, data: messageDelivery.status() }));
+
+const validId = (value: unknown): value is string =>
+  typeof value === 'string' && value.length > 0 && value.length <= 256;
+const validTopic = (value: unknown): value is string =>
+  typeof value === 'string' && value.length <= 65535;
+for (const [channel, handler] of Object.entries({
+  'history-status': () => historyService!.refreshStatus(),
+  'history-page': (query: any) => {
+    if (
+      !query ||
+      !validId(query.connectionId) ||
+      !validTopic(query.topic) ||
+      ['before', 'snapshot', 'generation'].some(
+        (key) => query[key] !== undefined && (!Number.isSafeInteger(query[key]) || query[key] < 0),
+      )
+    )
+      throw new Error('Invalid history query');
+    return historyService!.request({ action: 'page', query });
+  },
+  'history-topics': (connectionId: unknown, search: unknown) => {
+    if (!validId(connectionId) || !validTopic(search)) throw new Error('Invalid topic search');
+    return historyService!.request({ action: 'topics', connectionId, search });
+  },
+  'history-clear': (connectionId: unknown, topic?: unknown) => {
+    if (!validId(connectionId) || (topic !== undefined && !validTopic(topic)))
+      throw new Error('Invalid history scope');
+    return historyService!.clear(connectionId, topic as string | undefined);
+  },
+  'history-persist': (enabled: unknown) => {
+    if (typeof enabled !== 'boolean') throw new Error('Invalid persistence setting');
+    return historyService!.request({ action: 'persist', enabled });
+  },
+  'history-resume': () => historyService!.resume(),
+})) {
+  handleIPC(channel, async (_event, ...args) => {
+    try {
+      return { success: true, data: await (handler as (...args: any[]) => unknown)(...args) };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+}
 
 handleIPC('mqtt-connect', async (_event, connectionId, config) => {
   try {
@@ -244,14 +293,20 @@ for (const [channel, handler] of Object.entries({
 }
 
 let finishingQuit = false;
+let shutdownStarted = false;
 app.on('before-quit', (event) => {
-  if (!finishingQuit && recordingStore.busy) {
-    event.preventDefault();
-    void recordingStore.flush().finally(() => {
-      finishingQuit = true;
-      app.quit();
-    });
-  }
+  if (finishingQuit || !primaryInstance) return;
+  event.preventDefault();
+  if (shutdownStarted) return;
+  shutdownStarted = true;
+  void Promise.allSettled([
+    mqttManager.disconnectAll(),
+    recordingStore.flush(),
+    historyService?.close(),
+  ]).then(() => {
+    finishingQuit = true;
+    app.quit();
+  });
 });
 
 app.on('window-all-closed', () => {

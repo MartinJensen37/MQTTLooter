@@ -41,6 +41,16 @@ function createEventHandler(eventPrefix: string) {
 const mqttEvents = createEventHandler('mqtt');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  history: {
+    status: () => ipcRenderer.invoke('history-status'),
+    page: (query: unknown) => ipcRenderer.invoke('history-page', query),
+    topics: (connectionId: string, search: string) =>
+      ipcRenderer.invoke('history-topics', connectionId, search),
+    clear: (connectionId: string, topic?: string) =>
+      ipcRenderer.invoke('history-clear', connectionId, topic),
+    persist: (enabled: boolean) => ipcRenderer.invoke('history-persist', enabled),
+    resume: () => ipcRenderer.invoke('history-resume'),
+  },
   recordings: {
     load: () => ipcRenderer.invoke('recordings-load'),
     migrate: (recordings: unknown[]) => ipcRenderer.invoke('recordings-migrate', recordings),

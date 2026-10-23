@@ -411,6 +411,12 @@ async function run() {
         );
     },
   });
+  await require('./electron-history.cjs')({
+    evaluate, waitFor, field,
+    send: (topic, payload) => {
+      for (const socket of sockets) socket.write(codec.generate({cmd:'publish',topic,payload,qos:0,retain:false},{protocolVersion:5}));
+    },
+  });
   assert.deepEqual(errors, []);
   console.log(
     'Electron smoke passed: MQTT 5, binary payloads, recording recovery, simulator/QoS 1+2, topic search, anchored scrolling, responsive layout and sandbox.',
@@ -443,5 +449,6 @@ run().then(
 function finish(code) {
   sockets.forEach((socket) => socket.destroy());
   broker.close();
-  app.exit(code);
+  app.once('will-quit', () => app.exit(code));
+  app.quit();
 }

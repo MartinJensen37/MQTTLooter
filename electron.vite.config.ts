@@ -8,7 +8,12 @@ export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     build: {
-      lib: { entry: resolve(__dirname, 'src/main/index.ts') },
+      rollupOptions: {
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          'history-worker': resolve(__dirname, 'src/main/history-worker.ts'),
+        },
+      },
     },
   },
   preload: {

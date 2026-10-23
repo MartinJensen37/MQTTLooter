@@ -14,7 +14,7 @@ child.on('error', (error) => {
 const timeout = setTimeout(() => {
   console.error('Electron smoke test timed out');
   child.kill();
-}, 30000);
+}, 45000);
 child.on('exit', (code) => {
   clearTimeout(timeout);
   process.exitCode = code ?? 1;

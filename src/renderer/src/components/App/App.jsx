@@ -4,7 +4,7 @@ import MQTTService from '../../services/MQTTService';
 import TopicTreeService from '../../services/TopicTreeService';
 import ConnectionSidebar from '../ConnectionSidebar/ConnectionSidebar';
 import TopicTreeComponent from '../TopicTree/TopicTreeComponent';
-import MessagePanel from '../MessagePanel/MessagePanel';
+import MessagePanel from '../MessagePanel/MessageWorkspace';
 import PublishingPanel from '../PublishingPanel/PublishingPanel';
 import RecordingPanel from '../RecordingPanel/RecordingPanel';
 import SimulationPanel from '../SimulationPanel/SimulationPanel';
