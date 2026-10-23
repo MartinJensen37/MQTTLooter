@@ -9,6 +9,7 @@ import {
 import ConnectionDetailsSection from './connectionModal/ConnectionDetailsSection';
 import Mqtt5PropertiesSection from './connectionModal/Mqtt5PropertiesSection';
 import TlsSection from './connectionModal/TlsSection';
+import SecretInput from './connectionModal/SecretInput';
 import LastWillSection from './connectionModal/LastWillSection';
 import SubscriptionsSection from './connectionModal/SubscriptionsSection';
 
@@ -254,9 +255,10 @@ function ConnectionModal({ connection, onSave, onCancel }: ConnectionModalProps)
                 </div>
                 <div className="mqtt-form-group">
                   <label htmlFor="password">Password</label>
-                  <input
+                  <SecretInput
+                    key={connection?.id ?? 'new'}
+                    label="password"
                     id="password"
-                    type="password"
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
                     placeholder="Optional"

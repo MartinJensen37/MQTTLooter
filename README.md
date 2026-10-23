@@ -79,3 +79,11 @@ A worker owns `history/history.sqlite` in Electron's user-data directory. It sto
 History is session-only by default: it is removed on normal exit, or on the next startup after a crash. Enable **Disk history settings > Keep history across app restarts** to retain it. Messages older than 24 hours are excluded from pages and removed incrementally. Retention trims oldest records at a 256 MiB payload/metadata estimate; SQLite has a separate 512 MiB database ceiling, with additional temporary rollback-journal space. Database free pages are reused, so deleting messages need not shrink the file. The worker uses an 8 MiB SQLite page cache and rollback journaling; WAL is not enabled.
 
 **Clear Messages** in Disk history removes that topic's stored and cached messages. Live-cache clearing remains a cache-only action. Exports currently cover the displayed page; streaming whole-history export and database-backed recording migration are still planned. Saved recordings remain in their existing JSON library.
+
+### Inspecting and copying payloads
+
+Message cards offer Text, Hex and Pretty JSON. JSON formatting is bounded and preserves numeric spelling (including integers beyond JavaScript's safe range), strings and duplicate keys. Formatting changes the preview only; copy/export retains the original payload. Expand **Inspect payload** and drag its lower edge to resize it. Collapsed previews adapt to panel width.
+
+Choose **Display > Plain log** for selectable text rows, then **Copy visible log** to copy the displayed preview. Binary payloads are labeled base64. The plain preview is limited to 4,096 payload characters per row and 262,144 characters overall, with a truncation notice; JSON/CSV exports still contain the complete payloads in the current view/page.
+
+Connection settings now have **Show/Hide** controls for the broker password and TLS private-key passphrase. Values start masked when the dialog opens. Credential storage has not changed; OS-backed secret migration remains planned.

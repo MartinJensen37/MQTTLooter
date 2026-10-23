@@ -374,3 +374,7 @@
   font-size: 13px;
 }
 .mqtt-cert-remove:hover { background: #f5c6cb; color: #721c24; }
+
+.mqtt-secret-input { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mqtt-secret-input input { flex: 1; min-width: 0; }
+.mqtt-secret-input button { flex-shrink: 0; }

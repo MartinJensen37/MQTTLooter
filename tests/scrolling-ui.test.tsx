@@ -104,7 +104,7 @@ it('automatically pins a visible message across prepends and follows again at th
 it('anchors oldest-first views through append and eviction and resets when switching brokers', async () => {
   await renderMessages([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
   await act(async () => {
-    const select = container.querySelector('.message-filters select') as HTMLSelectElement;
+    const select = container.querySelector('[aria-label="Message order"]') as HTMLSelectElement;
     select.value = 'asc';
     select.dispatchEvent(new Event('change', { bubbles: true }));
   });
@@ -150,7 +150,7 @@ it('orders same-millisecond bursts by arrival in both directions', async () => {
   );
   expect(container.querySelector('.message-item')!.getAttribute('data-scroll-key')).toBe('3');
   await act(async () => {
-    const select = container.querySelector('.message-filters select') as HTMLSelectElement;
+    const select = container.querySelector('[aria-label="Message order"]') as HTMLSelectElement;
     select.value = 'asc';
     select.dispatchEvent(new Event('change', { bubbles: true }));
   });

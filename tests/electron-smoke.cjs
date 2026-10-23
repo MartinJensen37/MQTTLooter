@@ -417,6 +417,8 @@ async function run() {
       for (const socket of sockets) socket.write(codec.generate({cmd:'publish',topic,payload,qos:0,retain:false},{protocolVersion:5}));
     },
   });
+  fs.writeFileSync(path.join(workspace, '.tmp', 'electron-inspector.png'), (await window.webContents.capturePage()).toPNG());
+  await require('./electron-credentials.cjs')({ evaluate, waitFor, field });
   assert.deepEqual(errors, []);
   console.log(
     'Electron smoke passed: MQTT 5, binary payloads, recording recovery, simulator/QoS 1+2, topic search, anchored scrolling, responsive layout and sandbox.',

@@ -26,7 +26,7 @@ module.exports = async ({ evaluate, waitFor, field, send }) => {
     false,
   );
 
-  await field('.message-filters select', 'desc');
+  await field('[aria-label="Message order"]', 'desc');
   await field('[aria-label="Message source"]', 'stored');
   await field('[aria-label="Search stored topics"]', 'archive/series');
   await waitFor(
@@ -80,4 +80,35 @@ module.exports = async ({ evaluate, waitFor, field, send }) => {
     false,
   );
   await field('[aria-label="Message source"]', 'live');
+  send('archive/json', '{"count":9007199254740993,"values":[1,2]}');
+  await field('[aria-label="Search topics"]', 'archive/json');
+  await waitFor(
+    () => evaluate('!!document.querySelector(\'.topic-tree-node[title="archive/json"]\')'),
+    'JSON topic',
+  );
+  await evaluate('document.querySelector(\'.topic-tree-node[title="archive/json"]\').click()');
+  await waitFor(
+    () => evaluate('!!document.querySelector(\'[aria-label="Payload view"]\')'),
+    'payload selector',
+  );
+  await field('[aria-label="Payload view"]', 'json');
+  await evaluate("document.querySelector('.payload-full').open = true");
+  await waitFor(
+    () =>
+      evaluate("document.querySelector('.payload-code')?.textContent.includes('9007199254740993')"),
+    'pretty JSON precision',
+  );
+  assert.equal(
+    await evaluate("getComputedStyle(document.querySelector('.payload-code')).resize"),
+    'vertical',
+  );
+  await field('[aria-label="Message display"]', 'plain');
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.message-plain-entry')?.textContent.includes('9007199254740993')",
+      ),
+    'plain log',
+  );
+  await field('[aria-label="Message display"]', 'cards');
 };

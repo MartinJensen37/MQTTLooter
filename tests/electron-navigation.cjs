@@ -111,7 +111,7 @@ module.exports = async function checkNavigation({ evaluate, waitFor, field, send
   );
   assert.equal(await evaluate("document.querySelector('.message-list').scrollTop"), 0);
 
-  await field('.message-filters select', 'asc');
+  await field('[aria-label="Message order"]', 'asc');
   await settle();
   assert.equal(await evaluate("document.querySelector('.message-list').scrollTop"), 0);
   await evaluate("document.querySelector('.message-list').scrollTop = 1800");

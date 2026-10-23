@@ -1,4 +1,5 @@
 import React from 'react';
+import SecretInput from './SecretInput';
 import type { ConnectionFormData, FieldChange, CertFileType } from './types';
 
 interface Props {
@@ -185,9 +186,9 @@ function TlsSection({ formData, handleInputChange, handleFileSelect, clearCertif
           {formData.tls.key && (
             <div className="mqtt-form-group">
               <label htmlFor="key-passphrase">Private Key Passphrase</label>
-              <input
+              <SecretInput
+                label="key passphrase"
                 id="key-passphrase"
-                type="password"
                 value={formData.tls.passphrase}
                 onChange={(e) =>
                   handleInputChange('tls', { ...formData.tls, passphrase: e.target.value })

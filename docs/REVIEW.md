@@ -73,3 +73,9 @@ A main-managed worker now owns SQLite via the installed Electron/Node runtime. I
 Remaining limits: the live tree is still a separate bounded cache; export is page-scoped; recording capture/library migration is not implemented; gap counters are per-run, not a durable journal of all capture failures; long-running RSS/input-latency benchmarks and installer upgrade checks remain open. Obsolete renderer page results are ignored and worker requests are bounded; full search cancellation still needs work.
 
 Validation: 92 tests plus typecheck and lint pass. Built Electron coverage browses 650 messages through the real source/topic/page controls, checks invalid cursors and scoped deletion, and retains the earlier pressure tests. The worker suite passes under Node, Electron 45, and the Windows packaged executable using the worker inside `app.asar`; it verifies binary/MQTT 5 round trips, restart persistence, crash-session cleanup and corruption reporting. `npm run pack` passes. This validates unpacked Windows packaging, not an installer upgrade or sustained-load benchmark.
+
+### 2026-10-23: inspection controls
+
+Added bounded Pretty JSON without numeric reserialization, a vertically resizable inspector, width-adaptive collapsed previews and a selectable/copyable plain log. Formatting does not change copy/export payloads; truncation is explicit. Broker password and private-key passphrase use the same accessible show/hide control and existing button styles. Secret persistence remains unchanged.
+
+Validation: 95 tests, typecheck, lint and the built Electron smoke pass. Coverage checks JSON lexeme preservation/complexity bounds, plain-log limits, existing scroll anchoring, real inspector/plain-log controls, and password/passphrase reveal/remasking. The packaged SQLite worker validation from the storage slice remains applicable; packaging was not repeated for these renderer-only changes.

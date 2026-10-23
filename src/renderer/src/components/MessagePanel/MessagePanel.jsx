@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './MessagePanel.css';
 import StableScrollViewport from '../StableScrollViewport';
 import PayloadView from './PayloadView';
+import { plainLog } from '../../utils/payloadPresentation';
 
 function MessagePanel({
   messages,
@@ -12,6 +13,17 @@ function MessagePanel({
   showFeedback,
   storedPage = false,
 }) {
+  const panelRef = useRef(null);
+  const [previewBytes, setPreviewBytes] = useState(100);
+  const [displayMode, setDisplayMode] = useState('cards');
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined' || !panelRef.current) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setPreviewBytes(Math.max(40, Math.min(512, Math.floor((entry.contentRect.width - 100) / 7))));
+    });
+    observer.observe(panelRef.current);
+    return () => observer.disconnect();
+  }, []);
   const [sortBy, setSortBy] = useState('timestamp');
   const [sortOrder, setSortOrder] = useState('desc');
   const [showRetainedOnly, setShowRetainedOnly] = useState(false);
@@ -29,6 +41,11 @@ function MessagePanel({
     }
     return filtered;
   }, [messages, showRetainedOnly, sortBy, sortOrder]);
+
+  const log = React.useMemo(
+    () => (displayMode === 'plain' ? plainLog(processedMessages) : null),
+    [processedMessages, displayMode],
+  );
 
   const topicDetails = React.useMemo(() => {
     if (!selectedTopic) return null;
@@ -132,7 +149,7 @@ function MessagePanel({
   const formatTimestamp = (ts) => new Date(ts).toLocaleString();
 
   return (
-    <div className="message-panel">
+    <div className="message-panel" ref={panelRef}>
       <div className="panel-header">
         <div className="header-left">
           <h2>
@@ -146,9 +163,34 @@ function MessagePanel({
 
       <div className="message-filters" aria-label="Message filters">
         <label>
+          Display{' '}
+          <select
+            className="custom-select-button form-select form-select-compact"
+            aria-label="Message display"
+            value={displayMode}
+            onChange={(event) => setDisplayMode(event.target.value)}
+          >
+            <option value="cards">Message cards</option>
+            <option value="plain">Plain log</option>
+          </select>
+        </label>
+        {log && (
+          <button
+            className="btn btn-sm btn-secondary"
+            onClick={() => {
+              void navigator.clipboard
+                .writeText(log.rows.map((row) => row.text).join('\n'))
+                .then(() => showFeedback?.('Visible log copied.', 'success'));
+            }}
+          >
+            Copy visible log
+          </button>
+        )}
+        <label>
           Order{' '}
           <select
             className="custom-select-button form-select form-select-compact"
+            aria-label="Message order"
             value={sortOrder}
             onChange={(e) => {
               setSortBy('timestamp');
@@ -267,6 +309,7 @@ function MessagePanel({
           selectedTopic?.topicPath,
           sortOrder,
           showRetainedOnly,
+          displayMode,
         ])}
         following={autoScroll}
         onFollowingChange={setAutoScroll}
@@ -293,56 +336,72 @@ function MessagePanel({
                   : 'Showing up to 300 most recent messages for this topic.'}
               </div>
             )}
-            {processedMessages.map((msg) => (
-              <div
-                key={msg.id}
-                data-scroll-key={msg.id}
-                className="message-item"
-                onDoubleClick={(e) => copyPayload(msg.message, e)}
-                title={
-                  msg.encoding === 'base64'
-                    ? 'Double-click to copy base64 payload'
-                    : 'Double-click to copy payload'
-                }
-              >
-                <div className="message-header">
-                  <div className="message-meta">
-                    <span className="timestamp" title={formatTimestamp(msg.timestamp)}>
-                      <i className="fas fa-clock"></i>{' '}
-                      {new Date(msg.timestamp).toLocaleTimeString()}
-                    </span>
-                    <span className="topic" title={msg.topic}>
-                      <i className="fas fa-tag"></i> {msg.topic}
-                    </span>
-                    <span className={`badge badge-qos-${msg.qos}`}>QoS {msg.qos}</span>
-                    {msg.encoding === 'base64' && (
-                      <span className="badge">Binary (base64 export)</span>
-                    )}
-                    {msg.retain && (
-                      <span className="badge badge-retain">
-                        <i className="fas fa-save"></i> RETAIN
-                      </span>
-                    )}
-                    <span className="connection-id" title={`Connection: ${msg.connectionId}`}>
-                      <i className="fas fa-plug"></i> {msg.connectionId}
-                    </span>
+            {log?.truncated && (
+              <p className="message-history-notice">
+                Plain log preview is limited to 4,096 payload characters per message and 262,144
+                total characters. Export preserves complete payloads for this view.
+              </p>
+            )}
+            {log
+              ? log.rows.map((row) => (
+                  <pre className="message-plain-entry" key={row.id} data-scroll-key={row.id}>
+                    {row.text}
+                  </pre>
+                ))
+              : processedMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    data-scroll-key={msg.id}
+                    className="message-item"
+                    onDoubleClick={(e) => copyPayload(msg.message, e)}
+                    title={
+                      msg.encoding === 'base64'
+                        ? 'Double-click to copy base64 payload'
+                        : 'Double-click to copy payload'
+                    }
+                  >
+                    <div className="message-header">
+                      <div className="message-meta">
+                        <span className="timestamp" title={formatTimestamp(msg.timestamp)}>
+                          <i className="fas fa-clock"></i>{' '}
+                          {new Date(msg.timestamp).toLocaleTimeString()}
+                        </span>
+                        <span className="topic" title={msg.topic}>
+                          <i className="fas fa-tag"></i> {msg.topic}
+                        </span>
+                        <span className={`badge badge-qos-${msg.qos}`}>QoS {msg.qos}</span>
+                        {msg.encoding === 'base64' && (
+                          <span className="badge">Binary (base64 export)</span>
+                        )}
+                        {msg.retain && (
+                          <span className="badge badge-retain">
+                            <i className="fas fa-save"></i> RETAIN
+                          </span>
+                        )}
+                        <span className="connection-id" title={`Connection: ${msg.connectionId}`}>
+                          <i className="fas fa-plug"></i> {msg.connectionId}
+                        </span>
+                      </div>
+                      <div className="message-actions">
+                        <button
+                          className="copy-btn"
+                          onClick={(e) => copyPayload(msg.message, e)}
+                          title={msg.encoding === 'base64' ? 'Copy base64 payload' : 'Copy payload'}
+                          style={{ borderRadius: '50%', minWidth: '24px', height: '24px' }}
+                        >
+                          <i className="fas fa-copy"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="message-content">
+                      <PayloadView
+                        value={msg.message}
+                        encoding={msg.encoding}
+                        previewBytes={previewBytes}
+                      />
+                    </div>
                   </div>
-                  <div className="message-actions">
-                    <button
-                      className="copy-btn"
-                      onClick={(e) => copyPayload(msg.message, e)}
-                      title={msg.encoding === 'base64' ? 'Copy base64 payload' : 'Copy payload'}
-                      style={{ borderRadius: '50%', minWidth: '24px', height: '24px' }}
-                    >
-                      <i className="fas fa-copy"></i>
-                    </button>
-                  </div>
-                </div>
-                <div className="message-content">
-                  <PayloadView value={msg.message} encoding={msg.encoding} />
-                </div>
-              </div>
-            ))}
+                ))}
           </>
         )}
       </StableScrollViewport>
