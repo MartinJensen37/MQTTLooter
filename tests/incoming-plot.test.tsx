@@ -61,7 +61,12 @@ it('selects a JSON field, pauses polling, bounds zoom and releases polling on cl
       availablePaths: [['temperature']],
       series: query.paths.map((path) => ({
         path,
-        points: path.length ? [{ x: query.to, y: 42 }] : [],
+        points: path.length
+          ? [
+              { x: query.to, y: 1 },
+              { x: query.to, y: 42 },
+            ]
+          : [],
         valid: path.length ? 1 : 0,
         gaps: path.length ? 0 : 1,
       })),

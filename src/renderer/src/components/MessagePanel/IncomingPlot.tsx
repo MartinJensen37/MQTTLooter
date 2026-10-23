@@ -248,7 +248,7 @@ export default function IncomingPlot({
         {result?.series.map((series, index) => {
           const point = series.points.reduce<(typeof series.points)[number] | undefined>(
             (nearest, point) =>
-              !nearest || Math.abs(point.x - cursorTime) < Math.abs(nearest.x - cursorTime)
+              !nearest || Math.abs(point.x - cursorTime) <= Math.abs(nearest.x - cursorTime)
                 ? point
                 : nearest,
             undefined,
