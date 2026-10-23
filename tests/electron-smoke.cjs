@@ -385,6 +385,42 @@ async function run() {
     (await window.webContents.capturePage()).toPNG(),
   );
   await clickButton('.signal-dialog', 'Save Signal');
+  await clickButton('.publish-timeline', 'Publish timeline');
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelectorAll('.publish-timeline-row').length === 3 && !!document.querySelector('.publish-timeline-lane rect')",
+      ),
+    'timeline worker and random bands',
+  );
+  await field('[aria-label="Timeline horizon"]', '60000');
+  await waitFor(
+    () =>
+      evaluate("document.querySelector('.publish-timeline-axis')?.textContent.includes('60 s')"),
+    'timeline horizon',
+  );
+  assert.equal(
+    await evaluate("document.querySelectorAll('.publish-timeline [role=alert]').length"),
+    0,
+  );
+  window.setSize(800, 600);
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  await evaluate("document.querySelector('.publish-timeline').scrollIntoView({block:'start'})");
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const timelineLayout = await evaluate(
+    "(() => { const element = document.querySelector('.publish-timeline'); return {width:element.clientWidth,scroll:element.scrollWidth}; })()",
+  );
+  assert.ok(timelineLayout.scroll <= timelineLayout.width + 2, JSON.stringify(timelineLayout));
+  const timelineAlignment = await evaluate(
+    "(() => { const lane=document.querySelector('.publish-timeline-lane svg').getBoundingClientRect(); const total=document.querySelector('.publish-timeline-total svg').getBoundingClientRect(); return Math.abs(lane.right-total.right)+Math.abs(lane.left-total.left); })()",
+  );
+  assert.ok(timelineAlignment < 2, `Timeline axis alignment: ${timelineAlignment}`);
+  fs.writeFileSync(
+    path.join(workspace, '.tmp', 'electron-timeline-small.png'),
+    (await window.webContents.capturePage()).toPNG(),
+  );
+  await clickButton('.publish-timeline', 'Publish timeline');
+  window.setSize(1400, 900);
   const settings = await evaluate(
     "JSON.parse(localStorage.getItem('mqtt-simulation-devices-smoke'))",
   );

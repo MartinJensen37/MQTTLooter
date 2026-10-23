@@ -35,6 +35,18 @@ Time offset delays the first tick and shifts the fixed schedule. With a 1,000 ms
 
 Publish probability is evaluated independently at each eligible tick: 100% always sends, 0% never sends, and 25% sends on average once in four ticks. It does not alter the signal's value distribution. Publish Once explicitly sends every signal, bypassing timing and probability.
 
+## Publish timeline
+
+Open **Publish timeline** below the signal list to compare planned sending times from a fresh loop start. The default window is 10 seconds, with 5/30/60-second options. Synchronized rows align, independent periods repeat separately, and offsets shift the first opportunity. This previews message timing; the tiny waveform in each signal row previews its value.
+
+Fixed schedules show ticks colored by send chance. Random timing uses fading bands for the estimated chance of at least one send in each time bin. Hover for a numeric description, or move **Inspect bin** with the keyboard to read each row's likelihood and the aggregate expected message count. A bin with several opportunities can have more than one expected message; its probability of at least one send still cannot exceed 100%. Colors have a visibility floor, so read the numbers rather than treating opacity as a linear scale. Dashed ticks mean 0% and never send. No bins are hidden by a 1% cutoff.
+
+For example, a 1-second fixed period with 1% send chance has 99% probability of at least one send by its 459th opportunity, assuming independent decisions and no stalls. That wait is described below the row even though the timeline stops at 60 seconds. A longer period or offset also shows the first opportunity outside the window. Combined mode explains its completion-dependent spacing instead of drawing independent signal messages.
+
+Random estimates use 512 repeatable timing trajectories in a separate worker, with the same bounded-delay rule as publishing, a 100 ms minimum and integer-millisecond timer rounding. Send probability is calculated analytically within each trajectory. This does not consume the live RNG or generator state. Per-bin sampling uncertainty is at most approximately ±4.4 percentage points at 95% confidence under the sampling assumptions. The preview assumes an available connection and no delayed callbacks or pending publishes; it does not forecast actual deliveries, manual sends or edits during an existing run.
+
+The calculation is capped at 128 signals and 128 time bins; extra signals are explicitly excluded from the preview and its aggregate. Rows are virtualized, live sample updates reuse the result, and closing the timeline terminates calculation. Invalid timing must be corrected before a preview is shown.
+
 ## Timing and state
 
 - The publish interval is 100 ms to 24 hours. Individual signals follow monotonic deadlines from loop start. A slow signal skips ticks while its publish is pending; other signals keep their schedule. Late timer callbacks sample once rather than sending a catch-up burst. Combined mode retains a delay of one interval after each completed publish.

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SimulationEngine } from '../src/renderer/src/services/SimulationEngine';
+import { calculateTimeline } from '../src/renderer/src/components/SimulationPanel/simulationPanel/publishTimelineModel';
 import {
   loadDevices,
   validateDevice,
@@ -75,6 +76,19 @@ it('publishes each topic on a shared clock with offsets, independent periods and
   );
   expect(JSON.parse(calls[0].payload).timestamp).toBe(JSON.parse(calls[1].payload).timestamp);
   expect(publish.mock.calls[0][0]).toMatchObject({ qos: 2, retain: true });
+  const preview = calculateTimeline({
+    period: 100,
+    horizon: 300,
+    signals: [
+      signal(1),
+      signal(3, { mode: 'sync', offsetMs: 50 }),
+      signal(4, { mode: 'fixed', intervalMs: 250 }),
+    ],
+  });
+  for (const [index, topic] of ['factory/s1', 'factory/s3', 'custom/topic'].entries())
+    expect(preview.rows[index].ticks).toEqual(
+      calls.filter((call) => call.topic === topic).map((call) => call.elapsed),
+    );
 });
 
 it('drops busy ticks without delaying another signal or drifting the shared clock', async () => {

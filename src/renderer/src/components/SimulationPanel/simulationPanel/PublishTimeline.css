@@ -1,0 +1,126 @@
+.publish-timeline {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+  font-size: 12px;
+}
+.publish-timeline-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0;
+}
+.publish-timeline-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.publish-timeline-controls select {
+  width: auto;
+}
+.publish-timeline-controls > span,
+.publish-timeline small,
+.publish-timeline details {
+  color: var(--text-muted);
+}
+.publish-timeline-axis {
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+  display: grid;
+  grid-template-columns: 140px 1fr 1fr 1fr;
+  padding-right: 48px;
+  margin-bottom: 4px;
+}
+.publish-timeline-axis span:last-child {
+  text-align: right;
+}
+.publish-timeline-axis span:nth-child(3) {
+  text-align: center;
+}
+.publish-timeline-rows {
+  height: 248px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  border-block: 1px solid var(--border-color);
+}
+.publish-timeline-row,
+.publish-timeline-total {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) 48px;
+  align-items: center;
+  height: 62px;
+  gap: 0;
+}
+.publish-timeline-name {
+  padding-right: 8px;
+  min-width: 0;
+}
+.publish-timeline-name strong,
+.publish-timeline-name span,
+.publish-timeline-lane small {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.publish-timeline-lane {
+  min-width: 0;
+}
+.publish-timeline svg {
+  width: 100%;
+  display: block;
+  height: 24px;
+  overflow: hidden;
+}
+.publish-timeline svg rect {
+  fill: var(--primary);
+}
+.publish-timeline svg line {
+  stroke: var(--primary);
+  stroke-width: 2;
+}
+.publish-timeline svg .publish-timeline-cursor {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+.publish-timeline-likelihood {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.publish-timeline-total {
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
+.publish-timeline-total svg {
+  height: 40px;
+}
+.publish-timeline-total > span:last-child {
+  text-align: right;
+}
+.publish-timeline-inspect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.publish-timeline-inspect input {
+  flex: 1;
+  min-width: 80px;
+  accent-color: var(--primary);
+}
+.publish-timeline details summary {
+  cursor: pointer;
+}
+@media (max-width: 900px) {
+  .publish-timeline-row,
+  .publish-timeline-total {
+    grid-template-columns: 100px minmax(0, 1fr) 44px;
+  }
+  .publish-timeline-axis {
+    overflow-y: hidden;
+    scrollbar-gutter: stable;
+    grid-template-columns: 100px 1fr 1fr 1fr;
+  }
+}

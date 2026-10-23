@@ -4,6 +4,7 @@ import type {
 } from '../components/SimulationPanel/simulationPanel/types';
 import { signalTopic, validateDevice } from '../components/SimulationPanel/simulationPanel/model';
 import { sampleDevice, type SignalState, type SimulationCallbacks } from './SimulationSample';
+import { signalDelay, signalPeriod } from './signalTiming';
 
 interface Lane {
   signature: string;
@@ -37,18 +38,10 @@ export class SignalScheduler {
     return `${id}:${signal}`;
   }
   private period(device: SimulatedDevice, output: DeviceOutput) {
-    return !output.timing || output.timing.mode === 'sync'
-      ? device.publishInterval
-      : output.timing.intervalMs!;
+    return signalPeriod(device.publishInterval, output.timing);
   }
   private delay(device: SimulatedDevice, output: DeviceOutput) {
-    const period = this.period(device, output);
-    return output.timing?.mode === 'random'
-      ? Math.max(
-          100,
-          period * (1 + ((this.random() * 2 - 1) * (output.timing.jitterPercent ?? 20)) / 100),
-        )
-      : period;
+    return signalDelay(this.period(device, output), output.timing, this.random);
   }
   private busy(id: number) {
     return [...this.pending].some((key) => key.startsWith(`${id}:`));

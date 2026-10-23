@@ -80,6 +80,10 @@ History is session-only by default: it is removed on normal exit, or on the next
 
 **Clear Messages** in Disk history removes that topic's stored and cached messages. Live-cache clearing remains a cache-only action. Exports currently cover the displayed page; streaming whole-history export and database-backed recording migration are still planned. Saved recordings remain in their existing JSON library.
 
+### Previewing publish schedules
+
+In Simulation, open **Publish timeline** below a device's signal list. It shows aligned fixed opportunities, offsets, random timing likelihood bands and expected message counts per time bin. The time-bin slider exposes numeric likelihoods, including rare 1% sends. A separate worker calculates repeatable estimates without advancing live generator state. Windows are bounded to 60 seconds and 128 signals; exclusions and assumptions are explicit. See [the simulator guide](docs/SIMULATION.md#publish-timeline).
+
 ### Plotting incoming values
 
 Select a topic in Logging and choose **Plot incoming values**. The plot reads retained disk history, so it can show more than the live cache's 300 messages. It also works for topics selected through **Source > Disk history**. Numeric text plots directly; for JSON, the first discovered numeric field is selected automatically. Add up to four fields using the field menu or a JSON Pointer such as `/sensors/0/value`. A literal slash in a key is `~1`, and a tilde is `~0`; dots need no escaping. JSON numeric strings, booleans and missing values are gaps, not zero.

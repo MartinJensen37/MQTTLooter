@@ -6,6 +6,8 @@ Implementation update (2026-10-23): phase 1 is complete. Signals use compact row
 
 The inspection backlog also now includes a resizable payload inspector, bounded Pretty JSON with exact numeric lexemes, a bounded selectable plain log, adaptive preview widths, and shared password/passphrase show-hide controls. Incoming numeric plots now read retained disk history, support four numeric fields per topic, shared chart styling, extrema-preserving aggregation, a hover/keyboard sample cursor, pause/resume, zoom and time navigation. New connection sessions and invalid values break lines. Content search, live MQTT 5 property inspection and OS-backed credential migration remain open.
 
+Phase 5 now includes the planned publish timeline: aligned opportunity ticks, offset schedules, seeded random likelihood bands, per-bin expected-message totals, numeric probability inspection, long-wait descriptions and combined-mode guidance. The preview uses a separate worker and does not consume live random state. Optional actual-event overlays and next-success distribution views remain follow-ups; the preview does not predict broker delivery or scheduling stalls.
+
 ## What is already covered
 
 | Request | Current status | Remaining work |
@@ -123,6 +125,10 @@ Acceptance: replay a known waveform through a local broker and compare generated
 Suggested commits: `Plot topic values`, `Improve payload inspection`, `Search stored messages`, `Show MQTT 5 properties`.
 
 ## 5. Visualize message timing and probability
+
+Implemented (2026-10-23): the collapsible device timeline defaults to 10 seconds, offers 5/10/30/60-second horizons and uses 128 bins. Fixed opportunities follow the scheduler's period/offset rules; random delays reuse its bounded-delay function and model integer-millisecond callbacks. Random rows average 512 seeded timing trajectories, calculating send probability analytically within each trajectory. This keeps 1% signals visible without sampling away rare sends. A fixed-schedule 99% first-send time is described even when outside the window; 0% is explicitly never.
+
+Rendering is virtualized to ten rows at a time, and computation is capped at 128 signals with an explicit exclusion notice and scoped aggregate. A worker is created only while calculating; edits are debounced, live sample changes reuse results, and closing/changing settings terminates obsolete work. Nonzero colors have a documented visibility floor, accompanied by numeric probabilities and an accessible time-bin slider. Fixed rows are exact under the stated no-stall assumptions; random per-bin sampling uncertainty is approximately ±4.4 percentage points at 95% confidence in the worst case. The original scope below includes optional actual-event overlays and a next-success distribution view, which remain unimplemented.
 
 Add a collapsible **Publish timeline** below the device's signal list. This visualizes when messages may be sent; the small waveform shows what value a signal generates. Keep those meanings distinct.
 

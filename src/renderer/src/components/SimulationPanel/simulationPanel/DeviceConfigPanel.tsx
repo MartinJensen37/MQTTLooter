@@ -1,6 +1,7 @@
 import type { SimulatedDevice, DeviceOutput } from './types';
 import IntervalField from './IntervalField';
 import SignalSparkline from './SignalSparkline';
+import PublishTimeline from './PublishTimeline';
 import { validateDevice } from './model';
 import { formatInterval } from './formatters';
 interface Props {
@@ -193,6 +194,7 @@ export default function DeviceConfigPanel({
           })}
         </div>
       </section>
+      <PublishTimeline key={device.id} device={device} />
       {!!errors.length && (
         <ul role="alert">
           {errors.map((error, index) => (
