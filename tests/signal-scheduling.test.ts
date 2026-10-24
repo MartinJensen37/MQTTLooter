@@ -47,6 +47,27 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
+it('uses device raw defaults and per-signal JSON overrides without changing timing or generator state', async () => {
+  const d = {
+    ...device([signal(1), { ...signal(2), payloadMode: 'json' as const }]),
+    payloadMode: 'raw' as const,
+  };
+  engine.sync([d], true);
+  await vi.advanceTimersByTimeAsync(100);
+  expect(publish.mock.calls[0][0]).toMatchObject({
+    topic: 'factory/s1',
+    payload: '0',
+    qos: 2,
+    retain: true,
+  });
+  expect(JSON.parse(publish.mock.calls[1][0].payload)).toHaveProperty('value', 0);
+  expect(sample.mock.calls[0][1].payloadMode).toBe('raw');
+  engine.sync([{ ...d, outputs: [{ ...d.outputs[0], payloadMode: 'json' }, d.outputs[1]] }], true);
+  await vi.advanceTimersByTimeAsync(100);
+  expect(JSON.parse(publish.mock.calls[2][0].payload)).toHaveProperty('value', 1);
+  expect(error).not.toHaveBeenCalled();
+});
+
 it('publishes each topic on a shared clock with offsets, independent periods and shared timestamps', async () => {
   const calls: { elapsed: number; topic: string; payload: string }[] = [];
   const start = Date.now();

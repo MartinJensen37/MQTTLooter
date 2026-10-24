@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { DATA_TYPE_CONFIGS, GENERATOR_CONFIGS } from './constants';
-import { defaultConfig, signalTopic, validateOutput } from './model';
+import { defaultConfig, signalTopic, validateOutput, payloadMode } from './model';
 import {
   sampleDevice,
   type SimulationSample,
@@ -10,6 +10,7 @@ import type { DeviceOutput, SimulatedDevice } from './types';
 import SignalTimingFields from './SignalTimingFields';
 import DynamicConfigFields from './DynamicConfigFields';
 import SignalWaveform from './SignalWaveform';
+import SimulationPayloadPreview from './SimulationPayloadPreview';
 
 interface Props {
   output: DeviceOutput;
@@ -18,7 +19,7 @@ interface Props {
   onClose: () => void;
   onSave: (output: DeviceOutput) => void;
   onRemove?: () => void;
-  lastPublished?: Pick<SimulationSample, 'payload' | 'topic'>;
+  lastPublished?: Pick<SimulationSample, 'payload' | 'topic' | 'payloadMode'>;
 }
 export default function EditOutputModal({
   output,
@@ -36,11 +37,13 @@ export default function EditOutputModal({
     config: { ...defaultConfig(output.dataType, output.generator), ...output.config },
   });
   const [preview, setPreview] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState('');
   const [confirmRemove, setConfirmRemove] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
   const errors = validateOutput(form, otherOutputs);
+  const mode = payloadMode(device, form);
   const update = (updates: Partial<DeviceOutput>) =>
     setForm((previous) => ({ ...previous, ...updates }));
   useEffect(() => {
@@ -94,24 +97,25 @@ export default function EditOutputModal({
       ...device,
       outputs,
       payloadFormat: combined ? device.payloadFormat : 'auto',
+      payloadMode: mode,
     };
     const tick = () => {
       try {
-        if (validateOutput(form).length) {
-          setPreview(null);
-          return;
-        }
+        const errors = validateOutput(form);
+        if (errors.length) throw new Error(errors[0]);
         const sample = sampleDevice(previewDevice, performance.now() - started, previous);
         previous = sample.next;
-        setPreview(JSON.stringify(JSON.parse(sample.payload), null, 2));
-      } catch {
+        setPreview(sample.payload);
+        setPreviewError('');
+      } catch (error) {
         setPreview(null);
+        setPreviewError((error as Error).message);
       }
     };
     tick();
     const timer = setInterval(tick, 500);
     return () => clearInterval(timer);
-  }, [form, device]);
+  }, [form, device, mode]);
   const changeType = (dataType: string) =>
     update({
       dataType,
@@ -196,6 +200,7 @@ export default function EditOutputModal({
                   <input
                     className="form-input"
                     value={form.unit ?? ''}
+                    disabled={mode === 'raw'}
                     onChange={(e) => update({ unit: e.target.value })}
                   />
                 </label>
@@ -227,14 +232,44 @@ export default function EditOutputModal({
             }
           />
           <SignalWaveform output={form} />
+          {(!device || device.publishMode === 'signals') && (
+            <label>
+              Signal payload format
+              <select
+                className="custom-select-button form-select"
+                aria-label="Signal payload format"
+                value={form.payloadMode ?? 'inherit'}
+                onChange={(event) =>
+                  update({
+                    payloadMode:
+                      event.target.value === 'inherit'
+                        ? undefined
+                        : (event.target.value as 'json' | 'raw'),
+                  })
+                }
+              >
+                <option value="inherit">Device default ({device?.payloadMode ?? 'json'})</option>
+                <option value="json">JSON with metadata</option>
+                <option value="raw">Raw scalar (UTF-8)</option>
+              </select>
+            </label>
+          )}
           <label>
             <input
               type="checkbox"
               checked={form.includeTimestamp !== false}
+              disabled={mode === 'raw'}
               onChange={(e) => update({ includeTimestamp: e.target.checked })}
             />{' '}
             Include timestamp
           </label>
+          {mode === 'raw' && (
+            <p className="simulation-help">
+              Publishes the generated value as UTF-8 text, without quotes around strings or added
+              units, timestamps or newlines. Numbers use the selected decimal rounding, without
+              fixed-width trailing zeroes. Empty retained values remove the retained message.
+            </p>
+          )}
           {!!errors.length && (
             <ul role="alert">
               {errors.map((error, i) => (
@@ -257,7 +292,11 @@ export default function EditOutputModal({
               Independent preview, sampled twice per second. A new loop starts each signal from its
               beginning.
             </p>
-            <pre>{preview ?? 'Enter valid settings to preview.'}</pre>
+            {preview === null ? (
+              <pre>{previewError || 'Enter valid settings to preview.'}</pre>
+            ) : (
+              <SimulationPayloadPreview key={mode} payload={preview} mode={mode} />
+            )}
           </div>
           {lastPublished && (
             <details className="last-published">
@@ -266,7 +305,11 @@ export default function EditOutputModal({
                 Last accepted publish containing this signal; may reflect earlier settings.
               </p>
               <code className="preview-topic">{lastPublished.topic}</code>
-              <pre>{JSON.stringify(JSON.parse(lastPublished.payload), null, 2)}</pre>
+              <SimulationPayloadPreview
+                key={lastPublished.payloadMode ?? 'json'}
+                payload={lastPublished.payload}
+                mode={lastPublished.payloadMode}
+              />
             </details>
           )}
           {confirmRemove && (

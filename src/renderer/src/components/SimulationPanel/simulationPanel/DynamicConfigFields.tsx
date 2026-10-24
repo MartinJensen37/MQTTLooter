@@ -139,8 +139,9 @@ export default function DynamicConfigFields({
                   <option value="false">False</option>
                 </select>
               ) : (
-                <input
+                <textarea
                   className="form-input"
+                  rows={3}
                   value={values.value ?? ''}
                   onChange={(e) => onConfigChange('value', e.target.value)}
                 />

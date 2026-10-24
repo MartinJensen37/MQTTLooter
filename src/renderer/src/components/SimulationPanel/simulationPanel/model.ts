@@ -1,16 +1,24 @@
 import { DATA_TYPE_CONFIGS } from './constants';
 import type { DeviceOutput, SimulatedDevice } from './types';
+import { validatePublishTopic } from '../../../../../shared/publish-properties';
+
+export const payloadMode = (device?: SimulatedDevice, output?: DeviceOutput) =>
+  (!device || device.publishMode === 'signals' ? output?.payloadMode : undefined) ??
+  device?.payloadMode ??
+  'json';
 
 export const signalTopic = (device: SimulatedDevice, output: DeviceOutput) =>
   typeof output.topic === 'string' && output.topic !== ''
     ? output.topic
     : `${device.topic}/${output.name.trim()}`;
-export const validTopic = (topic: string) =>
-  typeof topic === 'string' &&
-  !!topic &&
-  !/[+#]/.test(topic) &&
-  !topic.includes('\u0000') &&
-  new TextEncoder().encode(topic).length <= 65535;
+export const validTopic = (topic: string) => {
+  try {
+    validatePublishTopic(topic);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 export function validateTiming(output: DeviceOutput): string[] {
   const t = output.timing;
@@ -80,6 +88,8 @@ export function defaultConfig(type: string, generator: string): Record<string, a
 
 export function validateOutput(output: DeviceOutput, others: DeviceOutput[] = []): string[] {
   const errors: string[] = validateTiming(output);
+  if (!['json', 'raw'].includes(output.payloadMode ?? 'json'))
+    errors.push('Invalid signal payload mode.');
   if (
     output.topic !== undefined &&
     (typeof output.topic !== 'string' || (output.topic !== '' && !validTopic(output.topic)))
@@ -180,6 +190,16 @@ export function validateOutput(output: DeviceOutput, others: DeviceOutput[] = []
 
 export function validateDevice(device: SimulatedDevice): string[] {
   const errors: string[] = [];
+  if (!['json', 'raw'].includes(device.payloadMode ?? 'json'))
+    errors.push('Invalid device payload mode.');
+  if (
+    device.publishMode !== 'signals' &&
+    device.payloadMode === 'raw' &&
+    device.outputs.length !== 1
+  )
+    errors.push(
+      'Combined raw output requires exactly one signal. Use one topic per signal for multiple raw values.',
+    );
   if (!device.name.trim()) errors.push('Device name is required.');
   if (!validTopic(device.topic))
     errors.push('Use a nonempty publish topic without wildcards or NUL.');
@@ -219,6 +239,8 @@ export function loadDevices(raw: string | null): SimulatedDevice[] {
   if (!Array.isArray(devices)) throw new Error('Saved devices must be a list.');
   const ids = new Set<number>();
   return devices.map((device) => {
+    if (device?.schemaVersion !== undefined && device.schemaVersion !== 1)
+      throw new Error('Unsupported saved device schema version.');
     if (
       !device ||
       typeof device.name !== 'string' ||
@@ -229,6 +251,8 @@ export function loadDevices(raw: string | null): SimulatedDevice[] {
     )
       throw new Error('Invalid saved device.');
     ids.add(device.id);
+    if (!['json', 'raw'].includes(device.payloadMode ?? 'json'))
+      throw new Error('Invalid saved payload mode.');
     const outputIds = new Set<number>();
     for (const output of device.outputs) {
       if (
@@ -243,9 +267,13 @@ export function loadDevices(raw: string | null): SimulatedDevice[] {
       )
         throw new Error('Invalid saved signal.');
       outputIds.add(output.id);
+      if (!['json', 'raw'].includes(output.payloadMode ?? 'json'))
+        throw new Error('Invalid saved signal payload mode.');
     }
     return {
       ...device,
+      schemaVersion: 1,
+      payloadMode: device.payloadMode ?? 'json',
       isPublishing: false,
       qos: device.qos ?? 0,
       retain: device.retain ?? false,

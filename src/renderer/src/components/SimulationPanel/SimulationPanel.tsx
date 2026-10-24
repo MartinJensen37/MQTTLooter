@@ -37,7 +37,7 @@ function SimulationWorkspace({
   });
   const [simulatedDevices, setSimulatedDevices] = useState<SimulatedDevice[]>(loaded.devices);
   const [samples, setSamples] = useState<
-    Record<number, Record<number, Pick<SimulationSample, 'payload' | 'topic'>>>
+    Record<number, Record<number, Pick<SimulationSample, 'payload' | 'topic' | 'payloadMode'>>>
   >({});
   const [busy, setBusy] = useState<Record<number, boolean>>({});
   const engineRef = useRef<SimulationEngine | null>(null);
@@ -61,6 +61,7 @@ function SimulationWorkspace({
                 outputId,
                 {
                   payload: sample.payload,
+                  payloadMode: sample.payloadMode,
                   topic: sample.topic,
                 },
               ]),
@@ -101,6 +102,7 @@ function SimulationWorkspace({
         JSON.stringify(
           simulatedDevices.map((device) => ({
             ...device,
+            schemaVersion: 1,
             isPublishing: false,
             outputs: device.outputs.map((output) => ({ ...output, currentValue: undefined })),
           })),
@@ -119,6 +121,8 @@ function SimulationWorkspace({
   }) => {
     const device: SimulatedDevice = {
       ...deviceData,
+      schemaVersion: 1,
+      payloadMode: 'json',
       id: nextId(simulatedDevices),
       isPublishing: false,
       outputs: presetOutputs(deviceData.preset ?? 'sensor'),

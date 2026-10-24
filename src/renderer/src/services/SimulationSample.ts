@@ -1,6 +1,9 @@
 import { generateSignalSample } from '../utils/valueGenerators';
 import { defaultConfig, validateDevice } from '../components/SimulationPanel/simulationPanel/model';
-import type { SimulatedDevice } from '../components/SimulationPanel/simulationPanel/types';
+import type {
+  SimulatedDevice,
+  SimulationPayloadMode,
+} from '../components/SimulationPanel/simulationPanel/types';
 
 export interface SignalState {
   signature: string;
@@ -9,6 +12,7 @@ export interface SignalState {
   startedAt: number;
 }
 export interface SimulationSample {
+  payloadMode?: SimulationPayloadMode;
   payload: string;
   topic?: string;
   values: Record<number, any>;
@@ -58,12 +62,29 @@ export function sampleDevice(
       },
     ] as const;
   });
-  const payload = JSON.stringify(
-    (device.payloadFormat ?? 'auto') === 'auto' && entries.length === 1
-      ? entries[0][1]
-      : Object.fromEntries(entries),
-  );
-  return { payload, values, next };
+  let payload: string;
+  if (device.payloadMode === 'raw') {
+    if (entries.length !== 1)
+      throw new Error('Raw output requires exactly one signal per message.');
+    const value = entries[0][1].value;
+    if (
+      !['string', 'number', 'boolean'].includes(typeof value) ||
+      (typeof value === 'number' && !Number.isFinite(value))
+    )
+      throw new Error('Raw output requires a finite number, boolean or string.');
+    payload = String(value);
+    for (const character of payload) {
+      const code = character.codePointAt(0)!;
+      if (code >= 0xd800 && code <= 0xdfff)
+        throw new Error('Raw text contains an unpaired Unicode surrogate.');
+    }
+  } else
+    payload = JSON.stringify(
+      (device.payloadFormat ?? 'auto') === 'auto' && entries.length === 1
+        ? entries[0][1]
+        : Object.fromEntries(entries),
+    );
+  return { payload, payloadMode: device.payloadMode ?? 'json', values, next };
 }
 
 export interface SimulationCallbacks {

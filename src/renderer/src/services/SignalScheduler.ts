@@ -2,7 +2,11 @@ import type {
   DeviceOutput,
   SimulatedDevice,
 } from '../components/SimulationPanel/simulationPanel/types';
-import { signalTopic, validateDevice } from '../components/SimulationPanel/simulationPanel/model';
+import {
+  signalTopic,
+  validateDevice,
+  payloadMode,
+} from '../components/SimulationPanel/simulationPanel/model';
 import { sampleDevice, type SignalState, type SimulationCallbacks } from './SimulationSample';
 import { signalDelay, signalPeriod } from './signalTiming';
 
@@ -143,7 +147,14 @@ export class SignalScheduler {
     try {
       const topic = signalTopic(device, output);
       const sample = sampleDevice(
-        { ...device, publishMode: 'combined', topic, outputs: [output], payloadFormat: 'auto' },
+        {
+          ...device,
+          publishMode: 'combined',
+          topic,
+          outputs: [output],
+          payloadFormat: 'auto',
+          payloadMode: payloadMode(device, output),
+        },
         now - run.epoch,
         lane.state,
         this.random,
@@ -158,7 +169,12 @@ export class SignalScheduler {
       });
       if (!this.disposed && this.runs.get(device.id) === run && run.lanes.get(output.id) === lane) {
         lane.state = sample.next;
-        this.callbacks.sample(device.id, { payload: sample.payload, values: sample.values, topic });
+        this.callbacks.sample(device.id, {
+          payload: sample.payload,
+          payloadMode: sample.payloadMode,
+          values: sample.values,
+          topic,
+        });
       }
     } catch (error) {
       if (!this.disposed && this.runs.get(device.id) === run) {

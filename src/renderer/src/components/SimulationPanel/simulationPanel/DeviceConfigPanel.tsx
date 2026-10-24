@@ -89,7 +89,22 @@ export default function DeviceConfigPanel({
               <option value="combined">Combined device payload</option>
             </select>
           </label>
-          {!separate && (
+          <label>
+            Payload format
+            <select
+              className="custom-select-button form-select"
+              aria-label="Device payload format"
+              value={device.payloadMode ?? 'json'}
+              disabled={device.isPublishing || busy}
+              onChange={(event) =>
+                onUpdateDevice(device.id, { payloadMode: event.target.value as 'json' | 'raw' })
+              }
+            >
+              <option value="json">JSON with metadata</option>
+              <option value="raw">Raw scalar (UTF-8)</option>
+            </select>
+          </label>
+          {!separate && device.payloadMode !== 'raw' && (
             <label>
               Payload structure
               <select
@@ -121,9 +136,15 @@ export default function DeviceConfigPanel({
         />
         <p className="simulation-help">
           {separate
-            ? 'Each signal has its own topic and schedule. Edit a signal to set an offset, period, interval variation or publish probability.'
+            ? 'Each signal has its own topic and schedule. Edit a signal to override its payload format, offset, period, interval variation or publish probability.'
             : 'Compatibility mode: all signals share one topic and publish together. Stop the loop to switch to individual signal topics.'}
         </p>
+        {device.payloadMode === 'raw' && (
+          <p className="simulation-help">
+            Raw values contain no JSON wrapper, unit, timestamp or added newline. Combined raw mode
+            requires one signal. An empty retained raw value removes the retained message.
+          </p>
+        )}
       </fieldset>
       <div className="publishing-buttons">
         <button

@@ -91,6 +91,57 @@ it('keeps random mini-patterns repeatable without consuming live randomness or s
   expect(output.currentValue).toBe(75);
 });
 
+it('publishes raw strings, previews exact bytes and reopens non-JSON last publications', async () => {
+  seed('a');
+  const saved = JSON.parse(localStorage.getItem('mqtt-simulation-devices-a')!);
+  saved[0].outputs[0] = {
+    ...saved[0].outputs[0],
+    dataType: 'string',
+    config: { value: '  café 🌡️\r\n' },
+  };
+  localStorage.setItem('mqtt-simulation-devices-a', JSON.stringify(saved));
+  const publish = vi.fn().mockResolvedValue(undefined);
+  await act(async () =>
+    root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={publish} />),
+  );
+  await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
+  await input('Payload format', 'raw');
+  await click('Edit value');
+  expect(container.querySelector('.preview-section pre')!.textContent).toBe('  café 🌡️\r\n');
+  await input('Preview view', 'hex');
+  expect(container.querySelector('.preview-section pre')!.textContent).toBe(
+    '20 20 63 61 66 c3 a9 20 f0 9f 8c a1 ef b8 8f 0d 0a',
+  );
+  await click('Cancel');
+  await click('Publish Once');
+  expect(publish.mock.calls[0][0].payload).toBe('  café 🌡️\r\n');
+  await click('Edit value');
+  expect(container.querySelector('.last-published pre')!.textContent).toBe('  café 🌡️\r\n');
+  expect(container.querySelector('.last-published')!.textContent).toContain('17 UTF-8 bytes');
+  await click('Cancel');
+  await input('Payload format', 'json');
+  await click('Edit value');
+  expect(JSON.parse(container.querySelector('.preview-section pre')!.textContent!).value).toBe(
+    '  café 🌡️\r\n',
+  );
+  expect(container.querySelector('.last-published pre')!.textContent).toBe('  café 🌡️\r\n');
+  const persisted = JSON.parse(localStorage.getItem('mqtt-simulation-devices-a')!)[0];
+  expect(persisted).toMatchObject({ schemaVersion: 1, payloadMode: 'json', isPublishing: false });
+});
+
+it('keeps unsupported future device settings untouched', async () => {
+  seed('future');
+  const saved = JSON.parse(localStorage.getItem('mqtt-simulation-devices-future')!);
+  saved[0].schemaVersion = 2;
+  const original = JSON.stringify(saved);
+  localStorage.setItem('mqtt-simulation-devices-future', original);
+  await act(async () =>
+    root.render(<SimulationPanel connectionId="future" isConnected onPublishMessage={vi.fn()} />),
+  );
+  expect(container.textContent).toContain('Unsupported saved device schema version');
+  expect(localStorage.getItem('mqtt-simulation-devices-future')).toBe(original);
+});
+
 it('constructs compact signal rows and keeps payload details inside the editor', async () => {
   await act(async () =>
     root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={vi.fn()} />),

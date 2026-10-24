@@ -314,6 +314,23 @@
 .signal-dialog .preview-section {
   margin-top: var(--spacing-lg);
 }
+.simulation-payload-controls {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.simulation-payload-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.simulation-payload-preview pre {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .signal-dialog .form-actions .remove-signal {
   margin-right: auto;
 }

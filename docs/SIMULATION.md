@@ -11,7 +11,7 @@ The workspace shows device status in a list and signals as compact, single-line 
 - Strings and enums: static, random selection, weighted selection and repeating sequences.
 - Numeric signals support units and 0-10 decimal places. Each signal can include a timestamp. Names must be nonempty and unique within the device.
 
-New devices use **One topic per signal**. Leaving a signal's topic blank uses `<device prefix>/<signal name>`; enter a topic in the signal editor to override it. Each message contains only that signal's value, optional unit and timestamp. For example, `room/temperature` receives:
+New devices use **One topic per signal**. Leaving a signal's topic blank uses `<device prefix>/<signal name>`; enter a topic in the signal editor to override it. By default, each JSON message contains that signal's value, optional unit and timestamp. For example, `room/temperature` receives:
 
 ```json
 {"value":21.5,"unit":"°C","timestamp":"2026-10-22T12:00:00.000Z"}
@@ -22,6 +22,16 @@ Existing devices keep **Combined device payload** mode and their topic, timing a
 Payload previews live in the signal editor, alongside the effective destination. Individual-topic mode previews that signal; combined mode previews the full device payload including unsaved edits to the signal. Last successful publish shows the last accepted message containing that particular signal and its original destination, even when another signal publishes afterwards. It may reflect older settings and does not confirm subscriber processing. These live results are not saved as device configuration.
 
 The signal editor uses the same payload construction and generators as publishing, with its own independent preview sampled twice per second. Waveform charts show three cycles, including phase and square-wave duty cycle, with numeric value ticks on the left and time in seconds along the bottom. A zero-frequency wave is constant. Overview patterns have no axes: random patterns are repeatable representative samples, counters/random walks scale to their sampled range, and text/enum signals display their generator label. They describe the value pattern, not publishing times or a prediction of random values. Drawing them never advances live generator state or randomness.
+
+## Raw scalar output
+
+Set **Payload format** to **Raw scalar (UTF-8)** in device settings. In individual-topic mode, each signal can inherit that default or explicitly select JSON or raw output. Combined raw output requires exactly one signal; multiple signals remain supported in combined JSON mode.
+
+Raw strings are sent exactly as configured, including empty strings, spaces, newlines and Unicode. Static string fields support multiple lines. Booleans send `true` or `false`; numbers use the existing precision rounding without fixed-width trailing zeroes. No quotes, JSON wrapper, units, timestamps or newline are appended. Unit/timestamp settings remain saved but are disabled while raw output is selected. An empty retained raw payload clears the broker's retained message for that topic.
+
+The signal editor offers exact text, hex and Pretty JSON views, a UTF-8 byte count and full payload copy. Text/hex previews are bounded to 4 KiB; JSON formatting has its own bounded preview. Truncation is labeled and never changes the copied or published payload. Raw JSON-looking strings open as exact text. Last-published previews remember the format that was actually used, even after editing the current format.
+
+Saved devices now carry `schemaVersion: 1`. Unversioned devices migrate to JSON without changing their existing payload structure, topic or schedule. Unknown versions and output formats are reported while preserving the original saved library. This adds scalar serialization; nested typed fields and schema-driven payload construction remain pending.
 
 ## Per-signal schedules
 
