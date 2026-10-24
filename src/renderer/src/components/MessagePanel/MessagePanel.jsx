@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './MessagePanel.css';
 import StableScrollViewport from '../StableScrollViewport';
 import PayloadView from './PayloadView';
+import MessageProperties from './MessageProperties';
+import { exportMessage, exportMessageCSV } from '../../utils/messageExport';
 import { plainLog } from '../../utils/payloadPresentation';
 
 function MessagePanel({
@@ -75,14 +77,7 @@ function MessagePanel({
       connectionName: connectionName || 'Unknown',
       topic: selectedTopic.topicPath,
       messageCount: processedMessages.length,
-      messages: processedMessages.map((m) => ({
-        timestamp: m.timestamp,
-        payload: m.message,
-        encoding: m.encoding ?? 'utf8',
-        qos: m.qos,
-        retain: m.retain,
-        connectionId: m.connectionId,
-      })),
+      messages: processedMessages.map(exportMessage),
     };
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
@@ -101,19 +96,7 @@ function MessagePanel({
 
   const exportTopicAsCSV = useCallback(() => {
     if (!selectedTopic || processedMessages.length === 0) return;
-    const csv = [
-      ['Timestamp', 'Payload', 'Encoding', 'QoS', 'Retain', 'Connection'].join(','),
-      ...processedMessages.map((m) =>
-        [
-          `"${m.timestamp}"`,
-          `"${m.message.replace(/"/g, '""')}"`,
-          m.encoding ?? 'utf8',
-          m.qos,
-          m.retain,
-          `"${m.connectionId}"`,
-        ].join(','),
-      ),
-    ].join('\n');
+    const csv = exportMessageCSV(processedMessages);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const a = Object.assign(document.createElement('a'), {
       href: url,
@@ -403,6 +386,10 @@ function MessagePanel({
                         value={msg.message}
                         encoding={msg.encoding}
                         previewBytes={previewBytes}
+                      />
+                      <MessageProperties
+                        protocolVersion={msg.protocolVersion}
+                        properties={msg.properties}
                       />
                     </div>
                   </div>

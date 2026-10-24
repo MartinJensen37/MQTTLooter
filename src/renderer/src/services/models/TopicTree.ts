@@ -1,4 +1,4 @@
-import TopicNode from './TopicNode';
+import TopicNode, { type IncomingMessage } from './TopicNode';
 import { CONNECTION_HISTORY, HISTORY_BUDGET } from '../../config';
 import type { PayloadEncoding } from '../../../../shared/payload';
 
@@ -103,6 +103,7 @@ class TopicTree {
     retain = false,
     timestamp = Date.now(),
     encoding: PayloadEncoding = 'utf8',
+    metadata: Pick<IncomingMessage, 'protocolVersion' | 'properties'> = {},
   ) {
     this.messageCount++;
     const leafNode = this.getOrCreateNode(topic);
@@ -114,7 +115,7 @@ class TopicTree {
     const beforeBytes = leafNode.messageHistory.storageUsage;
     const beforeCount = leafNode.messageHistory.count;
     leafNode.addMessage(
-      { payload: message, encoding, qos, retain, topic, timestamp },
+      { payload: message, encoding, qos, retain, topic, timestamp, ...metadata },
       timestamp,
       ++this.sequence,
     );

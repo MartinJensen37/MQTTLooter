@@ -1,11 +1,14 @@
 import RingBuffer from '../../utils/RingBuffer';
 import { MESSAGE_HISTORY } from '../../config';
 import { payloadBytes, type PayloadEncoding } from '../../../../shared/payload';
+import { serializeProperties } from '../../../../shared/history';
 
 const RATE_BUCKET_MS = 100;
 
 /** Message handed to a node when a publish arrives. */
 export interface IncomingMessage {
+  protocolVersion?: number;
+  properties?: Record<string, unknown>;
   encoding?: PayloadEncoding;
   payload: string;
   qos: number;
@@ -16,6 +19,8 @@ export interface IncomingMessage {
 
 /** Message as stored in a node's ring buffer (`length` drives the byte budget). */
 export interface StoredMessage {
+  protocolVersion?: number;
+  properties?: Record<string, unknown>;
   encoding: PayloadEncoding;
   storageBytes: number;
   id: number;
@@ -94,20 +99,26 @@ class TopicNode {
 
     // Account for the UTF-8 payload, rather than UTF-16 character count.
     const payloadLen = payloadBytes(message.payload, message.encoding).byteLength;
+    const propertyJson = serializeProperties(message.properties);
+    const properties = propertyJson ? JSON.parse(propertyJson) : undefined;
+    // Include normalized property strings and object overhead in both cache budgets.
+    const propertyBytes = propertyJson ? propertyJson.length * 4 + 256 : 0;
     const beforeCount = this.messageHistory.count;
     const accepted = this.messageHistory.add({
       id,
       encoding: message.encoding ?? 'utf8',
-      storageBytes: (message.payload.length + message.topic.length) * 2 + 128,
+      protocolVersion: message.protocolVersion,
+      properties,
+      storageBytes: (message.payload.length + message.topic.length) * 2 + 128 + propertyBytes,
       payload: message ? message.payload : null,
       qos: message ? message.qos : 0,
       retain: message ? message.retain : false,
       timestamp,
       topic: message ? message.topic : null,
-      length: payloadLen,
+      length: payloadLen + propertyBytes,
     });
     // No separate unbounded latest-payload cache when history rejects a large message.
-    this.lastMessage = accepted ? message : null;
+    this.lastMessage = accepted ? { ...message, properties } : null;
     this.discardedHistory += beforeCount + 1 - this.messageHistory.count;
 
     const bucket = Math.floor(timestamp / RATE_BUCKET_MS) * RATE_BUCKET_MS;
@@ -257,7 +268,12 @@ class TopicNode {
       formattedRate: this.hasDirectMessages ? this.getFormattedRate() : '',
       lastMessage: this.lastMessage
         ? {
-            ...this.lastMessage,
+            qos: this.lastMessage.qos,
+            retain: this.lastMessage.retain,
+            topic: this.lastMessage.topic,
+            timestamp: this.lastMessage.timestamp,
+            encoding: this.lastMessage.encoding,
+            protocolVersion: this.lastMessage.protocolVersion,
             payload: this.lastMessage.payload.slice(0, 160),
             truncated: this.lastMessage.payload.length > 160,
           }

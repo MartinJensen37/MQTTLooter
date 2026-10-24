@@ -56,7 +56,22 @@ const broker = net.createServer((socket) => {
       for (const topic of ['a/b', 'a//b', '/a/b']) {
         send({ cmd: 'publish', topic, payload: `sample:${topic}`, qos: 0, retain: true });
       }
-      send({ cmd: 'publish', topic: 'binary', payload: binaryPayload, qos: 0, retain: true });
+      send({
+        cmd: 'publish',
+        topic: 'binary',
+        payload: binaryPayload,
+        qos: 0,
+        retain: true,
+        properties: {
+          correlationData: binaryPayload,
+          responseTopic: 'reply//binary',
+          contentType: 'application/octet-stream',
+          messageExpiryInterval: 0,
+          payloadFormatIndicator: false,
+          userProperties: { repeated: ['first', 'second'] },
+          subscriptionIdentifier: [1, 3],
+        },
+      });
     } else if (packet.cmd === 'publish') {
       published.push(packet);
       if (packet.qos === 1) send({ cmd: 'puback', messageId: packet.messageId });
@@ -156,6 +171,29 @@ async function run() {
       ),
     'binary hex display',
   );
+  await evaluate("document.querySelector('.message-properties').open = true");
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.message-properties-body')?.textContent.includes('reply//binary')",
+      ),
+    'live MQTT 5 properties',
+  );
+  assert.equal(
+    await evaluate("document.querySelector('.message-correlation pre')?.textContent"),
+    '00 ff 80 0d 0a',
+  );
+  assert.equal(
+    await evaluate(
+      "[...document.querySelectorAll('.message-properties dt')].filter(node=>node.textContent==='User: repeated').length",
+    ),
+    2,
+  );
+  fs.writeFileSync(
+    path.join(workspace, '.tmp', 'electron-properties.png'),
+    (await window.webContents.capturePage()).toPNG(),
+  );
+  await evaluate("document.querySelector('.message-properties').open = false");
   // Capture real export blobs without opening a download dialog.
   await evaluate(`
     window.smokeExports = [];
@@ -183,9 +221,35 @@ async function run() {
   assert.equal(exported.encoding, 'base64');
   assert.deepEqual(Buffer.from(exported.payload, 'base64'), binaryPayload);
   assert.equal(exported.qos, 0);
+  assert.equal(exported.protocolVersion, 5);
+  assert.deepEqual(exported.properties.correlationData, {
+    encoding: 'base64',
+    data: binaryPayload.toString('base64'),
+  });
+  assert.deepEqual(exported.properties.userProperties.repeated, ['first', 'second']);
+  assert.equal(exported.properties.messageExpiryInterval, 0);
+  assert.equal(exported.properties.payloadFormatIndicator, false);
   assert.ok(exports[1].includes('Payload,Encoding,QoS'));
   assert.ok(exports[1].includes(`"${binaryPayload.toString('base64')}",base64,0,true`));
 
+  await evaluate(
+    `(() => { const select=document.querySelector('[aria-label="Message source"]'); select.value='stored'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`,
+  );
+  await waitFor(
+    () => evaluate("document.querySelector('.message-item .message-properties') !== null"),
+    'stored property card',
+  );
+  await evaluate("document.querySelector('.message-properties').open = true");
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.message-correlation pre')?.textContent === '00 ff 80 0d 0a'",
+      ),
+    'stored correlation bytes',
+  );
+  await evaluate(
+    `(() => { const select=document.querySelector('[aria-label="Message source"]'); select.value='live'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`,
+  );
   await evaluate(
     "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }))",
   );

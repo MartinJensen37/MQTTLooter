@@ -15,6 +15,8 @@ interface PendingUpdate {
 
 /** Display-ready message shape consumed by MessagePanel. */
 export interface DisplayMessage {
+  protocolVersion?: number;
+  properties?: Record<string, unknown>;
   encoding: PayloadEncoding;
   id: string;
   connectionId: string;
@@ -66,7 +68,10 @@ export class TopicTreeService {
     }
 
     const limitVersion = topicTree.limitVersion;
-    topicTree.addMessage(topic, message, qos, retain, timestamp, encoding);
+    topicTree.addMessage(topic, message, qos, retain, timestamp, encoding, {
+      protocolVersion: messageData.protocolVersion,
+      properties: messageData.properties,
+    });
 
     this.queueUpdate(connectionId, topicTree.limitVersion !== limitVersion ? undefined : topic);
     this.enforceGlobalBudget();
@@ -296,6 +301,8 @@ export class TopicTreeService {
         topic: m.topic || topicPath,
         message: m.payload || '',
         encoding: m.encoding,
+        protocolVersion: m.protocolVersion,
+        properties: m.properties,
         qos: m.qos || 0,
         retain: m.retain || false,
         timestamp: m.timestamp,

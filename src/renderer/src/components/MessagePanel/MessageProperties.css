@@ -1,0 +1,42 @@
+.message-properties {
+  margin-top: var(--spacing-sm);
+  font-size: 12px;
+  border-top: 1px solid var(--border-light);
+  padding-top: var(--spacing-sm);
+}
+.message-properties summary {
+  cursor: pointer;
+  color: var(--text-body);
+}
+.message-properties-body {
+  max-height: 300px;
+  overflow: auto;
+  padding: 8px 0;
+}
+.message-properties dl {
+  margin: 0;
+}
+.message-properties dl > div {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.message-properties dt {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.message-properties dd {
+  margin: 2px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.message-properties pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+}
+.message-properties p {
+  margin: 6px 0;
+}
+.message-properties button {
+  margin: 6px 6px 0 0;
+}
