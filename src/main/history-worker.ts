@@ -45,6 +45,9 @@ parentPort!.on(
         case 'page':
           data = database.page(request.query);
           break;
+        case 'search':
+          data = database.search(request.query);
+          break;
         case 'topics':
           data = database.topics(request.connectionId, request.search);
           break;

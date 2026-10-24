@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SplitPane, Pane } from 'react-split-pane';
 import MQTTService from '../../services/MQTTService';
 import TopicTreeService from '../../services/TopicTreeService';
@@ -16,6 +16,17 @@ import './App.css';
 function App() {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  const mainPanelsRef = useRef(null);
+  const [panelWidth, setPanelWidth] = useState(0);
+  useEffect(() => {
+    const observer = new ResizeObserver(([entry]) =>
+      setPanelWidth(Math.round(entry.contentRect.width)),
+    );
+    observer.observe(mainPanelsRef.current);
+    return () => observer.disconnect();
+  }, []);
+  // Clamp the rendered width without overwriting the user's preferred split on window resize.
+  const maxTopicWidth = Math.max(50, panelWidth - 361);
 
   // ── Notifications ────────────────────────────────────────────────────────
   const showFeedback = useCallback((message, type = 'success') => {
@@ -211,7 +222,8 @@ function App() {
           <Pane
             className="topic-browser-pane"
             minSize={activeTab === 'simulation' ? 0 : 50}
-            size={activeTab === 'simulation' ? 0 : topicTreeWidth}
+            maxSize={activeTab === 'simulation' ? 0 : maxTopicWidth}
+            size={activeTab === 'simulation' ? 0 : Math.min(topicTreeWidth, maxTopicWidth)}
           >
             <div className="topic-tree-panel">
               <TopicTreeComponent
@@ -222,7 +234,7 @@ function App() {
               />
             </div>
           </Pane>
-          <Pane>{renderTabContent()}</Pane>
+          <Pane minSize={Math.max(0, Math.min(360, panelWidth - 51))}>{renderTabContent()}</Pane>
         </SplitPane>
       </div>
     );
@@ -307,7 +319,9 @@ function App() {
             )}
           </div>
 
-          <div className="main-panels">{renderMainContent()}</div>
+          <div className="main-panels" ref={mainPanelsRef}>
+            {renderMainContent()}
+          </div>
         </div>
       </div>
     </div>

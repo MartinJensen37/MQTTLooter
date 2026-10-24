@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import MessagePanel from './MessagePanel';
 import IncomingPlot from './IncomingPlot';
+import HistorySearch from './HistorySearch';
 import type { HistoryPage, HistoryQuery, HistoryStatus } from '../../../../shared/history';
 import TopicTreeService from '../../services/TopicTreeService';
 import './MessageWorkspace.css';
@@ -12,6 +13,7 @@ export default function MessageWorkspace(props: any) {
 function Workspace(props: any) {
   const [stored, setStored] = useState(false);
   const [plotOpen, setPlotOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [status, setStatus] = useState<HistoryStatus>();
   const [page, setPage] = useState<HistoryPage>();
   const [cursors, setCursors] = useState<Partial<HistoryQuery>[]>([{}]);
@@ -52,7 +54,7 @@ function Workspace(props: any) {
   }, [connectionId, refresh]);
 
   useEffect(() => {
-    if (!stored || !connectionId || topic === undefined) return;
+    if (!stored || searchOpen || !connectionId || topic === undefined) return;
     let disposed = false;
     setBusy(true);
     setError('');
@@ -74,10 +76,10 @@ function Workspace(props: any) {
     return () => {
       disposed = true;
     };
-  }, [stored, connectionId, topic, cursors, refresh]);
+  }, [stored, searchOpen, connectionId, topic, cursors, refresh]);
 
   useEffect(() => {
-    if (!stored || !connectionId) return;
+    if (!stored || searchOpen || !connectionId) return;
     let disposed = false;
     const timer = setTimeout(() => {
       void window.electronAPI.history
@@ -93,7 +95,7 @@ function Workspace(props: any) {
       disposed = true;
       clearTimeout(timer);
     };
-  }, [stored, connectionId, search, refresh]);
+  }, [stored, searchOpen, connectionId, search, refresh]);
 
   const latest = () => {
     setPage(undefined);
@@ -108,6 +110,7 @@ function Workspace(props: any) {
       return;
     }
     TopicTreeService.clearTopicMessages(connectionId, topic);
+    setSearchOpen(false);
     latest();
     props.showFeedback?.('Stored and cached messages cleared for this topic.', 'success');
   };
@@ -122,14 +125,30 @@ function Workspace(props: any) {
   return (
     <div className="message-workspace">
       <div className="message-history-toolbar">
-        <button
-          className="btn btn-sm btn-secondary"
-          aria-expanded={plotOpen}
-          disabled={!connectionId || (stored ? topic : selectedPath) === undefined}
-          onClick={() => setPlotOpen((value) => !value)}
-        >
-          {plotOpen ? 'Hide incoming plot' : 'Plot incoming values'}
-        </button>
+        {stored && (
+          <button
+            className="btn btn-sm btn-secondary"
+            aria-expanded={searchOpen}
+            disabled={topic === undefined}
+            onClick={() => {
+              setSearchOpen((value) => !value);
+              setPlotOpen(false);
+              setBusy(false);
+            }}
+          >
+            {searchOpen ? 'Close content search' : 'Search message contents'}
+          </button>
+        )}
+        {!searchOpen && (
+          <button
+            className="btn btn-sm btn-secondary"
+            aria-expanded={plotOpen}
+            disabled={!connectionId || (stored ? topic : selectedPath) === undefined}
+            onClick={() => setPlotOpen((value) => !value)}
+          >
+            {plotOpen ? 'Hide incoming plot' : 'Plot incoming values'}
+          </button>
+        )}
         <label>
           Source{' '}
           <select
@@ -138,6 +157,7 @@ function Workspace(props: any) {
             value={stored ? 'stored' : 'live'}
             onChange={(event) => {
               setStored(event.target.value === 'stored');
+              setSearchOpen(false);
               latest();
             }}
           >
@@ -181,7 +201,7 @@ function Workspace(props: any) {
           )}
           <p>Saved recordings still use their separate library.</p>
         </details>
-        {stored && (
+        {stored && !searchOpen && (
           <>
             <button className="btn btn-sm btn-secondary" onClick={latest} disabled={busy}>
               Latest stored page
@@ -236,7 +256,7 @@ function Workspace(props: any) {
           this run.
         </p>
       )}
-      {stored && (
+      {stored && !searchOpen && (
         <div className="message-history-catalog">
           <input
             type="search"
@@ -272,7 +292,7 @@ function Workspace(props: any) {
           <span>First 50 matching paths, including topics outside the live cache.</span>
         </div>
       )}
-      {stored && (
+      {stored && !searchOpen && (
         <p className="message-storage-caption">
           A fixed snapshot of retained disk history. Export applies to this page. Refresh to include
           new messages. One large payload can exceed the page byte target. Retention may remove
@@ -292,19 +312,31 @@ function Workspace(props: any) {
           topic={stored ? topic : selectedPath}
         />
       )}
-      <MessagePanel
-        {...props}
-        storedPage={stored}
-        messages={stored ? archiveMessages : props.messages}
-        selectedTopic={
-          stored
-            ? topic === undefined
-              ? null
-              : { topicPath: topic, connectionId }
-            : props.selectedTopic
-        }
-        onClearMessages={stored ? clearStored : props.onClearMessages}
-      />
+      {stored && searchOpen && connectionId && topic !== undefined ? (
+        <HistorySearch
+          key={`${connectionId}:${topic}`}
+          connectionId={connectionId}
+          topic={topic}
+          active={props.active}
+          connectionName={props.connectionName}
+          showFeedback={props.showFeedback}
+          onClearMessages={clearStored}
+        />
+      ) : (
+        <MessagePanel
+          {...props}
+          storedPage={stored}
+          messages={stored ? archiveMessages : props.messages}
+          selectedTopic={
+            stored
+              ? topic === undefined
+                ? null
+                : { topicPath: topic, connectionId }
+              : props.selectedTopic
+          }
+          onClearMessages={stored ? clearStored : props.onClearMessages}
+        />
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ function MessagePanel({
   connectionId,
   showFeedback,
   storedPage = false,
+  clearLabel = 'Clear Messages',
 }) {
   const panelRef = useRef(null);
   const [previewBytes, setPreviewBytes] = useState(100);
@@ -255,18 +256,22 @@ function MessagePanel({
                 title="Clear messages for this topic"
                 disabled={processedMessages.length === 0}
               >
-                <i className="fas fa-trash"></i> Clear Messages
+                <i className="fas fa-trash"></i> {clearLabel}
               </button>
-              <button
-                className={`btn btn-sm ${autoScroll ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setAutoScroll((v) => !v)}
-                title={
-                  autoScroll ? 'Auto-scroll ON — click to pin' : 'Auto-scroll OFF — click to follow'
-                }
-              >
-                <i className={`fas ${autoScroll ? 'fa-arrow-up' : 'fa-thumbtack'}`}></i>
-                {autoScroll ? ' Following' : ' Pinned'}
-              </button>
+              {!storedPage && (
+                <button
+                  className={`btn btn-sm ${autoScroll ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setAutoScroll((v) => !v)}
+                  title={
+                    autoScroll
+                      ? 'Auto-scroll ON — click to pin'
+                      : 'Auto-scroll OFF — click to follow'
+                  }
+                >
+                  <i className={`fas ${autoScroll ? 'fa-arrow-up' : 'fa-thumbtack'}`}></i>
+                  {autoScroll ? ' Following' : ' Pinned'}
+                </button>
+              )}
               <div className="message-export-wrapper custom-select-wrapper">
                 <button
                   type="button"

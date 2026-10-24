@@ -47,6 +47,7 @@ export interface HistoryStatus {
 export type HistoryRequest =
   | { action: 'append'; messages: IncomingPublish[] }
   | { action: 'page'; query: HistoryQuery }
+  | { action: 'search'; query: import('./history-search').HistorySearchQuery }
   | { action: 'series'; query: import('./numeric-series').NumericQuery }
   | { action: 'topics'; connectionId: string; search: string }
   | { action: 'clear'; connectionId: string; topic?: string }

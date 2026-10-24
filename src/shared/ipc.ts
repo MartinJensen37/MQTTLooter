@@ -50,6 +50,9 @@ export type MqttEventCallback = (data: any) => void;
 export interface ElectronAPI {
   history: {
     status(): Promise<IpcResult<import('./history').HistoryStatus>>;
+    search(
+      query: import('./history-search').HistorySearchQuery,
+    ): Promise<IpcResult<import('./history-search').HistorySearchPage>>;
     series(
       query: import('./numeric-series').NumericQuery,
     ): Promise<IpcResult<import('./numeric-series').NumericResult>>;

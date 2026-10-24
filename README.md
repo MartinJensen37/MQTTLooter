@@ -80,6 +80,14 @@ History is session-only by default: it is removed on normal exit, or on the next
 
 **Clear Messages** in Disk history removes that topic's stored and cached messages. Live-cache clearing remains a cache-only action. Exports currently cover the displayed page; streaming whole-history export and database-backed recording migration are still planned. Saved recordings remain in their existing JSON library.
 
+### Searching message contents
+
+In Logging, choose **Source > Disk history**, select a stored topic, and open **Search message contents**. Search literal, case-sensitive UTF-8 text or a hexadecimal byte sequence such as `00 ff 80`. Hex searches the original bytes, including binary payloads. Choose the last 5 minutes, last hour or retained 24 hours; the time range and captured-message snapshot are fixed when the search starts.
+
+Search scans beyond the displayed page and the live cache. **Stop search** pauses scanning, and **Continue search** resumes from the last completed step or looks for older matches. Changing criteria, switching topics or leaving Logging stops further scan requests. Start a new search to include new arrivals. Result pages hold up to 100 matches / 1 MiB estimated; sorting, copying and export apply to those displayed matches. **Clear topic history** removes all stored and cached messages for the selected topic, including unmatched messages.
+
+Payloads above 256 KiB and records above 1 MiB estimated are skipped with a visible count. Text mode also counts non-UTF-8 payloads it skips. Retention may remove records while browsing, and searches cannot recover expired data. Search currently covers one exact topic at a time; cross-topic search and whole-result export are still planned.
+
 ### Previewing publish schedules
 
 In Simulation, open **Publish timeline** below a device's signal list. It shows aligned fixed opportunities, offsets, random timing likelihood bands and expected message counts per time bin. The time-bin slider exposes numeric likelihoods, including rare 1% sends. A separate worker calculates repeatable estimates without advancing live generator state. Windows are bounded to 60 seconds and 128 signals; exclusions and assumptions are explicit. See [the simulator guide](docs/SIMULATION.md#publish-timeline).

@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 
-module.exports = async ({ evaluate, waitFor, field, send }) => {
+module.exports = async ({ evaluate, waitFor, field, send, captureSearch }) => {
   for (let i = 0; i < 650; i++) send('archive/series', String(i));
   await waitFor(async () => {
     const result = await evaluate(
@@ -58,6 +58,34 @@ module.exports = async ({ evaluate, waitFor, field, send }) => {
   );
 
   const status = await evaluate('window.electronAPI.history.status()');
+  await evaluate(
+    "[...document.querySelectorAll('.message-history-toolbar button')].find(button=>button.textContent==='Search message contents').click()",
+  );
+  await field('[aria-label="Search message contents"]', '123');
+  await evaluate("document.querySelector('.history-search form').requestSubmit()");
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.history-search .message-item')?.textContent.includes('123')",
+      ),
+    'content match outside loaded page',
+  );
+  assert.equal(
+    await evaluate("document.querySelectorAll('.history-search .message-item').length"),
+    1,
+  );
+  await captureSearch?.();
+  assert.equal(
+    (
+      await evaluate(
+        "window.electronAPI.history.search({connectionId:'smoke',topic:'archive/series',mode:'hex',term:'x',from:Date.now()-1000,to:Date.now()})",
+      )
+    ).success,
+    false,
+  );
+  await evaluate(
+    "[...document.querySelectorAll('.message-history-toolbar button')].find(button=>button.textContent==='Close content search').click()",
+  );
   assert.equal(status.success, true);
   assert.equal(status.data.error, undefined);
   assert.equal(status.data.delivery.connections.smoke.dropped, 0);

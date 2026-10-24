@@ -79,6 +79,19 @@ async function run() {
   });
   assert.equal(series.series[0].gaps, 1);
   assert.equal(series.series[0].points.length, 0);
+  const found = await client.request({
+    action: 'search',
+    query: {
+      connectionId: 'broker',
+      topic: 'a//b',
+      mode: 'hex',
+      term: '00 ff',
+      from: message.timestamp - 1000,
+      to: message.timestamp,
+    },
+  });
+  assert.equal(found.messages[0].message, 'AP8=');
+  assert.equal(found.nextBefore, null);
   await client.close();
   assert.equal(existsSync(join(directory, 'history.sqlite')), true);
   client = start();

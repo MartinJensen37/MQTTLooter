@@ -3,6 +3,7 @@ import { join } from 'path';
 import { MQTTConnectionManager } from './mqtt-connection-manager';
 import { RecordingStore } from './recording-store';
 import { HistoryService } from './history-service';
+import { validateSearch, type HistorySearchQuery } from '../shared/history-search';
 import { MessageDelivery } from './message-delivery';
 import type { IncomingPublish } from '../shared/traffic';
 
@@ -172,6 +173,10 @@ const validTopic = (value: unknown): value is string =>
   typeof value === 'string' && value.length <= 65535;
 for (const [channel, handler] of Object.entries({
   'history-status': () => historyService!.refreshStatus(),
+  'history-search': (query: HistorySearchQuery) => {
+    validateSearch(query);
+    return historyService!.request({ action: 'search', query });
+  },
   'history-page': (query: any) => {
     if (
       !query ||

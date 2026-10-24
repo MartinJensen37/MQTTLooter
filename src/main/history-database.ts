@@ -1,9 +1,16 @@
 import { NumericSampler, type NumericQuery } from '../shared/numeric-series';
+import {
+  SEARCH_LIMITS,
+  validateSearch,
+  type HistorySearchQuery,
+  type HistorySearchPage,
+} from '../shared/history-search';
 import { DatabaseSync } from 'node:sqlite';
 import {
   DISK_HISTORY,
   serializeProperties,
   type HistoryPage,
+  type HistoryMessage,
   type HistoryQuery,
 } from '../shared/history';
 import { encodePayload, payloadBytes } from '../shared/payload';
@@ -190,21 +197,25 @@ export class HistoryDatabase {
         break;
       }
       bytes += Number(row.storage_bytes);
-      result.messages.push({
-        rowId: Number(row.id),
-        id: String(row.connection_id),
-        topic: String(row.path),
-        sessionId: String(row.session_id),
-        sequence: Number(row.sequence),
-        timestamp: Number(row.timestamp),
-        qos: Number(row.qos),
-        retain: Boolean(row.retain),
-        protocolVersion: Number(row.protocol),
-        ...encodePayload(row.payload as Uint8Array),
-        properties: row.properties ? JSON.parse(String(row.properties)) : undefined,
-      });
+      result.messages.push(this.decodeMessage(row));
     }
     return result;
+  }
+
+  private decodeMessage(row: Record<string, unknown>): HistoryMessage {
+    return {
+      rowId: Number(row.id),
+      id: String(row.connection_id),
+      topic: String(row.path),
+      sessionId: String(row.session_id),
+      sequence: Number(row.sequence),
+      timestamp: Number(row.timestamp),
+      qos: Number(row.qos),
+      retain: Boolean(row.retain),
+      protocolVersion: Number(row.protocol),
+      ...encodePayload(row.payload as Uint8Array),
+      properties: row.properties ? JSON.parse(String(row.properties)) : undefined,
+    };
   }
 
   series(query: NumericQuery) {
@@ -240,6 +251,96 @@ export class HistoryDatabase {
       sampler.add(Number(row.timestamp), Number(row.id), String(row.session_id), payload);
     }
     return sampler.result(truncated);
+  }
+
+  /** One resumable slice. Time filtering happens here so SQL cannot scan an unbounded time-filtered tail. */
+  search(query: HistorySearchQuery, now = Date.now()): HistorySearchPage {
+    validateSearch(query);
+    if (query.generation !== undefined && query.generation !== this.generation)
+      throw new Error('History was cleared. Start a new search.');
+    const snapshot =
+      query.snapshot ??
+      Number(this.db.prepare('SELECT coalesce(max(id),0) id FROM messages').get()!.id);
+    const result: HistorySearchPage = {
+      messages: [],
+      snapshot,
+      generation: this.generation,
+      nextBefore: null,
+      expired: this.expired,
+      scanned: 0,
+      skippedLarge: 0,
+      skippedBinary: 0,
+    };
+    const rows = this.db
+      .prepare(
+        `SELECT m.id, m.timestamp, m.storage_bytes,
+      CASE WHEN length(m.payload)<=? AND m.storage_bytes<=? THEN m.payload ELSE NULL END payload
+      FROM messages m JOIN topics t ON t.id=m.topic_id
+      WHERE t.connection_id=? AND t.path=? AND m.id<=? AND m.id<? ORDER BY m.id DESC LIMIT ?`,
+      )
+      .iterate(
+        SEARCH_LIMITS.payloadBytes,
+        SEARCH_LIMITS.resultBytes,
+        query.connectionId,
+        query.topic,
+        snapshot,
+        query.before ?? Number.MAX_SAFE_INTEGER,
+        SEARCH_LIMITS.rows + 1,
+      );
+    const getMatch = this.db.prepare(
+      'SELECT m.*, t.path, t.connection_id FROM messages m JOIN topics t ON t.id=m.topic_id WHERE m.id=?',
+    );
+    const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+    const needle = query.mode === 'hex' ? Buffer.from(query.term.replace(/\s/g, ''), 'hex') : null;
+    const started = performance.now();
+    let scannedBytes = 0;
+    let resultBytes = 0;
+    let lastRow = 0;
+    for (const row of rows) {
+      const payload = row.payload as Uint8Array | null;
+      if (
+        result.scanned &&
+        (result.scanned >= SEARCH_LIMITS.rows ||
+          scannedBytes + (payload?.byteLength ?? 0) > SEARCH_LIMITS.scanBytes ||
+          performance.now() - started >= SEARCH_LIMITS.workMs ||
+          result.messages.length >= SEARCH_LIMITS.matches)
+      ) {
+        result.nextBefore = lastRow;
+        break;
+      }
+      const inRange =
+        Number(row.timestamp) >= Math.max(query.from, now - this.limits.maxAgeMs) &&
+        Number(row.timestamp) <= query.to;
+      let matches = false;
+      let binary = false;
+      if (inRange && payload) {
+        if (needle)
+          matches = Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength).includes(
+            needle,
+          );
+        else {
+          try {
+            matches = decoder.decode(payload).includes(query.term);
+          } catch {
+            binary = true;
+          }
+        }
+      }
+      if (matches && resultBytes + Number(row.storage_bytes) > SEARCH_LIMITS.resultBytes) {
+        result.nextBefore = lastRow;
+        break;
+      }
+      result.scanned++;
+      scannedBytes += payload?.byteLength ?? 0;
+      lastRow = Number(row.id);
+      if (inRange && payload === null) result.skippedLarge++;
+      if (binary) result.skippedBinary++;
+      if (!matches) continue;
+      resultBytes += Number(row.storage_bytes);
+      const match = getMatch.get(row.id)!;
+      result.messages.push(this.decodeMessage(match));
+    }
+    return result;
   }
 
   topics(connectionId: string, search: string): { path: string }[] {

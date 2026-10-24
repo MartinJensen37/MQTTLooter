@@ -448,6 +448,23 @@ async function run() {
     },
   });
   await require('./electron-history.cjs')({
+    captureSearch: async () => {
+      window.setSize(800, 600);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const layout = await evaluate(
+        "(() => { const panel=document.querySelector('.history-search').getBoundingClientRect(); const list=document.querySelector('.history-search .message-list').getBoundingClientRect(); return {width:panel.width,right:panel.right,height:list.height}; })()",
+      );
+      assert.ok(
+        layout.width >= 350 && layout.right <= 801 && layout.height >= 50,
+        JSON.stringify(layout),
+      );
+      fs.writeFileSync(
+        path.join(workspace, '.tmp', 'electron-search-small.png'),
+        (await window.webContents.capturePage()).toPNG(),
+      );
+      window.setSize(1400, 900);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    },
     evaluate,
     waitFor,
     field,
