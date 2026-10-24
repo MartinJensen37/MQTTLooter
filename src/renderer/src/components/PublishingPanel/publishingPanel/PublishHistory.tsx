@@ -25,6 +25,7 @@ function PublishHistory({ publishHistory, clearHistory, loadFromHistory }: Props
                   <i className="fas fa-tag"></i> {item.topic}
                 </span>
                 <div className="history-badges">
+                  {item.properties && <span className="badge">MQTT 5 properties</span>}
                   {item.encoding === 'base64' && <span className="badge">Base64 bytes</span>}
                   <span className={`badge badge-qos-${item.qos}`}>QoS {item.qos}</span>
                   {item.retain && (

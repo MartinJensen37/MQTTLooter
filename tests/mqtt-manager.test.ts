@@ -34,6 +34,58 @@ describe('MQTT lifecycle', () => {
     vi.useRealTimers();
   });
 
+  it('validates outgoing MQTT 5 properties and converts correlation bytes for the packet codec', async () => {
+    const connecting = manager.connect('a', { brokerUrl: 'mqtt://localhost', protocolVersion: 5 });
+    client.emit('connect', {});
+    await connecting;
+    await manager.publish('a', 'request/topic', '', {
+      qos: 1,
+      properties: {
+        responseTopic: 'response/topic',
+        correlationData: { encoding: 'base64', data: 'AP+A' },
+        messageExpiryInterval: 0,
+        payloadFormatIndicator: false,
+        userProperties: { repeated: ['a', 'b'] },
+      },
+    });
+    expect(client.publish.mock.calls[0][2]).toMatchObject({
+      properties: {
+        correlationData: Buffer.from([0, 255, 128]),
+        messageExpiryInterval: 0,
+        payloadFormatIndicator: false,
+        userProperties: { repeated: ['a', 'b'] },
+      },
+    });
+    for (const properties of [
+      { topicAlias: 1 },
+      { subscriptionIdentifier: 1 },
+      { responseTopic: 'a/#' },
+      { correlationData: { encoding: 'base64', data: 'bad' } },
+    ])
+      await expect(manager.publish('a', 'request/topic', '', { properties })).rejects.toThrow();
+    await expect(manager.publish('a', 'a/+', '')).rejects.toThrow('wildcards');
+    await expect(manager.publish('a', 'a', '', { qos: 3 })).rejects.toThrow('QoS');
+    await expect(
+      manager.publish('a', 'a', '/w==', {
+        encoding: 'base64',
+        properties: { payloadFormatIndicator: true },
+      }),
+    ).rejects.toThrow('UTF-8');
+    expect(client.publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects MQTT 5 properties on MQTT 3 connections before publishing', async () => {
+    const connecting = manager.connect('a', { brokerUrl: 'mqtt://localhost', protocolVersion: 4 });
+    client.emit('connect', {});
+    await connecting;
+    await expect(
+      manager.publish('a', 'topic', '', { properties: { contentType: 'text/plain' } }),
+    ).rejects.toThrow('MQTT 5');
+    expect(client.publish).not.toHaveBeenCalled();
+    await manager.publish('a', 'topic', '', {});
+    expect(client.publish.mock.calls[0][2]).not.toHaveProperty('properties');
+  });
+
   it('settles on an early close and removes the failed client', async () => {
     const result = manager.connect('a', { brokerUrl: 'mqtt://localhost' });
     const rejected = expect(result).rejects.toThrow('before CONNACK');

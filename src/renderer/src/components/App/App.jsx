@@ -137,6 +137,7 @@ function App() {
         encoding: messageData.encoding,
         qos: messageData.qos,
         retain: messageData.retain,
+        properties: messageData.properties,
       });
     },
     [selectedConnection],
@@ -163,6 +164,12 @@ function App() {
       </div>
       <div className={`tab-content ${activeTab === 'publishing' ? 'active' : 'hidden'}`}>
         <PublishingPanel
+          protocolVersion={
+            isConnected
+              ? MQTTService.getProtocolVersion(selectedConnection)
+              : (connections.find((connection) => connection.id === selectedConnection)?.config
+                  ?.protocolVersion ?? 4)
+          }
           key={selectedConnection}
           connectionId={selectedConnection}
           onPublishMessage={handlePublishMessage}

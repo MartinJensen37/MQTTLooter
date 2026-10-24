@@ -2,6 +2,7 @@ import mqtt from 'mqtt';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'events';
 import { encodePayload, payloadBytes } from '../shared/payload';
+import { normalizePublishProperties, validatePublishTopic } from '../shared/publish-properties';
 
 class MQTTConnection extends EventEmitter {
   constructor(id, config) {
@@ -373,7 +374,19 @@ class MQTTConnection extends EventEmitter {
 
   publish(topic, message, options = {}) {
     return new Promise((resolve, reject) => {
+      validatePublishTopic(topic);
+      if (!options || typeof options !== 'object' || Array.isArray(options))
+        throw new Error('Invalid publish options');
+      if (options.qos !== undefined && ![0, 1, 2].includes(options.qos))
+        throw new Error('QoS must be 0, 1 or 2');
+      if (options.retain !== undefined && typeof options.retain !== 'boolean')
+        throw new Error('Retain must be a boolean');
       const bytes = Buffer.from(payloadBytes(message, options.encoding ?? 'utf8'));
+      const properties = normalizePublishProperties(
+        options.properties,
+        this.config.protocolVersion || 4,
+        bytes,
+      );
       if (!this.client || !this.isConnected || this.isDestroyed) {
         reject(new Error('Not connected'));
         return;
@@ -385,8 +398,13 @@ class MQTTConnection extends EventEmitter {
         dup: options.dup || false,
       };
 
-      if (this.config.protocolVersion === 5 && options.properties) {
-        publishOptions.properties = options.properties;
+      if (properties) {
+        publishOptions.properties = { ...properties };
+        if (properties.correlationData)
+          publishOptions.properties.correlationData = Buffer.from(
+            properties.correlationData.data,
+            'base64',
+          );
       }
 
       this.client.publish(topic, bytes, publishOptions, (err) => {

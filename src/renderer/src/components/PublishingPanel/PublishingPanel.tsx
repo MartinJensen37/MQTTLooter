@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import MessageTemplateService from '../../services/MessageTemplateService';
 import './PublishingPanel.css';
 import { payloadBytes, type PayloadEncoding } from '../../../../shared/payload';
 import TopicTreeService from '../../services/TopicTreeService';
 import type { PublishHistoryItem, SchemaValidationResult } from './publishingPanel/types';
 import PayloadEditor from './publishingPanel/PayloadEditor';
+import PublishPropertiesEditor from './publishingPanel/PublishPropertiesEditor';
+import {
+  buildPublishProperties,
+  draftFromProperties,
+  emptyPropertyDraft,
+  readPropertyDraft,
+} from './publishingPanel/propertyDraft';
 import TemplatesSection from './publishingPanel/TemplatesSection';
 import QosRetainOptions from './publishingPanel/QosRetainOptions';
 import PublishHistory from './publishingPanel/PublishHistory';
@@ -12,6 +19,7 @@ import TemplateDeleteDialog from './publishingPanel/TemplateDeleteDialog';
 
 interface PublishingPanelProps {
   connectionId?: string | null;
+  protocolVersion?: number;
   onPublishMessage?: (messageData: any) => Promise<void> | void;
   isConnected?: boolean;
   selectedTopic?: any;
@@ -20,6 +28,7 @@ interface PublishingPanelProps {
 
 function PublishingPanel({
   connectionId,
+  protocolVersion = 4,
   onPublishMessage,
   isConnected = false,
   selectedTopic = null,
@@ -28,13 +37,17 @@ function PublishingPanel({
   const formKey = `publish-form-state-${connectionId}`;
   const [initialForm] = useState(() => {
     try {
-      return JSON.parse(
+      const saved = JSON.parse(
         localStorage.getItem(formKey) || localStorage.getItem('publish-form-state') || '{}',
       );
+      return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
     } catch {
       return {};
     }
   });
+  const [propertyDraft, setPropertyDraft] = useState(() =>
+    readPropertyDraft(initialForm.propertyDraft),
+  );
   const [topic, setTopic] = useState<string>(initialForm.topic || '');
   const [payload, setPayload] = useState<string>(initialForm.payload || '');
   const [encoding, setEncoding] = useState<PayloadEncoding>(initialForm.encoding ?? 'utf8');
@@ -42,7 +55,14 @@ function PublishingPanel({
   const [retain, setRetain] = useState<boolean>(initialForm.retain || false);
   const [publishHistory, setPublishHistory] = useState<PublishHistoryItem[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem(`publish-history-${connectionId}`) || '[]');
+      const history = JSON.parse(localStorage.getItem(`publish-history-${connectionId}`) || '[]');
+      return Array.isArray(history)
+        ? history
+            .filter(
+              (item) => item && typeof item.topic === 'string' && typeof item.payload === 'string',
+            )
+            .slice(0, 10)
+        : [];
     } catch {
       return [];
     }
@@ -61,6 +81,20 @@ function PublishingPanel({
   const selectedPath = selectedTopic?.topicPath ?? selectedTopic?.topic ?? null;
   const selectedRetain = selectedTopic?.node?.lastMessage?.retain === true;
   const selectedMessageId = selectedTopic?.node?.lastMessageId;
+  const propertyValidation = useMemo(() => {
+    if (!propertyDraft.enabled) return {};
+    try {
+      return {
+        properties: buildPublishProperties(
+          propertyDraft,
+          protocolVersion,
+          payloadBytes(payload, encoding),
+        ),
+      };
+    } catch (error) {
+      return { error: (error as Error).message };
+    }
+  }, [propertyDraft, protocolVersion, payload, encoding]);
 
   useEffect(() => {
     setMessageTemplates(templateService.getAllTemplates());
@@ -185,11 +219,14 @@ function PublishingPanel({
   // Persist form state.
   useEffect(() => {
     try {
-      localStorage.setItem(formKey, JSON.stringify({ topic, payload, encoding, qos, retain }));
+      localStorage.setItem(
+        formKey,
+        JSON.stringify({ topic, payload, encoding, qos, retain, propertyDraft }),
+      );
     } catch {
       showFeedback?.('Publishing draft could not be saved locally.', 'error');
     }
-  }, [formKey, topic, payload, encoding, qos, retain, showFeedback]);
+  }, [formKey, topic, payload, encoding, qos, retain, propertyDraft, showFeedback]);
 
   // Persist publish history per connection.
   useEffect(() => {
@@ -202,6 +239,10 @@ function PublishingPanel({
   }, [publishHistory, connectionId, showFeedback]);
 
   const handlePublish = async () => {
+    if (propertyValidation.error) {
+      showFeedback?.(propertyValidation.error, 'error');
+      return;
+    }
     const messageData: PublishHistoryItem = {
       topic,
       payload,
@@ -209,6 +250,7 @@ function PublishingPanel({
       qos,
       retain,
       timestamp: new Date().toISOString(),
+      properties: propertyValidation.properties,
     };
 
     setIsPublishing(true);
@@ -217,14 +259,15 @@ function PublishingPanel({
       if (!onPublishMessage || !isConnected) throw new Error('Not connected');
       await onPublishMessage(messageData);
 
-      // Add to history, de-duplicating by topic/payload/qos/retain.
+      // Keep distinct property sets when de-duplicating successful publications.
       setPublishHistory((prev) => {
         const matches = (item: PublishHistoryItem) =>
           item.topic === messageData.topic &&
           item.payload === messageData.payload &&
           (item.encoding ?? 'utf8') === messageData.encoding &&
           item.qos === messageData.qos &&
-          item.retain === messageData.retain;
+          item.retain === messageData.retain &&
+          JSON.stringify(item.properties ?? {}) === JSON.stringify(messageData.properties ?? {});
 
         const isDuplicate = prev.some(matches);
         if (!isDuplicate) return [messageData, ...prev.slice(0, 9)]; // keep last 10
@@ -304,6 +347,7 @@ function PublishingPanel({
       return;
     }
 
+    setPropertyDraft(emptyPropertyDraft());
     setTopic(selectedTopic.topicPath || selectedTopic.topic || '');
     const messageData = connectionId
       ? TopicTreeService.getTopicMessages(connectionId, selectedTopic.topicPath)[0]
@@ -325,6 +369,12 @@ function PublishingPanel({
   };
 
   const loadFromHistory = (historyItem: PublishHistoryItem) => {
+    try {
+      setPropertyDraft(draftFromProperties(historyItem.properties));
+    } catch (error) {
+      showFeedback?.(`Cannot load saved properties: ${(error as Error).message}`, 'error');
+      return;
+    }
     setTopic(historyItem.topic);
     setPayload(historyItem.payload);
     setEncoding(historyItem.encoding ?? 'utf8');
@@ -333,6 +383,7 @@ function PublishingPanel({
   };
 
   const clearForm = () => {
+    setPropertyDraft(emptyPropertyDraft());
     setTopic('');
     setPayload('');
     setEncoding('utf8');
@@ -490,11 +541,25 @@ function PublishingPanel({
               setShowQosDropdown={setShowQosDropdown}
             />
 
+            <PublishPropertiesEditor
+              draft={propertyDraft}
+              onChange={setPropertyDraft}
+              protocolVersion={protocolVersion}
+              disabled={isPublishing}
+              error={propertyValidation.error}
+            />
+
             <div className="form-actions">
               <button
                 onClick={handlePublish}
                 className="publish-form-publish-btn"
-                disabled={!topic.trim() || isPublishing || !connectionId || !isConnected}
+                disabled={
+                  !topic.trim() ||
+                  isPublishing ||
+                  !connectionId ||
+                  !isConnected ||
+                  !!propertyValidation.error
+                }
               >
                 {isPublishing ? (
                   <>

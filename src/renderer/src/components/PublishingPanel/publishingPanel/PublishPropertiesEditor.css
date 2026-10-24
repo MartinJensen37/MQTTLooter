@@ -1,0 +1,57 @@
+.publish-properties {
+  margin: 16px 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+.publish-properties summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.publish-properties p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 8px 0;
+}
+.publish-properties fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.publish-properties legend {
+  font-size: 13px;
+  margin: 8px 0;
+}
+.publish-properties-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 10px;
+}
+.publish-properties-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+}
+.publish-properties .publish-properties-enable {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.publish-user-property {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.publish-user-property input {
+  flex: 1;
+  min-width: 100px;
+  width: 0;
+}
+.publish-properties p.publish-properties-error {
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}

@@ -86,7 +86,17 @@ Open **MQTT 5 properties** on a message card in Logging. The same inspector work
 
 Correlation data has a hex preview and **Copy correlation as base64** for the exact bytes, including empty or non-UTF-8 values. **Copy properties as JSON** and topic JSON/CSV exports include full properties; binary values use `{ "encoding": "base64", "data": "..." }`. The inspector limits previews to 64 rows, 1,024 characters per value, 128 per label and 256 correlation bytes, with a truncation notice. Copy/export is not truncated to those preview limits. Topic export still covers only the displayed message page. Plain-log mode remains payload-focused; switch to message cards for properties.
 
-Property storage counts toward live-cache budgets, so large properties can cause history trimming even with small payloads. Advanced MQTT 5 publisher controls are still planned.
+Property storage counts toward live-cache budgets, so large properties can cause history trimming even with small payloads. The Publishing tab also supports explicit outgoing properties, described below.
+
+### Publishing MQTT 5 properties
+
+In Publishing, expand **MQTT 5 publish properties** and enable **Include MQTT 5 properties**. Set an optional response topic, content type, expiry, payload format, correlation bytes and user properties. Correlation accepts complete hex bytes or canonical base64; changing the encoding selector changes how the text is interpreted. Enabling correlation with an empty value sends an empty binary field.
+
+Expiry is in whole seconds: blank omits it, while `0` requests immediate expiry. Payload format describes the payload bytes and does not convert them; declaring UTF-8 rejects invalid UTF-8 payload bytes. Response topics cannot contain wildcards. These semantics follow the [MQTT 5 PUBLISH properties specification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html).
+
+The app allows 64 user-property pairs and 64 KiB of encoded properties per publish. Repeated names are grouped together, preserving values within each name; cross-name row order is not guaranteed. MQTT 3 publishing requires disabling the properties, while retaining their draft fields. Main-process validation rejects invalid or unsupported properties as well as invalid topic/QoS/retain values.
+
+Properties are saved per connection with the draft and successful publication history. Loading history restores them; different property sets remain separate history entries. **Use Selected Topic** loads the payload and resets outgoing properties so received aliases, subscription identifiers and request metadata are not replayed automatically. **Clear** resets properties, and **Remove Retained** sends an empty retained message without the draft's properties. Topic-alias publishing remains deferred until negotiated limits and reconnect lifecycle are implemented. No subscription identifiers are sent by this editor.
 
 ### Searching message contents
 

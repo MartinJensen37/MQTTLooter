@@ -2,6 +2,8 @@
 @import '../../styles/components.css';
 
 .publishing-panel {
+  container: publishing / inline-size;
+  min-width: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -626,14 +628,31 @@
 }
 
 /* Responsive design */
-@media (max-width: 768px) {
-  .form-options {
+@container publishing (max-width: 600px) {
+  .publishing-content {
+    padding: 12px;
+    min-width: 0;
+  }
+  .publishing-panel .publish-form {
+    padding: 0;
+    min-width: 0;
+  }
+  .publishing-panel .publish-form > .panel-content {
+    padding: 12px;
+  }
+  .publishing-panel .form-options {
     flex-direction: column;
     gap: 15px;
   }
   
-  .form-actions {
+  .publishing-panel .form-actions {
     flex-direction: column;
+  }
+  .publishing-panel .topic-label-wrapper,
+  .publishing-panel .payload-header,
+  .publishing-panel .template-header {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 }
 
