@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import LinePlot from '../Charts/LinePlot';
 import { fieldPointer, pointerPath, type NumericResult } from '../../../../shared/numeric-series';
 import './IncomingPlot.css';
@@ -16,6 +16,7 @@ export default function IncomingPlot({
   topic: string;
   active?: boolean;
 }) {
+  const fieldListId = useId();
   const [duration, setDuration] = useState(60_000);
   const [end, setEnd] = useState<number | null>(null);
   const [fields, setFields] = useState(['']);
@@ -106,7 +107,6 @@ export default function IncomingPlot({
   return (
     <section className="incoming-plot" aria-label="Incoming values plot">
       <div className="incoming-plot-toolbar">
-        <strong title={topic}>{topic}</strong>
         <label>
           Window{' '}
           <select
@@ -182,40 +182,29 @@ export default function IncomingPlot({
         ))}
         <label>
           Field{' '}
-          <select
-            aria-label="Available numeric fields"
-            className="form-select custom-select-button"
+          <input
+            className="form-input"
+            aria-label="Numeric field path"
+            list={fieldListId}
+            placeholder="Whole payload or /field/path"
             value={candidate}
             onChange={(event) => {
               setCandidate(event.target.value);
               setFieldError('');
             }}
-          >
-            <option value="">Whole payload</option>
+          />
+          <datalist id={fieldListId}>
             {(result?.availablePaths ?? [])
               .map(fieldPointer)
               .filter(Boolean)
               .map((pointer) => (
-                <option key={pointer} value={pointer}>
-                  {pointer}
-                </option>
+                <option key={pointer} value={pointer} />
               ))}
-            {candidate &&
-              !result?.availablePaths.some((path) => fieldPointer(path) === candidate) && (
-                <option value={candidate}>{candidate}</option>
-              )}
-          </select>
+          </datalist>
         </label>
-        <input
-          className="form-input"
-          aria-label="Numeric field path"
-          placeholder="/sensors/0/value"
-          value={candidate}
-          onChange={(event) => setCandidate(event.target.value)}
-        />
         <button
           className="btn btn-sm btn-secondary"
-          disabled={fields.length >= 4}
+          disabled={fields.length >= 4 || fields.includes(candidate)}
           onClick={addField}
         >
           Add field
@@ -224,6 +213,7 @@ export default function IncomingPlot({
       {fieldError && <p role="alert">{fieldError}</p>}
       {error && <p role="alert">{error}</p>}
       <LinePlot
+        plotHeight={300}
         series={plots}
         min={min}
         max={max}
@@ -263,27 +253,9 @@ export default function IncomingPlot({
           );
         })}
       </div>
-      <p className="incoming-plot-caption">
-        {end === null ? 'Live' : 'Paused'} · {result?.scanned.toLocaleString() ?? 0} messages
-        scanned · {values.length} points · shared Y scale. Nearest retained samples; extrema are
-        preserved. Missing, invalid and reconnect samples break the line. Numbers use JavaScript
-        precision.
-      </p>
       {result?.truncated && (
-        <p role="status">
-          Older samples omitted by query limits. Narrow the time window to inspect them.
-        </p>
+        <p role="status">Showing recent samples. Narrow the time window to see more detail.</p>
       )}
-      <details>
-        <summary>Plot limits</summary>
-        <p>
-          Reads retained disk history, including messages outside the live cache. Each query scans
-          at most 20,000 messages, 8 MiB of payloads or 75 ms of worker time; up to 512 points per
-          field. Payloads above 64 KiB, binary data and nonnumeric values create gaps. Numeric
-          strings are not converted. Suggested fields come from the latest 20 scanned messages;
-          enter a JSON pointer for other fields. Pause stops plot updates; capture continues.
-        </p>
-      </details>
     </section>
   );
 }

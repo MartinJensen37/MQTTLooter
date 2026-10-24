@@ -13,7 +13,7 @@ module.exports = async ({ evaluate, waitFor, field, send }) => {
     'plot topic',
   );
   await evaluate('document.querySelector(\'.topic-tree-node[title="plots/temperature"]\').click()');
-  await click('Plot incoming values');
+  await field('[aria-label="Message display"]', 'plot');
   await waitFor(
     () =>
       evaluate(
@@ -21,7 +21,22 @@ module.exports = async ({ evaluate, waitFor, field, send }) => {
       ),
     'automatic JSON field',
   );
-  await field('[aria-label="Available numeric fields"]', '/pressure');
+  assert.equal(
+    await evaluate("document.querySelectorAll('.message-workspace .message-item').length"),
+    0,
+  );
+  assert.equal(
+    await evaluate("document.querySelector('.message-workspace .message-list') === null"),
+    true,
+  );
+  assert.equal(await evaluate("!!document.querySelector('.message-panel > .incoming-plot')"), true);
+  assert.equal(
+    await evaluate(
+      "document.querySelector('.topic-details-box').getBoundingClientRect().bottom <= document.querySelector('.incoming-plot').getBoundingClientRect().top",
+    ),
+    true,
+  );
+  await field('[aria-label="Numeric field path"]', '/pressure');
   await click('Add field');
   await waitFor(
     () =>
@@ -34,7 +49,7 @@ module.exports = async ({ evaluate, waitFor, field, send }) => {
   await waitFor(
     () =>
       evaluate(
-        "document.querySelector('.incoming-plot-caption')?.textContent.startsWith('Paused')",
+        "[...document.querySelectorAll('.incoming-plot button')].some(button => button.textContent === 'Resume live plot')",
       ),
     'paused plot',
   );

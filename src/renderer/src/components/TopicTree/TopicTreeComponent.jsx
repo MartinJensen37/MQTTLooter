@@ -143,9 +143,7 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
 
   const historyNotice = (statistics?.discardedMessages > 0 || statistics?.evictedTopics > 0) && (
     <p role="status" className="history-limit-notice">
-      History limit: {statistics.discardedMessages} messages discarded; {statistics.evictedTopics}{' '}
-      topics evicted. Retained history budget: {(statistics.retainedBytes / 1048576).toFixed(1)} /{' '}
-      {(statistics.limits.maxBytes / 1048576).toFixed(0)} MiB per connection.
+      {statistics.discardedMessages} messages expired; {statistics.evictedTopics} topics evicted.
     </p>
   );
 
@@ -213,25 +211,12 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
               }
             }}
           />
-          {search && (
-            <button
-              className="btn btn-sm btn-secondary"
-              aria-label="Clear topic search"
-              onClick={() => {
-                searchRef.current = '';
-                setSearch('');
-                loadNodes();
-              }}
-            >
-              Clear
-            </button>
-          )}
         </div>
-        <div className="topic-search-status" role="status">
-          {search
-            ? `${nodes.filter((node) => node.searchMatch).length} matches / includes collapsed branches`
-            : 'Topics stay in first-seen order'}
-        </div>
+        {search && (
+          <div className="topic-search-status" role="status">
+            {nodes.filter((node) => node.searchMatch).length} matches
+          </div>
+        )}
         <HistoryControls
           connectionId={connectionId}
           selectedPath={selectedPath}

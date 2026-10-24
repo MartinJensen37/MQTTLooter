@@ -139,16 +139,6 @@ function Workspace(props: any) {
             {searchOpen ? 'Close content search' : 'Search message contents'}
           </button>
         )}
-        {!searchOpen && (
-          <button
-            className="btn btn-sm btn-secondary"
-            aria-expanded={plotOpen}
-            disabled={!connectionId || (stored ? topic : selectedPath) === undefined}
-            onClick={() => setPlotOpen((value) => !value)}
-          >
-            {plotOpen ? 'Hide incoming plot' : 'Plot incoming values'}
-          </button>
-        )}
         <label>
           Source{' '}
           <select
@@ -180,28 +170,8 @@ function Workspace(props: any) {
             />{' '}
             Keep history across app restarts
           </label>
-          <p>
-            Otherwise, session history is removed on exit or the next startup after a crash. History
-            expires after 24 hours or under the storage budget.
-          </p>
-          {status?.store && (
-            <p>
-              {status.store.retainedMessages.toLocaleString()} retained ·{' '}
-              {(status.store.databaseBytes / 1048576).toFixed(1)} MiB database ·{' '}
-              {status.store.expired.toLocaleString()} expired this run. Payload budget: 256 MiB;
-              database ceiling: 512 MiB plus a temporary rollback journal.
-            </p>
-          )}
-          {counts && (
-            <p>
-              {counts.received.toLocaleString()} received · {counts.processed.toLocaleString()}{' '}
-              committed · {counts.dropped.toLocaleString()} dropped/unconfirmed this run. Writes use
-              a separate bounded queue.
-            </p>
-          )}
-          <p>Saved recordings still use their separate library.</p>
         </details>
-        {stored && !searchOpen && (
+        {stored && !searchOpen && !plotOpen && (
           <>
             <button className="btn btn-sm btn-secondary" onClick={latest} disabled={busy}>
               Latest stored page
@@ -229,9 +199,7 @@ function Workspace(props: any) {
             >
               Older page
             </button>
-            <span>
-              {busy ? 'Loading...' : `Page ${cursors.length} · up to 300 messages / 2 MiB`}
-            </span>
+            <span>{busy ? 'Loading...' : `Page ${cursors.length}`}</span>
           </>
         )}
       </div>
@@ -289,28 +257,12 @@ function Workspace(props: any) {
               </option>
             ))}
           </select>
-          <span>First 50 matching paths, including topics outside the live cache.</span>
         </div>
-      )}
-      {stored && !searchOpen && (
-        <p className="message-storage-caption">
-          A fixed snapshot of retained disk history. Export applies to this page. Refresh to include
-          new messages. One large payload can exceed the page byte target. Retention may remove
-          older pages.
-        </p>
       )}
       {error && (
         <p role="alert" className="message-storage-notice">
           {error}
         </p>
-      )}
-      {plotOpen && connectionId && (stored ? topic : selectedPath) !== undefined && (
-        <IncomingPlot
-          active={props.active}
-          key={`${connectionId}:${stored ? topic : selectedPath}`}
-          connectionId={connectionId}
-          topic={stored ? topic : selectedPath}
-        />
       )}
       {stored && searchOpen && connectionId && topic !== undefined ? (
         <HistorySearch
@@ -325,6 +277,17 @@ function Workspace(props: any) {
       ) : (
         <MessagePanel
           {...props}
+          onPlotChange={setPlotOpen}
+          plotContent={
+            plotOpen && connectionId && (stored ? topic : selectedPath) !== undefined ? (
+              <IncomingPlot
+                active={props.active}
+                key={`${connectionId}:${stored ? topic : selectedPath}`}
+                connectionId={connectionId}
+                topic={stored ? topic : selectedPath}
+              />
+            ) : null
+          }
           storedPage={stored}
           messages={stored ? archiveMessages : props.messages}
           selectedTopic={

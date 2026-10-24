@@ -14,8 +14,11 @@ function MessagePanel({
   connectionId,
   showFeedback,
   storedPage = false,
+  plotContent = null,
+  onPlotChange = undefined,
   clearLabel = 'Clear Messages',
 }) {
+  const plotting = Boolean(plotContent);
   const panelRef = useRef(null);
   const [previewBytes, setPreviewBytes] = useState(100);
   const [displayMode, setDisplayMode] = useState('cards');
@@ -34,6 +37,7 @@ function MessagePanel({
   const [autoScroll, setAutoScroll] = useState(true);
 
   const processedMessages = React.useMemo(() => {
+    if (plotting) return messages;
     let filtered = showRetainedOnly ? messages.filter((m) => m.retain) : messages;
     if (sortBy === 'timestamp') {
       // History arrives newest-first. Reverse ties too when displaying oldest-first.
@@ -43,11 +47,11 @@ function MessagePanel({
       );
     }
     return filtered;
-  }, [messages, showRetainedOnly, sortBy, sortOrder]);
+  }, [messages, showRetainedOnly, sortBy, sortOrder, plotting]);
 
   const log = React.useMemo(
-    () => (displayMode === 'plain' ? plainLog(processedMessages) : null),
-    [processedMessages, displayMode],
+    () => (!plotting && displayMode === 'plain' ? plainLog(processedMessages) : null),
+    [processedMessages, displayMode, plotting],
   );
 
   const topicDetails = React.useMemo(() => {
@@ -137,7 +141,7 @@ function MessagePanel({
       <div className="panel-header">
         <div className="header-left">
           <h2>
-            Message Details ({processedMessages.length})
+            {plotContent ? 'Topic Details' : `Message Details (${processedMessages.length})`}
             {selectedTopic && (
               <span className="filter-indicator"> | {selectedTopic.topicPath}</span>
             )}
@@ -151,11 +155,20 @@ function MessagePanel({
           <select
             className="custom-select-button form-select form-select-compact"
             aria-label="Message display"
-            value={displayMode}
-            onChange={(event) => setDisplayMode(event.target.value)}
+            value={plotContent ? 'plot' : displayMode}
+            onChange={(event) => {
+              const value = event.target.value;
+              onPlotChange?.(value === 'plot');
+              if (value !== 'plot') setDisplayMode(value);
+            }}
           >
             <option value="cards">Message cards</option>
             <option value="plain">Plain log</option>
+            {onPlotChange && (
+              <option value="plot" disabled={!selectedTopic}>
+                Plot
+              </option>
+            )}
           </select>
         </label>
         {log && (
@@ -170,36 +183,37 @@ function MessagePanel({
             Copy visible log
           </button>
         )}
-        <label>
-          Order{' '}
-          <select
-            className="custom-select-button form-select form-select-compact"
-            aria-label="Message order"
-            value={sortOrder}
-            onChange={(e) => {
-              setSortBy('timestamp');
-              setSortOrder(e.target.value);
-            }}
-          >
-            <option value="desc">Newest first</option>
-            <option value="asc">Oldest first</option>
-          </select>
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={showRetainedOnly}
-            onChange={(e) => setShowRetainedOnly(e.target.checked)}
-          />
-          Retained only
-        </label>
+        {!plotContent && (
+          <>
+            <label>
+              Order{' '}
+              <select
+                className="custom-select-button form-select form-select-compact"
+                aria-label="Message order"
+                value={sortOrder}
+                onChange={(e) => {
+                  setSortBy('timestamp');
+                  setSortOrder(e.target.value);
+                }}
+              >
+                <option value="desc">Newest first</option>
+                <option value="asc">Oldest first</option>
+              </select>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={showRetainedOnly}
+                onChange={(e) => setShowRetainedOnly(e.target.checked)}
+              />
+              Retained only
+            </label>
+          </>
+        )}
       </div>
 
       {selectedTopic && topicDetails && (
         <div className="topic-details-box">
-          <div className="topic-details-header">
-            <h3>Current Message Details</h3>
-          </div>
           <div className="topic-details-content">
             <div className="topic-info-grid">
               <div className="topic-info-item">
@@ -232,171 +246,169 @@ function MessagePanel({
                 </span>
               </div>
             </div>
-            <div className="topic-actions-section">
-              <button
-                onClick={clearTopicMessages}
-                className="btn btn-sm btn-danger"
-                title="Clear messages for this topic"
-                disabled={processedMessages.length === 0}
-              >
-                <i className="fas fa-trash"></i> {clearLabel}
-              </button>
-              {!storedPage && (
+            {!plotContent && (
+              <div className="topic-actions-section">
                 <button
-                  className={`btn btn-sm ${autoScroll ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setAutoScroll((v) => !v)}
-                  title={
-                    autoScroll
-                      ? 'Auto-scroll ON — click to pin'
-                      : 'Auto-scroll OFF — click to follow'
-                  }
-                >
-                  <i className={`fas ${autoScroll ? 'fa-arrow-up' : 'fa-thumbtack'}`}></i>
-                  {autoScroll ? ' Following' : ' Pinned'}
-                </button>
-              )}
-              <div className="message-export-wrapper custom-select-wrapper">
-                <button
-                  type="button"
-                  className="custom-select-button"
-                  onClick={() => setShowTopicExportMenu((v) => !v)}
+                  onClick={clearTopicMessages}
+                  className="btn btn-sm btn-danger"
+                  title="Clear messages for this topic"
                   disabled={processedMessages.length === 0}
-                  title="Export topic data"
                 >
-                  <span className="select-value">
-                    <i className="fas fa-download"></i> Export
-                  </span>
-                  <i className={`fas fa-chevron-down ${showTopicExportMenu ? 'rotated' : ''}`}></i>
+                  <i className="fas fa-trash"></i> {clearLabel}
                 </button>
-                {showTopicExportMenu && (
-                  <div className="custom-select-dropdown">
-                    <button type="button" className="dropdown-option" onClick={exportTopicAsJSON}>
-                      <i className="fas fa-file-code"></i> Export as JSON
-                    </button>
-                    <button type="button" className="dropdown-option" onClick={exportTopicAsCSV}>
-                      <i className="fas fa-file-csv"></i> Export as CSV
-                    </button>
-                  </div>
+                {!storedPage && (
+                  <button
+                    className={`btn btn-sm ${autoScroll ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setAutoScroll((v) => !v)}
+                    title={
+                      autoScroll
+                        ? 'Auto-scroll ON — click to pin'
+                        : 'Auto-scroll OFF — click to follow'
+                    }
+                  >
+                    <i className={`fas ${autoScroll ? 'fa-arrow-up' : 'fa-thumbtack'}`}></i>
+                    {autoScroll ? ' Following' : ' Pinned'}
+                  </button>
                 )}
+                <div className="message-export-wrapper custom-select-wrapper">
+                  <button
+                    type="button"
+                    className="custom-select-button"
+                    onClick={() => setShowTopicExportMenu((v) => !v)}
+                    disabled={processedMessages.length === 0}
+                    title="Export topic data"
+                  >
+                    <span className="select-value">
+                      <i className="fas fa-download"></i> Export
+                    </span>
+                    <i
+                      className={`fas fa-chevron-down ${showTopicExportMenu ? 'rotated' : ''}`}
+                    ></i>
+                  </button>
+                  {showTopicExportMenu && (
+                    <div className="custom-select-dropdown">
+                      <button type="button" className="dropdown-option" onClick={exportTopicAsJSON}>
+                        <i className="fas fa-file-code"></i> Export as JSON
+                      </button>
+                      <button type="button" className="dropdown-option" onClick={exportTopicAsCSV}>
+                        <i className="fas fa-file-csv"></i> Export as CSV
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
 
-      {selectedTopic?.node?.discardedHistory > 0 && (
+      {!plotContent && selectedTopic?.node?.discardedHistory > 0 && (
         <p className="message-history-notice" role="status">
-          {selectedTopic.node.discardedHistory} older or oversized messages are unavailable under
-          the history limits. This topic remains selected.
+          {selectedTopic.node.discardedHistory} messages are no longer in the live cache.
         </p>
       )}
-      <StableScrollViewport
-        className="message-list"
-        viewKey={JSON.stringify([
-          connectionId,
-          selectedTopic?.topicPath,
-          sortOrder,
-          showRetainedOnly,
-          displayMode,
-        ])}
-        following={autoScroll}
-        onFollowingChange={setAutoScroll}
-      >
-        {processedMessages.length === 0 ? (
-          <div className="no-messages">
-            <div className="no-messages-icon">
-              <i className="fas fa-inbox"></i>
-            </div>
-            <h3>No messages in this view</h3>
-            <p>
-              {!selectedTopic
-                ? 'Select a topic from the topic tree to view its messages'
-                : 'No stored messages match this view. History may have been cleared or discarded at its limit.'}
-            </p>
-          </div>
-        ) : (
-          <>
-            {selectedTopic && processedMessages.length >= 300 && (
-              <div className="message-limit-notice">
-                <i className="fas fa-info-circle"></i>{' '}
-                {storedPage
-                  ? 'Showing one page of stored history. Use Older page to continue.'
-                  : 'Showing up to 300 most recent messages for this topic.'}
+      {plotContent || (
+        <StableScrollViewport
+          className="message-list"
+          viewKey={JSON.stringify([
+            connectionId,
+            selectedTopic?.topicPath,
+            sortOrder,
+            showRetainedOnly,
+            displayMode,
+          ])}
+          following={autoScroll}
+          onFollowingChange={setAutoScroll}
+        >
+          {processedMessages.length === 0 ? (
+            <div className="no-messages">
+              <div className="no-messages-icon">
+                <i className="fas fa-inbox"></i>
               </div>
-            )}
-            {log?.truncated && (
-              <p className="message-history-notice">
-                Plain log preview is limited to 4,096 payload characters per message and 262,144
-                total characters. Export preserves complete payloads for this view.
+              <h3>No messages in this view</h3>
+              <p>
+                {!selectedTopic
+                  ? 'Select a topic from the topic tree to view its messages'
+                  : 'No messages match this view.'}
               </p>
-            )}
-            {log
-              ? log.rows.map((row) => (
-                  <pre className="message-plain-entry" key={row.id} data-scroll-key={row.id}>
-                    {row.text}
-                  </pre>
-                ))
-              : processedMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    data-scroll-key={msg.id}
-                    className="message-item"
-                    onDoubleClick={(e) => copyPayload(msg.message, e)}
-                    title={
-                      msg.encoding === 'base64'
-                        ? 'Double-click to copy base64 payload'
-                        : 'Double-click to copy payload'
-                    }
-                  >
-                    <div className="message-header">
-                      <div className="message-meta">
-                        <span className="timestamp" title={formatTimestamp(msg.timestamp)}>
-                          <i className="fas fa-clock"></i>{' '}
-                          {new Date(msg.timestamp).toLocaleTimeString()}
-                        </span>
-                        <span className="topic" title={msg.topic}>
-                          <i className="fas fa-tag"></i> {msg.topic}
-                        </span>
-                        <span className={`badge badge-qos-${msg.qos}`}>QoS {msg.qos}</span>
-                        {msg.encoding === 'base64' && (
-                          <span className="badge">Binary (base64 export)</span>
-                        )}
-                        {msg.retain && (
-                          <span className="badge badge-retain">
-                            <i className="fas fa-save"></i> RETAIN
+            </div>
+          ) : (
+            <>
+              {log?.truncated && (
+                <p className="message-history-notice">
+                  Preview shortened. Export includes complete payloads.
+                </p>
+              )}
+              {log
+                ? log.rows.map((row) => (
+                    <pre className="message-plain-entry" key={row.id} data-scroll-key={row.id}>
+                      {row.text}
+                    </pre>
+                  ))
+                : processedMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      data-scroll-key={msg.id}
+                      className="message-item"
+                      onDoubleClick={(e) => copyPayload(msg.message, e)}
+                      title={
+                        msg.encoding === 'base64'
+                          ? 'Double-click to copy base64 payload'
+                          : 'Double-click to copy payload'
+                      }
+                    >
+                      <div className="message-header">
+                        <div className="message-meta">
+                          <span className="timestamp" title={formatTimestamp(msg.timestamp)}>
+                            <i className="fas fa-clock"></i>{' '}
+                            {new Date(msg.timestamp).toLocaleTimeString()}
                           </span>
-                        )}
-                        <span className="connection-id" title={`Connection: ${msg.connectionId}`}>
-                          <i className="fas fa-plug"></i> {msg.connectionId}
-                        </span>
+                          <span className="topic" title={msg.topic}>
+                            <i className="fas fa-tag"></i> {msg.topic}
+                          </span>
+                          <span className={`badge badge-qos-${msg.qos}`}>QoS {msg.qos}</span>
+                          {msg.encoding === 'base64' && (
+                            <span className="badge">Binary (base64 export)</span>
+                          )}
+                          {msg.retain && (
+                            <span className="badge badge-retain">
+                              <i className="fas fa-save"></i> RETAIN
+                            </span>
+                          )}
+                          <span className="connection-id" title={`Connection: ${msg.connectionId}`}>
+                            <i className="fas fa-plug"></i> {msg.connectionId}
+                          </span>
+                        </div>
+                        <div className="message-actions">
+                          <button
+                            className="copy-btn"
+                            onClick={(e) => copyPayload(msg.message, e)}
+                            title={
+                              msg.encoding === 'base64' ? 'Copy base64 payload' : 'Copy payload'
+                            }
+                            style={{ borderRadius: '50%', minWidth: '24px', height: '24px' }}
+                          >
+                            <i className="fas fa-copy"></i>
+                          </button>
+                        </div>
                       </div>
-                      <div className="message-actions">
-                        <button
-                          className="copy-btn"
-                          onClick={(e) => copyPayload(msg.message, e)}
-                          title={msg.encoding === 'base64' ? 'Copy base64 payload' : 'Copy payload'}
-                          style={{ borderRadius: '50%', minWidth: '24px', height: '24px' }}
-                        >
-                          <i className="fas fa-copy"></i>
-                        </button>
+                      <div className="message-content">
+                        <PayloadView
+                          value={msg.message}
+                          encoding={msg.encoding}
+                          previewBytes={previewBytes}
+                        />
+                        <MessageProperties
+                          protocolVersion={msg.protocolVersion}
+                          properties={msg.properties}
+                        />
                       </div>
                     </div>
-                    <div className="message-content">
-                      <PayloadView
-                        value={msg.message}
-                        encoding={msg.encoding}
-                        previewBytes={previewBytes}
-                      />
-                      <MessageProperties
-                        protocolVersion={msg.protocolVersion}
-                        properties={msg.properties}
-                      />
-                    </div>
-                  </div>
-                ))}
-          </>
-        )}
-      </StableScrollViewport>
+                  ))}
+            </>
+          )}
+        </StableScrollViewport>
+      )}
     </div>
   );
 }

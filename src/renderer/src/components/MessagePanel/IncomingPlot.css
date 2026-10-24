@@ -1,8 +1,7 @@
 .incoming-plot {
-  flex: 0 1 auto;
+  flex: 1;
   overflow-y: auto;
-  min-height: 140px;
-  max-height: 55vh;
+  min-height: 0;
   padding: 8px 12px;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-subtle);
@@ -17,12 +16,6 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 6px;
-}
-.incoming-plot-toolbar strong {
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .incoming-plot label {
   display: inline-flex;
@@ -55,13 +48,9 @@
   min-width: 80px;
   accent-color: var(--primary);
 }
-.incoming-plot-caption,
-.incoming-plot details {
-  color: var(--text-muted);
-}
 .incoming-plot p {
   margin: 6px 0;
 }
-.incoming-plot summary {
-  cursor: pointer;
+.incoming-plot .line-plot {
+  max-height: none;
 }

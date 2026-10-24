@@ -8,7 +8,9 @@ The inspection backlog also now includes a resizable payload inspector, bounded 
 
 Phase 5 now includes the planned publish timeline: aligned opportunity ticks, offset schedules, seeded random likelihood bands, per-bin expected-message totals, numeric probability inspection, long-wait descriptions and combined-mode guidance. The preview uses a separate worker and does not consume live random state. Optional actual-event overlays and next-success distribution views remain follow-ups; the preview does not predict broker delivery or scheduling stalls.
 
-## Current implementation status (2026-10-24)
+UI cleanup (2026-10-25): Display now switches between message cards, plain log and plotting in the same area below topic metadata. Plot mode hides message-only sorting, scrolling, export and pagination controls. Long storage/plot/search/simulator explanations live in documentation rather than the interface. Topic search uses its native clear control and Escape; plot field entry combines suggestions and manual paths. Actionable errors and concise incomplete-data indicators remain.
+
+## Current implementation status (2026-10-25)
 
 | Request | Current status | Remaining work |
 | --- | --- | --- |
@@ -114,7 +116,7 @@ Content search slice (2026-10-24): choose **Source > Disk history > Search messa
 
 Each result page holds up to 100 matches / 1 MiB estimated. Continue searches older records with the same snapshot/cursor; a new search includes newly captured messages. Oversized payloads (>256 KiB) or records (>1 MiB estimated) are skipped and counted. Text mode counts non-UTF-8 skips. Expired records remain unavailable; clear invalidates cursors. Copy/export is limited to displayed matches, and **Clear topic history** explicitly clears the whole topic rather than only matches. Cross-topic search, reverse page navigation, custom time boundaries, large-payload streaming search and whole-result streaming export remain follow-ups.
 
-Implemented slice: **Plot incoming values** in Logging works for live-selected and stored-only topics. Queries run in the storage worker with a topic/time index; schema version 1 upgrades without replacing messages. The renderer requests at most four fields and 512 points per field, no more than once per 250 ms after the previous query finishes. A query scans the newest portion of the range, stopping at 20,000 records, 8 MiB of decoded payloads or a 75 ms work target; omitted older samples are reported. Each payload is limited to 64 KiB for numeric parsing. Invalid/missing values break their whole aggregation bucket conservatively, so a sparse invalid sample can suppress nearby connecting lines. Closing the plot or hiding Logging stops polling. Plot configuration remains when switching tabs.
+Implemented slice: **Display > Plot** in Logging works for live-selected and stored-only topics. Queries run in the storage worker with a topic/time index; schema version 1 upgrades without replacing messages. The renderer requests at most four fields and 512 points per field, no more than once per 250 ms after the previous query finishes. A query scans the newest portion of the range, stopping at 20,000 records, 8 MiB of decoded payloads or a 75 ms work target; omitted older samples are reported. Each payload is limited to 64 KiB for numeric parsing. Invalid/missing values break their whole aggregation bucket conservatively, so a sparse invalid sample can suppress nearby connecting lines. Closing the plot or hiding Logging stops polling. Plot configuration remains when switching tabs.
 
 Numeric JSON fields use JSON Pointer paths, including arrays and escaped keys. Numbers use JavaScript floating-point precision; original payload bytes remain unchanged. Plotting currently uses receive timestamps and a shared Y scale. Payload timestamps, independent axes and adaptive point budgets based on exact chart width remain follow-up work. The original acceptance targets below also include that unfinished work.
 
@@ -185,7 +187,7 @@ Suggested commits: `Add tiled workspaces`, `Load panels on demand`, `Decode prot
 
 ## 8. Validation and release gates
 
-Every phase includes targeted regression tests, typecheck/lint/build where relevant, and documentation updates. Current baseline: 141 tests plus a built Electron smoke test with an isolated loopback broker. This is functional coverage, not yet a high-throughput benchmark.
+Every phase includes targeted regression tests, typecheck/lint/build where relevant, and documentation updates. Current baseline: 143 tests plus a built Electron smoke test with an isolated loopback broker. This is functional coverage, not yet a high-throughput benchmark.
 
 - Build a repeatable local-broker load harness: retained floods at 5,000, 20,000 and 50,000 topics; mixed payload sizes; deep/empty topic levels; slow acknowledgements; reconnects; multiple connections; recording and plotting together. Measure main/renderer/worker RSS, queue sizes, storage throughput, UI latency and dropped counts separately.
 - Initial performance targets to validate on the development machine: 50,000-topic discovery, 5,000 small messages/second for 60 seconds, p95 input feedback under 100 ms and disconnect initiation under 500 ms. Record hardware and payload sizes; revise targets with evidence. Acceptance also requires memory to plateau at configured caches and overload to remain explicit. Do not stress-publish to public brokers.

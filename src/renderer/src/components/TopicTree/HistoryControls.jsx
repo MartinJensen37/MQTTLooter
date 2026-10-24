@@ -38,19 +38,10 @@ export default function HistoryControls({
             onChange();
           }}
         >
-          <option value="compact">Compact: 32 MiB / 5,000 nodes</option>
-          <option value="larger">Larger: 64 MiB / 20,000 nodes</option>
+          <option value="compact">Compact</option>
+          <option value="larger">Larger</option>
         </select>
       </label>
-      <p>
-        Per connection, including ancestors. Shared cache:{' '}
-        {(settings.retainedBytes / 1048576).toFixed(1)} / {(settings.maxBytes / 1048576).toFixed(0)}{' '}
-        MiB across all connections.
-      </p>
-      <p>
-        Selected and pinned paths stay available. Old messages can expire. Changing the cache
-        applies to all connections and may trim history immediately.
-      </p>
       <button
         className="btn btn-sm btn-secondary"
         disabled={selectedPath == null || (!pinned && pins.length >= settings.maxPinnedTopics)}

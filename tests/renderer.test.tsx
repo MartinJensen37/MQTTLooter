@@ -191,7 +191,8 @@ describe('renderer state', () => {
     expect(savedRecordings).toHaveLength(0);
     await click('Retry storage');
     expect(savedRecordings[0].messages[0].message).toBe('keep me');
-    expect(container.textContent).toContain('stored on disk');
+    expect(container.querySelector('.recording-storage-status')).toBeNull();
+    expect(container.textContent).not.toContain('Disk full');
   });
 
   it('preserves saved profiles on mount and refresh in StrictMode', async () => {

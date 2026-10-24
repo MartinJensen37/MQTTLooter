@@ -26,7 +26,6 @@
 }
 .message-history-toolbar,
 .message-history-catalog,
-.message-storage-caption,
 .message-storage-settings {
   font-size: 12px;
 }
@@ -39,10 +38,6 @@
   min-width: 160px;
   max-width: 100%;
 }
-.message-history-catalog > span {
-  flex-basis: 100%;
-  color: var(--text-muted);
-}
 .message-storage-settings summary {
   cursor: pointer;
   color: var(--text-muted);
@@ -51,15 +46,6 @@
   flex-basis: 100%;
   max-height: 160px;
   overflow-y: auto;
-}
-.message-storage-settings p {
-  margin: 6px 0;
-  color: var(--text-muted);
-}
-.message-storage-caption {
-  margin: 0;
-  padding: 6px 12px;
-  color: var(--text-muted);
 }
 .message-storage-notice {
   margin: 0;

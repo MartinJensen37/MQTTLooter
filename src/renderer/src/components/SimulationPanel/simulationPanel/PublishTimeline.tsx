@@ -29,11 +29,7 @@ export default function PublishTimeline({ device }: { device: SimulatedDevice })
         (device.publishMode === 'signals' ? (
           <Timeline device={device} />
         ) : (
-          <p>
-            Combined mode sends one device message after each completed publish plus{' '}
-            {seconds(device.publishInterval)}. Broker acknowledgement time determines the spacing;
-            signal schedules do not apply. Switch to one topic per signal for a planned timeline.
-          </p>
+          <p>Choose one topic per signal to view the publish timeline.</p>
         ))}
     </section>
   );
@@ -281,26 +277,6 @@ function Timeline({ device }: { device: SimulatedDevice }) {
               excluded from this preview and its aggregate.
             </p>
           )}
-          <p className="simulation-help">
-            Ticks are opportunities; bands show estimated chance of at least one send per bin.
-            Darker means more likely. Nonzero chances have a visibility floor; use the numeric
-            labels for exact likelihood. Dashed ticks mean 0%. No probability tail is hidden by a 1%
-            cutoff.
-          </p>
-          <details>
-            <summary>Assumptions and estimate accuracy</summary>
-            <p>
-              Random timing uses {TIMELINE_LIMITS.trials} repeatable sampled schedules, independent
-              of the live simulator. Send probability is calculated analytically within each sampled
-              schedule. Per-bin sampling uncertainty is up to about ±4.4 percentage points at 95%
-              confidence; this is not a delivery prediction. Delays follow the scheduler's 100 ms
-              minimum and integer-millisecond timer rounding. Fixed rows are exact under those
-              assumptions. Late/busy ticks, network failures, manual publishes and edits during a
-              run are not predicted. A 99% first-send time assumes independent decisions and is
-              shown only for fixed timing. The 60-second maximum horizon is the display bound;
-              longer waits are described, not drawn.
-            </p>
-          </details>
         </>
       )}
     </>

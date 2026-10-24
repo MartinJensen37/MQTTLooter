@@ -395,25 +395,25 @@ function RecordingPanel({
         </div>
       </div>
 
-      <div className="recording-storage-status" role={status === 'error' ? 'alert' : 'status'}>
-        {status === 'loading' && 'Loading saved recordings...'}
-        {status === 'saving' && 'Saving recordings to disk...'}
-        {status === 'saved' && 'Saved recordings are stored on disk.'}
-        {status === 'error' && (
-          <>
-            <span>
-              Recordings could not be {ready ? 'saved' : 'loaded'}: {storageError}.{' '}
-              {ready
-                ? 'Unsaved changes remain in memory; retry or export recordings before closing.'
-                : 'Existing storage has been kept.'}
-            </span>
-            <button className="btn btn-sm" onClick={retry}>
-              Retry storage
-            </button>
-          </>
-        )}
-        {isRecording && <span> The active capture is saved when stopped.</span>}
-      </div>
+      {status !== 'saved' && (
+        <div className="recording-storage-status" role={status === 'error' ? 'alert' : 'status'}>
+          {status === 'loading' && 'Loading saved recordings...'}
+          {status === 'saving' && 'Saving recordings to disk...'}
+          {status === 'error' && (
+            <>
+              <span>
+                Recordings could not be {ready ? 'saved' : 'loaded'}: {storageError}.{' '}
+                {ready
+                  ? 'Unsaved changes remain in memory; retry or export recordings before closing.'
+                  : 'Existing storage has been kept.'}
+              </span>
+              <button className="btn btn-sm" onClick={retry}>
+                Retry storage
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       <RecordingControls
         storageReady={ready}

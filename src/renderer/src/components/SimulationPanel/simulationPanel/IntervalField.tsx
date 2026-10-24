@@ -47,9 +47,6 @@ export default function IntervalField({
           onChange={(event) => onChange(event.target.valueAsNumber)}
         />
       </div>
-      <small className="field-hint">
-        100 ms to 24 hours. Enter an exact value or drag to adjust.
-      </small>
     </div>
   );
 }

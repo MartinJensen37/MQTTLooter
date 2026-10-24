@@ -24,9 +24,8 @@ export default function HistorySearch({
   const [mode, setMode] = useState<'text' | 'hex'>('text');
   const [windowMs, setWindowMs] = useState(86400000);
   const [page, setPage] = useState<HistorySearchPage>();
-  const [query, setQuery] = useState<HistorySearchQuery>();
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('Enter a literal payload search.');
+  const [status, setStatus] = useState('Enter text or hex bytes to search.');
   const [error, setError] = useState('');
   const [stats, setStats] = useState({ scanned: 0, large: 0, binary: 0 });
   const generation = useRef(0);
@@ -37,7 +36,7 @@ export default function HistorySearch({
   const cancel = useCallback(() => {
     invalidate();
     setBusy(false);
-    setStatus('Search stopped. You can continue from the last completed chunk.');
+    setStatus('Search stopped.');
   }, [invalidate]);
   useEffect(() => {
     if (!active) cancel();
@@ -48,7 +47,6 @@ export default function HistorySearch({
     next.current = undefined;
     setBusy(false);
     setPage(undefined);
-    setQuery(undefined);
     setError('');
     setStats({ scanned: 0, large: 0, binary: 0 });
     setStatus('Search settings changed. Start a new search.');
@@ -67,7 +65,6 @@ export default function HistorySearch({
     setStatus('Searching retained history…');
     if (fresh) {
       setStats({ scanned: 0, large: 0, binary: 0 });
-      setQuery(initial);
     }
     next.current = initial;
     let cursor = initial;
@@ -201,13 +198,7 @@ export default function HistorySearch({
         </form>
         <p role="status">
           {status} {stats.scanned.toLocaleString()} records scanned; {page?.messages.length ?? 0}{' '}
-          matches on this page.
-        </p>
-        <p>
-          Exact topic: <strong>{topic}</strong> ·{' '}
-          {query
-            ? `${new Date(query.from).toLocaleString()} – ${new Date(query.to).toLocaleString()}. New messages require a new search.`
-            : 'Retained disk history.'}
+          matches.
         </p>
         {!!stats.large && (
           <p role="status">
@@ -222,20 +213,6 @@ export default function HistorySearch({
           </p>
         )}
         {error && <p role="alert">{error}</p>}
-        <details>
-          <summary>Search scope and limits</summary>
-          <p>
-            Searches the exact selected topic in retained disk history, including records outside
-            the current page and live cache. Text matching is literal and case sensitive, without
-            regular expressions or JSON formatting. Hex matching searches raw bytes in any payload.
-            Stop pauses scanning; Continue resumes from the last completed step. A result page
-            contains up to 100 matches / 1 MiB estimated. Payloads above 256 KiB or records above 1
-            MiB estimated are skipped and counted. Continue searches older records in the same
-            snapshot. Retention can remove records during a search. Sorting, copying and export
-            apply only to displayed matches. Clear topic history removes all stored and cached
-            messages for this topic, including unmatched records.
-          </p>
-        </details>
       </div>
       <MessagePanel
         connectionName={panelProps.connectionName}

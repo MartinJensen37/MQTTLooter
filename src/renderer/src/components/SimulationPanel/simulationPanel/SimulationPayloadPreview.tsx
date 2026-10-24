@@ -50,8 +50,7 @@ export default function SimulationPayloadPreview({
         </button>
       </div>
       <p>
-        {size.toLocaleString()} UTF-8 bytes{size === 0 ? ' (empty payload)' : ''}. Text and hex
-        previews show up to 4,096 bytes; copy includes the full payload.
+        {size.toLocaleString()} UTF-8 bytes{size === 0 ? ' (empty payload)' : ''}
       </p>
       {pretty?.notice && <p>{pretty.notice}</p>}
       <pre tabIndex={0}>{text}</pre>

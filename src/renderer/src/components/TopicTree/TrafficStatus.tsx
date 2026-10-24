@@ -29,8 +29,7 @@ export default function TrafficStatus({ connectionId }: { connectionId: string }
     <>
       {counts.dropped > 0 && (
         <p className="history-limit-notice" role="status">
-          Delivery gap: {counts.dropped.toLocaleString()} messages dropped or unconfirmed after
-          reload. Browsing history and recordings may be incomplete.
+          Delivery gap: {counts.dropped.toLocaleString()} messages dropped or unconfirmed.
         </p>
       )}
       <details className="topic-history-controls topic-traffic-status">
@@ -38,15 +37,6 @@ export default function TrafficStatus({ connectionId }: { connectionId: string }
         <p>
           {counts.received.toLocaleString()} received · {counts.processed.toLocaleString()}{' '}
           processed · {counts.dropped.toLocaleString()} dropped/unconfirmed
-        </p>
-        <p>
-          Shared queue: {status.pendingMessages + status.inFlightMessages} / {status.maxMessages}{' '}
-          messages · {((status.pendingBytes + status.inFlightBytes) / 1048576).toFixed(1)} /{' '}
-          {(status.maxBytes / 1048576).toFixed(0)} MiB estimated.
-        </p>
-        <p>
-          Counts cover this app run. Processed means delivered to the UI, not saved to disk. Old
-          cached messages may expire separately.
         </p>
       </details>
     </>

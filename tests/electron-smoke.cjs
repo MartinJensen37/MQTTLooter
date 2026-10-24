@@ -673,6 +673,29 @@ async function run() {
     path.join(workspace, '.tmp', 'electron-plots.png'),
     (await window.webContents.capturePage()).toPNG(),
   );
+  window.setSize(800, 600);
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  const plotLayout = await evaluate(`(() => {
+    const plot = document.querySelector('.incoming-plot');
+    return { height: plot.clientHeight, width: plot.clientWidth, scroll: plot.scrollWidth };
+  })()`);
+  assert.ok(
+    plotLayout.height > 100 && plotLayout.scroll <= plotLayout.width + 2,
+    JSON.stringify(plotLayout),
+  );
+  fs.writeFileSync(
+    path.join(workspace, '.tmp', 'electron-plots-small.png'),
+    (await window.webContents.capturePage()).toPNG(),
+  );
+  window.setSize(1400, 900);
+  await field('[aria-label="Message display"]', 'cards');
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelectorAll('.message-item').length > 0 && !document.querySelector('.incoming-plot')",
+      ),
+    'return from plot to messages',
+  );
   await require('./electron-reload.cjs')({
     window,
     evaluate,

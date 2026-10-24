@@ -87,10 +87,6 @@ export default function PublishPropertiesEditor({
               </select>
             </label>
           </div>
-          <p>
-            Expiry 0 means immediate expiry; blank omits expiry. Payload format describes the bytes
-            and does not convert them.
-          </p>
           <label className="publish-properties-enable">
             <input
               type="checkbox"
@@ -126,17 +122,10 @@ export default function PublishPropertiesEditor({
                   onChange={(event) => change({ correlation: event.target.value })}
                 />
               </label>
-              <p>
-                Enabled with a blank value sends an empty binary field. The encoding selector
-                changes how the entered text is interpreted.
-              </p>
             </div>
           )}
           <div className="publish-user-properties">
-            <p>
-              User properties ({draft.users.length}/64). Repeated names are grouped together when
-              sent.
-            </p>
+            <p>User properties ({draft.users.length})</p>
             {draft.users.length > 64 && (
               <p>
                 Only the first 64 saved pairs are displayed. Clear user properties to reset this
@@ -191,7 +180,7 @@ export default function PublishPropertiesEditor({
             >
               Add user property
             </button>
-            {!!draft.users.length && (
+            {draft.users.length > 1 && (
               <button
                 className="btn btn-sm btn-secondary"
                 type="button"
@@ -201,10 +190,6 @@ export default function PublishPropertiesEditor({
               </button>
             )}
           </div>
-          <p>
-            Properties are limited to 64 KiB per publish. Topic aliases and subscription identifiers
-            are not sent by this editor.
-          </p>
         </fieldset>
       </details>
       {error && (

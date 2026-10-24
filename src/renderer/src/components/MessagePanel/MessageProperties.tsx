@@ -53,12 +53,7 @@ function PropertyDetails({ properties }: { properties: Record<string, unknown> }
         </div>
       )}
       {!rows.length && !hasCorrelation && <p>No publish properties were received.</p>}
-      {truncated && (
-        <p>
-          Property preview is limited to 64 rows, 1,024 characters per value and 128 per label. Copy
-          or export includes complete properties.
-        </p>
-      )}
+      {truncated && <p>Preview shortened. Copy includes complete properties.</p>}
       <button
         className="btn btn-sm btn-secondary"
         onClick={() => void copy(serializeProperties(properties) ?? '{}')}

@@ -17,7 +17,9 @@ module.exports = async function checkNavigation({ evaluate, waitFor, field, send
       "document.querySelector('.topic-tree-empty').textContent.includes('No topics match')",
     ),
   );
-  await evaluate('document.querySelector(\'[aria-label="Clear topic search"]\').click()');
+  await evaluate(
+    "document.querySelector('[aria-label=\"Search topics\"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true}))",
+  );
   assert.equal(
     await evaluate('!!document.querySelector(\'.topic-tree-node[title="a//b"]\')'),
     false,
@@ -179,5 +181,7 @@ module.exports = async function checkNavigation({ evaluate, waitFor, field, send
   assert.equal(await evaluate("localStorage.getItem('mqtt-history-profile')"), 'compact');
   await field('[aria-label="History cache"]', 'larger');
   await evaluate("document.querySelector('.topic-history-controls').open = false");
-  await evaluate('document.querySelector(\'[aria-label="Clear topic search"]\').click()');
+  await evaluate(
+    "document.querySelector('[aria-label=\"Search topics\"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true}))",
+  );
 };

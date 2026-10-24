@@ -263,13 +263,7 @@ export default function EditOutputModal({
             />{' '}
             Include timestamp
           </label>
-          {mode === 'raw' && (
-            <p className="simulation-help">
-              Publishes the generated value as UTF-8 text, without quotes around strings or added
-              units, timestamps or newlines. Numbers use the selected decimal rounding, without
-              fixed-width trailing zeroes. Empty retained values remove the retained message.
-            </p>
-          )}
+
           {!!errors.length && (
             <ul role="alert">
               {errors.map((error, i) => (
@@ -288,10 +282,6 @@ export default function EditOutputModal({
                 {device.publishMode === 'signals' ? signalTopic(device, form) : device.topic}
               </code>
             )}
-            <p>
-              Independent preview, sampled twice per second. A new loop starts each signal from its
-              beginning.
-            </p>
             {preview === null ? (
               <pre>{previewError || 'Enter valid settings to preview.'}</pre>
             ) : (
@@ -301,9 +291,6 @@ export default function EditOutputModal({
           {lastPublished && (
             <details className="last-published">
               <summary>Last successful publish</summary>
-              <p className="simulation-help">
-                Last accepted publish containing this signal; may reflect earlier settings.
-              </p>
               <code className="preview-topic">{lastPublished.topic}</code>
               <SimulationPayloadPreview
                 key={lastPublished.payloadMode ?? 'json'}

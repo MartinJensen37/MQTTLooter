@@ -162,12 +162,6 @@ export default function DynamicConfigFields({
           </label>
         );
       })}
-      {generator === 'counter' && (
-        <p>Advances once per successful publish and stops at the configured bound.</p>
-      )}
-      {generator === 'walk' && (
-        <p>Each sample moves randomly by at most the step size, staying within the bounds.</p>
-      )}
     </div>
   );
 }

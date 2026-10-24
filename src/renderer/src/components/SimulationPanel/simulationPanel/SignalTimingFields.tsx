@@ -1,5 +1,4 @@
 import type { DeviceOutput, SimulatedDevice } from './types';
-import { signalTopic } from './model';
 import IntervalField from './IntervalField';
 
 export default function SignalTimingFields({
@@ -32,9 +31,6 @@ export default function SignalTimingFields({
           placeholder={`${device.topic}/${output.name.trim()}`}
           onChange={(event) => onChange({ topic: event.target.value })}
         />
-        <small className="field-hint">
-          Blank uses the device prefix and signal name. Publishes to: {signalTopic(device, output)}
-        </small>
       </label>
       <div className="signal-parameters">
         <label>
@@ -102,16 +98,6 @@ export default function SignalTimingFields({
           onChange={(intervalMs) => setTiming({ intervalMs })}
         />
       )}
-      <p className="simulation-help">
-        {timing.mode === 'sync'
-          ? `Shares the device's ${device.publishInterval} ms clock.`
-          : timing.mode === 'fixed'
-            ? 'Keeps a fixed period on the device clock.'
-            : 'Chooses a new interval within the variation range, with a minimum of 100 ms.'}{' '}
-        Offset delays the first tick and shifts fixed schedules. Probability is checked at each
-        tick: 100% always sends, 0% never sends. Publish Once sends every signal regardless of its
-        schedule.
-      </p>
     </fieldset>
   );
 }

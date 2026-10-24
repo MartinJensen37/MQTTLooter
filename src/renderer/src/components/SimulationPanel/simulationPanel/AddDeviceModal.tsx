@@ -81,7 +81,6 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }: Props) {
             {presetOutputs(preset)
               .map((output) => output.name)
               .join(', ')}
-            . You can edit them after creating the device.
           </p>
           <div className="form-group">
             <label htmlFor="sim-device-name">Device Name:</label>
@@ -109,11 +108,6 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }: Props) {
               required
             />
           </div>
-
-          <p className="simulation-help">
-            Each signal publishes to its own topic, such as sensors/room/temperature. You can
-            override topics individually.
-          </p>
           <IntervalField value={interval} onChange={setInterval} />
           {!!deviceName && !!deviceTopic && !!errors.length && <p role="alert">{errors[0]}</p>}
           <div className="form-actions">

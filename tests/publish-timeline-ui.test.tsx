@@ -118,12 +118,12 @@ it('virtualizes large signal lists and explicitly scopes the aggregate', async (
   expect(container.textContent).toContain('Signal 100');
 });
 
-it('explains combined timing and rejects invalid numeric edits without starting a worker', async () => {
+it('requires individual signal mode and rejects invalid timing without starting a worker', async () => {
   await act(async () =>
     root.render(<PublishTimeline device={{ ...device, publishMode: 'combined' }} />),
   );
   await open();
-  expect(container.textContent).toContain('acknowledgement time');
+  expect(container.textContent).toContain('Choose one topic per signal');
   expect(workers).toHaveLength(0);
   await act(async () =>
     root.render(

@@ -20,6 +20,7 @@ export default function LinePlot({
   label,
   compact = false,
   stepped = false,
+  plotHeight = 152,
   formatX,
   onInspect,
 }: {
@@ -31,15 +32,16 @@ export default function LinePlot({
   label: string;
   compact?: boolean;
   stepped?: boolean;
+  plotHeight?: number;
   formatX?: (value: number) => string;
   onInspect?: (fraction: number) => void;
 }) {
   const width = compact ? 100 : 680;
-  const height = compact ? 24 : 152;
+  const height = compact ? 24 : plotHeight;
   const left = compact ? 2 : 72;
   const right = width - (compact ? 2 : 18);
   const top = compact ? 3 : 12;
-  const bottom = compact ? 21 : 118;
+  const bottom = compact ? 21 : height - 34;
   // Scale before subtraction so finite values near +/- Number.MAX_VALUE stay drawable.
   const scale = Math.max(Math.abs(min), Math.abs(max), 1);
   const range = max / scale - min / scale;

@@ -134,17 +134,6 @@ export default function DeviceConfigPanel({
           value={device.publishInterval}
           onChange={(publishInterval) => onUpdateDevice(device.id, { publishInterval })}
         />
-        <p className="simulation-help">
-          {separate
-            ? 'Each signal has its own topic and schedule. Edit a signal to override its payload format, offset, period, interval variation or publish probability.'
-            : 'Compatibility mode: all signals share one topic and publish together. Stop the loop to switch to individual signal topics.'}
-        </p>
-        {device.payloadMode === 'raw' && (
-          <p className="simulation-help">
-            Raw values contain no JSON wrapper, unit, timestamp or added newline. Combined raw mode
-            requires one signal. An empty retained raw value removes the retained message.
-          </p>
-        )}
       </fieldset>
       <div className="publishing-buttons">
         <button
@@ -162,11 +151,6 @@ export default function DeviceConfigPanel({
           Publish Once
         </button>
       </div>
-      <p className="simulation-help">
-        {separate
-          ? 'Signals share a clock, with at most one pending publish per signal. Busy ticks are skipped without a catch-up burst. Publish Once sends every signal.'
-          : 'One publish at a time per device. The interval starts after each publish completes; slow brokers do not build a queue.'}
-      </p>
       {!isConnected && (
         <p role="status">Connect to publish. Signals can still be configured and previewed.</p>
       )}
