@@ -15,6 +15,7 @@ const messageDelivery = new MessageDelivery((batch) => {
     mainWindow.webContents.send('mqtt-message-batch', batch);
   } else messageDelivery.reset();
 });
+messageDelivery.pause();
 const recordingStore = new RecordingStore(join(app.getPath('userData'), 'recordings.json'));
 // One main process owns the library; renderer revisions prevent stale snapshots within it.
 const primaryInstance = app.requestSingleInstanceLock();
@@ -92,11 +93,11 @@ function createWindow() {
     (_webContents, _permission, callback) => callback(false),
   );
   mainWindow.webContents.on('render-process-gone', () => {
-    messageDelivery.reset();
+    messageDelivery.pause();
     void mqttManager.disconnectAll();
   });
   mainWindow.webContents.on('did-start-navigation', (_event, _url, inPlace, isMainFrame) => {
-    if (isMainFrame && !inPlace) messageDelivery.reset();
+    if (isMainFrame && !inPlace) messageDelivery.pause();
   });
 
   // electron-vite injects ELECTRON_RENDERER_URL for the dev server; otherwise load the build.
@@ -116,7 +117,7 @@ function createWindow() {
   });
 
   mainWindow.on('closed', () => {
-    messageDelivery.reset();
+    messageDelivery.pause();
     mqttManager.disconnectAll();
     mainWindow = null;
   });
@@ -161,6 +162,10 @@ function handleIPC(channel: string, handler: (...args: any[]) => any) {
   });
 }
 
+handleIPC('mqtt-renderer-ready', () => {
+  messageDelivery.resume();
+  return { success: true };
+});
 handleIPC('mqtt-ack-batch', (_event, batchId) => {
   if (Number.isSafeInteger(batchId)) messageDelivery.acknowledge(batchId);
   return { success: true };

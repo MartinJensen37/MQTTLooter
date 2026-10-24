@@ -18,7 +18,7 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
   const [isLoading, setIsLoading] = useState(true);
 
   const scrollRef = useRef(null);
-  const pendingRaf = useRef(null);
+  const pendingRefresh = useRef(null);
 
   const loadNodes = useCallback(() => {
     try {
@@ -33,11 +33,12 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
   }, [connectionId, topicTreeService]);
 
   const scheduleLoad = useCallback(() => {
-    if (pendingRaf.current) return;
-    pendingRaf.current = requestAnimationFrame(() => {
-      pendingRaf.current = null;
+    // Data refresh must also run when Chromium suspends animation frames.
+    if (pendingRefresh.current !== null) return;
+    pendingRefresh.current = setTimeout(() => {
+      pendingRefresh.current = null;
       loadNodes();
-    });
+    }, 0);
   }, [loadNodes]);
 
   useEffect(() => {
@@ -84,9 +85,9 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
     topicTreeService.on('ratesUpdated', handleRatesUpdated);
 
     return () => {
-      if (pendingRaf.current) {
-        cancelAnimationFrame(pendingRaf.current);
-        pendingRaf.current = null;
+      if (pendingRefresh.current) {
+        clearTimeout(pendingRefresh.current);
+        pendingRefresh.current = null;
       }
       topicTreeService.off('historySettingsChanged', scheduleLoad);
       topicTreeService.off('treeUpdated', handleTreeUpdated);

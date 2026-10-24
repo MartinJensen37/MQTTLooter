@@ -41,6 +41,7 @@ const broker = net.createServer((socket) => {
   socket.on('close', () => sockets.delete(socket));
   socket.on('error', () => {});
   const parser = codec.parser();
+  const subscriptions = new Set();
   let protocolVersion = 4;
   const send = (packet) => socket.write(codec.generate(packet, { protocolVersion }));
   parser.on('packet', (packet) => {
@@ -48,6 +49,7 @@ const broker = net.createServer((socket) => {
       protocolVersion = packet.protocolVersion;
       send({ cmd: 'connack', sessionPresent: false, returnCode: 0, reasonCode: 0 });
     } else if (packet.cmd === 'subscribe') {
+      packet.subscriptions.forEach(({ topic }) => subscriptions.add(topic));
       send({
         cmd: 'suback',
         messageId: packet.messageId,
@@ -74,6 +76,15 @@ const broker = net.createServer((socket) => {
       });
     } else if (packet.cmd === 'publish') {
       published.push(packet);
+      if (subscriptions.has('#') && packet.topic.startsWith('smoke/')) {
+        send({
+          cmd: 'publish',
+          topic: packet.topic,
+          payload: packet.payload,
+          qos: 0,
+          retain: false,
+        });
+      }
       if (packet.qos === 1) send({ cmd: 'puback', messageId: packet.messageId });
       if (packet.qos === 2) send({ cmd: 'pubrec', messageId: packet.messageId });
     } else if (packet.cmd === 'pubrel') {
@@ -365,7 +376,7 @@ async function run() {
   const field = async (selector, value) =>
     evaluate(`(() => {
     const element = document.querySelector(${JSON.stringify(selector)});
-    const prototype = element.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+    const prototype = element.tagName === 'SELECT' ? HTMLSelectElement.prototype : element.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(prototype, 'value').set.call(element, ${JSON.stringify(value)});
     element.dispatchEvent(new Event(element.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
   })()`);
@@ -417,6 +428,22 @@ async function run() {
   );
   const beforeTabSwitch = simulationPackets().length;
   await waitFor(() => simulationPackets().length > beforeTabSwitch, 'loop survives tab switch');
+  await field('[aria-label="Search topics"]', 'smoke/device/cycles');
+  await waitFor(
+    () => evaluate('!!document.querySelector(\'.topic-tree-node[title="smoke/device/cycles"]\')'),
+    'simulator messages return through topic tree',
+  );
+  await evaluate(
+    'document.querySelector(\'.topic-tree-node[title="smoke/device/cycles"]\').click()',
+  );
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.message-item')?.textContent.includes('smoke/device/cycles')",
+      ),
+    'simulator topic can be selected',
+  );
+  await field('[aria-label="Search topics"]', '');
   await evaluate(
     "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', bubbles: true }))",
   );
@@ -525,6 +552,59 @@ async function run() {
     'individual signal topic',
   );
   assert.ok(published.some((packet) => packet.topic === 'smoke/device/state'));
+  await evaluate('document.querySelector(\'[aria-label="Edit speed"]\').click()');
+  await field('.signal-dialog select', 'string');
+  await field('[aria-label="Signal payload format"]', 'raw');
+  const rawPayload = '  caf\u00e9 \ud83c\udf21\ufe0f\nnext';
+  await field('.signal-dialog textarea', rawPayload);
+  await waitFor(
+    () =>
+      evaluate(
+        `document.querySelector('.preview-section pre')?.textContent === ${JSON.stringify(rawPayload)}`,
+      ),
+    'raw scalar preview',
+  );
+  window.setSize(800, 600);
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  await evaluate("document.querySelector('.preview-section').scrollIntoView({block:'center'})");
+  const rawLayout = await evaluate(
+    "(() => { const element=document.querySelector('.simulation-payload-preview'); return {width:element.clientWidth,scroll:element.scrollWidth}; })()",
+  );
+  assert.ok(
+    rawLayout.width > 250 && rawLayout.scroll <= rawLayout.width + 1,
+    JSON.stringify(rawLayout),
+  );
+  fs.writeFileSync(
+    path.join(workspace, '.tmp', 'electron-raw-preview.png'),
+    (await window.webContents.capturePage()).toPNG(),
+  );
+  await clickButton('.signal-dialog', 'Save Signal');
+  window.setSize(1400, 900);
+  const rawStart = published.length;
+  await clickButton('.simulation-panel', 'Publish Once');
+  await waitFor(
+    () => published.slice(rawStart).some((packet) => packet.topic === 'smoke/custom-speed'),
+    'raw scalar publish',
+  );
+  const rawPacket = published
+    .slice(rawStart)
+    .find((packet) => packet.topic === 'smoke/custom-speed');
+  assert.deepEqual(rawPacket.payload, Buffer.from(rawPayload, 'utf8'));
+  const rawSaved = await evaluate(
+    "JSON.parse(localStorage.getItem('mqtt-simulation-devices-smoke'))[0]",
+  );
+  assert.equal(rawSaved.schemaVersion, 1);
+  assert.equal(rawSaved.outputs[0].payloadMode, 'raw');
+  await evaluate('document.querySelector(\'[aria-label="Edit speed"]\').click()');
+  await waitFor(
+    () =>
+      evaluate(
+        `document.querySelector('.last-published pre')?.textContent === ${JSON.stringify(rawPayload)}`,
+      ),
+    'raw last publication',
+  );
+  await clickButton('.signal-dialog', 'Cancel');
+
   await require('./electron-navigation.cjs')({
     evaluate,
     waitFor,
@@ -593,6 +673,20 @@ async function run() {
     path.join(workspace, '.tmp', 'electron-plots.png'),
     (await window.webContents.capturePage()).toPNG(),
   );
+  await require('./electron-reload.cjs')({
+    window,
+    evaluate,
+    waitFor,
+    send: (topic, payload) => {
+      for (const socket of sockets)
+        socket.write(
+          codec.generate(
+            { cmd: 'publish', topic, payload, qos: 0, retain: false },
+            { protocolVersion: 5 },
+          ),
+        );
+    },
+  });
   assert.deepEqual(errors, []);
   console.log(
     'Electron smoke passed: MQTT 5, binary payloads, recording recovery, simulator/QoS 1+2, topic search, anchored scrolling, responsive layout and sandbox.',

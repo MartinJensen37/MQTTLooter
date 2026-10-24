@@ -139,3 +139,29 @@ it('lets control tasks run between renderer slices and only acknowledges complet
   expect(received).toEqual(Array.from({ length: 128 }, (_, i) => i));
   expect(ack).toHaveBeenCalledExactlyOnceWith(7);
 });
+
+it('holds bounded traffic during renderer startup and resumes after listener readiness', async () => {
+  const send = vi.fn();
+  const delivery = new MessageDelivery(send, { ...DELIVERY_LIMITS, maxMessages: 3 });
+  delivery.enqueue(message(1));
+  await vi.runAllTimersAsync();
+  const oldBatchId = send.mock.calls[0][0].batchId;
+  delivery.pause();
+  for (let i = 2; i <= 5; i++) delivery.enqueue(message(i));
+  await vi.runAllTimersAsync();
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(delivery.status()).toMatchObject({
+    pendingMessages: 3,
+    inFlightMessages: 0,
+    connections: { a: { received: 5, processed: 0, dropped: 2 } },
+  });
+  delivery.resume();
+  delivery.resume(); // Duplicate readiness must not reset an active stream.
+  await vi.runAllTimersAsync();
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(send.mock.calls[1][0].messages.map((m) => m.sequence)).toEqual([2, 3, 4]);
+  delivery.acknowledge(oldBatchId);
+  expect(delivery.status().inFlightMessages).toBe(3);
+  delivery.acknowledge(send.mock.calls[1][0].batchId);
+  expect(delivery.status().connections.a.processed).toBe(3);
+});

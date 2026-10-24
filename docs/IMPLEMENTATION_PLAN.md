@@ -12,7 +12,7 @@ Phase 5 now includes the planned publish timeline: aligned opportunity ticks, of
 
 | Request | Current status | Remaining work |
 | --- | --- | --- |
-| Stable topic tree and topic search | Virtualized stable ordering, anchored scrolling, search, live selection and eight session pins per connection. | Sustained-load responsiveness and full-process memory measurements. |
+| Stable topic tree and topic search | Virtualized stable ordering, anchored scrolling, search, live selection and eight session pins per connection. Refreshes do not depend on animation frames; renderer readiness gates delivery across reloads. | Sustained-load responsiveness and full-process memory measurements. |
 | Message scrolling and sorting | Anchored live scrolling, stable timestamp ties and fixed disk-history snapshots. | Explicit expired-anchor notices across retention and richer search-page navigation. |
 | Simulator stop on disconnect | Implemented, including manual restart after reconnect/reload. | Keep regression coverage as scheduling and layouts change. |
 | Per-signal destinations and timing | Individual topics, fixed/random periods, offsets, send probability and publish timeline. | Optional actual-event overlays and next-success distribution views. |
@@ -23,7 +23,7 @@ Phase 5 now includes the planned publish timeline: aligned opportunity ticks, of
 | Message-content search | Exact-topic disk search beyond loaded pages, text/hex, fixed time windows and stop/continue. | Cross-topic search, reverse paging, custom times, oversized-payload streaming and full-result export. |
 | Payload inspection | Text/hex, Pretty JSON, resizable inspector, plain log and adaptive previews; byte-preserving copy/export. | On-demand large-payload fetching and streaming exports. |
 | Templates and schemas | Template expansion and basic nested validation implemented; timestamp/UUID placeholders exist. | Full supported JSON Schema dialect, correct typed substitutions, schema-driven construction and simulation fields. |
-| Plain simulator payloads | Not implemented; current payload structures are JSON. | Explicit raw-text/scalar mode and compatible field rules. |
+| Plain simulator payloads | Raw UTF-8 scalar output, device defaults/per-signal overrides, exact text/hex previews and versioned legacy migration. | Composable typed fields and schema-driven payload construction. |
 | MQTT 5 properties | Live/disk inspection and exports preserve metadata. Publisher supports response topic, correlation bytes, content type, expiry, payload format and repeated user properties with main-process validation. | Broker-negotiated alias lifecycle and broader real-broker interoperability tests. |
 | Memory and throttling | Acknowledged transport batches, per-connection/shared budgets, protected topic metadata and worker-owned disk history. | Sustained input-latency/RSS benchmarks, durable gap records and streaming recordings. |
 | Recordings in a database | Not implemented. Saved recordings use an atomic JSON disk library. | Streaming capture, durable checkpoints, lazy loading and migration. |
@@ -154,9 +154,11 @@ Suggested commits: `Preview publish schedules`, `Show timing probabilities`.
 
 ## 6. Complete payload construction and publishing
 
+Raw simulator slice (2026-10-24): JSON remains the default, with raw UTF-8 scalar output configurable per device and per individual signal. Combined raw mode requires one signal. Text/hex previews show exact serialization and byte counts, with bounded rendering and full copying; last-published previews retain the original format. Multiline strings, empty strings, Unicode, booleans and rounded numbers are covered. Unversioned devices migrate to per-device schemaVersion 1 while preserving JSON envelopes; unknown versions/formats preserve saved data and report an error. Nested typed builders and standards-compliant schema validation remain open.
+
 Publish-property slice (2026-10-24): the Publishing editor now offers opt-in response topic, content type, expiry, payload format, hex/base64 correlation and repeated user-property fields using shared controls. Properties follow the existing App/MQTTService publish path into main, where shared validation rejects invalid UTF-8 strings, wildcard/empty topics, invalid QoS/retain, unsupported properties, MQTT 3 misuse, malformed binary data and UTF-8 format/payload mismatches. App limits are 64 user pairs and 64 KiB of encoded properties. Correlation stays binary through JSON-safe draft/history storage and conversion to the MQTT client's Buffer.
 
-Properties persist with per-connection drafts and successful publication history, with property-aware deduplication. History reload preserves zero/false/empty fields. Use Selected Topic resets properties rather than replaying received broker metadata; retained-message deletion is always a clean empty retained publish. Oversized saved user-property lists render at most 64 rows and require correction before sending. Narrow publishing layouts now respond to pane width and reduce nested padding. Topic aliases and outbound subscription identifiers are rejected; negotiated alias lifecycle remains open. Other phase-6 work below is still pending except the earlier visibility controls.
+Properties persist with per-connection drafts and successful publication history, with property-aware deduplication. History reload preserves zero/false/empty fields. Use Selected Topic resets properties rather than replaying received broker metadata; retained-message deletion is always a clean empty retained publish. Oversized saved user-property lists render at most 64 rows and require correction before sending. Narrow publishing layouts now respond to pane width and reduce nested padding. Topic aliases and outbound subscription identifiers are rejected; negotiated alias lifecycle remains open. Remaining phase-6 work below is still pending except raw scalar output and the earlier visibility controls.
 
 - Introduce typed field sources shared by publisher and simulator: literal, timestamp, UUID, counter/ramp, step, first-order step response and existing generators. Define reset, time origin and UUID lifetime (per message or stable per device) explicitly. Allow several sources in one nested payload without evaluating arbitrary code.
 - Add raw-text/scalar output with an exact byte preview; JSON-only metadata wrapping must not silently appear in basic mode. Preserve existing saved-device formats through a versioned migration.
@@ -183,7 +185,7 @@ Suggested commits: `Add tiled workspaces`, `Load panels on demand`, `Decode prot
 
 ## 8. Validation and release gates
 
-Every phase includes targeted regression tests, typecheck/lint/build where relevant, and documentation updates. Current baseline: 132 tests plus a built Electron smoke test with an isolated loopback broker. This is functional coverage, not yet a high-throughput benchmark.
+Every phase includes targeted regression tests, typecheck/lint/build where relevant, and documentation updates. Current baseline: 141 tests plus a built Electron smoke test with an isolated loopback broker. This is functional coverage, not yet a high-throughput benchmark.
 
 - Build a repeatable local-broker load harness: retained floods at 5,000, 20,000 and 50,000 topics; mixed payload sizes; deep/empty topic levels; slow acknowledgements; reconnects; multiple connections; recording and plotting together. Measure main/renderer/worker RSS, queue sizes, storage throughput, UI latency and dropped counts separately.
 - Initial performance targets to validate on the development machine: 50,000-topic discovery, 5,000 small messages/second for 60 seconds, p95 input feedback under 100 ms and disconnect initiation under 500 ms. Record hardware and payload sizes; revise targets with evidence. Acceptance also requires memory to plateau at configured caches and overload to remain explicit. Do not stress-publish to public brokers.

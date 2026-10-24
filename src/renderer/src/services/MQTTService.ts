@@ -66,6 +66,10 @@ class MQTTService {
     EVENT_TYPES.forEach((eventType) => {
       window.electronAPI.mqtt.on(eventType, (data) => this.handleEvent(eventType, data));
     });
+    // Let module initialization finish installing tree/recording subscribers first.
+    queueMicrotask(() => {
+      void window.electronAPI.mqtt.rendererReady();
+    });
   }
 
   private handleEvent(eventType: string, data: any): void {

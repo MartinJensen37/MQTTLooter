@@ -70,6 +70,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     publish: (connectionId: string, topic: string, message: unknown, options: unknown) =>
       ipcRenderer.invoke('mqtt-publish', connectionId, topic, message, options),
     acknowledgeBatch: (batchId: number) => ipcRenderer.invoke('mqtt-ack-batch', batchId),
+    rendererReady: () => ipcRenderer.invoke('mqtt-renderer-ready'),
     getTrafficStatus: () => ipcRenderer.invoke('mqtt-traffic-status'),
     getConnections: () => ipcRenderer.invoke('mqtt-get-connections'),
 

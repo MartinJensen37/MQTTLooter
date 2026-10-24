@@ -42,6 +42,13 @@ module.exports = async ({ evaluate, waitFor, published, capture }) => {
   assert.equal(packet.properties.messageExpiryInterval, 0);
   assert.equal(packet.properties.payloadFormatIndicator, false);
   assert.deepEqual(packet.properties.userProperties.repeated, ['first', 'second']);
+  await waitFor(
+    () =>
+      evaluate(
+        "JSON.parse(localStorage.getItem('publish-history-smoke'))?.[0]?.topic === 'smoke/properties'",
+      ),
+    'publish history saved after acknowledgement',
+  );
   const saved = await evaluate("JSON.parse(localStorage.getItem('publish-history-smoke'))[0]");
   assert.deepEqual(saved.properties.correlationData, { encoding: 'base64', data: 'AP+A' });
   const rejected = await evaluate(

@@ -18,6 +18,7 @@ export class MessageDelivery {
   private nextBatchId = 0;
   private ordinal = 0;
   private counts = new Map<string, DeliveryCounts>();
+  private paused = false;
 
   constructor(
     private send: (batch: MessageBatch) => void,
@@ -68,7 +69,7 @@ export class MessageDelivery {
   }
 
   private schedule(): void {
-    if (this.inFlight || this.head === this.queue.length) return;
+    if (this.paused || this.inFlight || this.head === this.queue.length) return;
     const full =
       this.queue.length - this.head >= this.limits.batchMessages ||
       this.bytes >= this.limits.batchBytes;
@@ -85,7 +86,7 @@ export class MessageDelivery {
   }
 
   private flush(): void {
-    if (this.inFlight) return;
+    if (this.paused || this.inFlight) return;
     const firstOrdinal = this.queue[this.head]?.ordinal ?? 0;
     const messages: IncomingPublish[] = [];
     let bytes = 0;
@@ -116,6 +117,17 @@ export class MessageDelivery {
     if (batchId !== this.inFlight?.batch.batchId) return;
     for (const message of this.inFlight.batch.messages) this.counts.get(message.id)!.processed++;
     this.inFlight = null;
+    this.schedule();
+  }
+
+  /** Hold new arrivals within the existing queue budget until listeners are installed. */
+  pause(): void {
+    this.paused = true;
+    this.reset();
+  }
+
+  resume(): void {
+    this.paused = false;
     this.schedule();
   }
 
