@@ -22,7 +22,7 @@ if (!profile) throw new Error(`Unknown LOAD_PROFILE ${profileName}`);
 const TARGETS = { inputP95Ms: 100, disconnectMs: 500 };
 
 const workspace = path.resolve(__dirname, '../..');
-const temporary = path.join(workspace, '.tmp', `load-${process.pid}`);
+const temporary = process.env.LOAD_USER_DATA ?? path.join(workspace, '.tmp', `load-${process.pid}`);
 fs.mkdirSync(temporary, { recursive: true });
 app.setPath('userData', temporary);
 app.disableHardwareAcceleration();
@@ -304,7 +304,11 @@ async function run() {
   const disconnectMs = await disconnect('stream');
   const sent = await streaming;
   const counts = await traffic('stream');
-  const historyAfter = (await evaluate('window.electronAPI.history.status()')).data;
+  let historyAfter;
+  await waitFor(async () => {
+    historyAfter = (await evaluate('window.electronAPI.history.status()')).data;
+    return !historyAfter.delivery.pendingMessages && !historyAfter.delivery.inFlightMessages;
+  }, 'history queue drained');
   const recorded = (await evaluate('window.electronAPI.recordings.list()')).data.find(
     (item) => item.id === recording.data.id,
   );
@@ -316,8 +320,13 @@ async function run() {
     brokerMaxBacklog: sent.maxBacklog,
     disconnectMs: round(disconnectMs),
     ...counts,
+    // Retention expires old rows during long streams; stored + expired counts every write.
     historyStored:
-      (historyAfter.store?.retainedMessages ?? 0) - (historyBefore?.retainedMessages ?? 0),
+      (historyAfter.store?.retainedMessages ?? 0) -
+      (historyBefore?.retainedMessages ?? 0) +
+      (historyAfter.store?.expired ?? 0) -
+      (historyBefore?.expired ?? 0),
+    historyGaps: historyAfter.store?.gaps?.stream?.dropped ?? 0,
     historyError: historyAfter.error ?? null,
     recording: {
       state: recorded.state,
