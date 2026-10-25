@@ -843,6 +843,35 @@ async function run() {
     path.join(workspace, '.tmp', 'electron-inspector.png'),
     (await window.webContents.capturePage()).toPNG(),
   );
+  await require('./electron-decoders.cjs')({
+    evaluate,
+    waitFor,
+    field,
+    userData: temporary,
+    capture: async () => {
+      window.setSize(800, 600);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const layout = await evaluate(`(() => {
+        const dialog = document.querySelector('.decoder-dialog').getBoundingClientRect();
+        return { left: dialog.left, right: dialog.right, width: dialog.width };
+      })()`);
+      assert.ok(layout.left >= 0 && layout.right <= 801, JSON.stringify(layout));
+      fs.writeFileSync(
+        path.join(workspace, '.tmp', 'electron-decoders.png'),
+        (await window.webContents.capturePage()).toPNG(),
+      );
+      window.setSize(1400, 900);
+    },
+    send: (topic, payload) => {
+      for (const socket of sockets)
+        socket.write(
+          codec.generate(
+            { cmd: 'publish', topic, payload, qos: 0, retain: false },
+            { protocolVersion: 5 },
+          ),
+        );
+    },
+  });
   await require('./electron-credentials.cjs')({ evaluate, waitFor, field });
   await require('./electron-plots.cjs')({
     evaluate,
