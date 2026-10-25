@@ -60,6 +60,52 @@ const click = async (text: string) =>
     button.click();
   });
 
+const set = async (label: string, value: string) =>
+  act(async () => {
+    const element = container.querySelector(`[aria-label="${label}"]`) as
+      | HTMLInputElement
+      | HTMLSelectElement;
+    const prototype =
+      element instanceof HTMLSelectElement
+        ? HTMLSelectElement.prototype
+        : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(element, value);
+    element.dispatchEvent(
+      new Event(element instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }),
+    );
+  });
+
+it('searches a custom receive-time range and rejects reversed or expired ranges', async () => {
+  vi.setSystemTime(new Date(2026, 9, 14, 12, 0, 0));
+  search.mockResolvedValue(page());
+  await input('needle');
+  await set('Content search time range', 'custom');
+  // Starts as the last hour, in local time.
+  expect((container.querySelector('[aria-label="Search from"]') as HTMLInputElement).value).toBe(
+    '2026-10-14T11:00',
+  );
+  await set('Search from', '2026-10-14T09:30:00');
+  await set('Search to', '2026-10-14T09:45:30');
+  await click('Search history');
+  expect(search.mock.calls[0][0]).toMatchObject({
+    from: new Date(2026, 9, 14, 9, 30, 0).getTime(),
+    to: new Date(2026, 9, 14, 9, 45, 30).getTime(),
+  });
+
+  await set('Search from', '2026-10-14T10:00:00');
+  await click('Search history');
+  expect(container.querySelector('[role="alert"]')!.textContent).toContain('before the end');
+  await set('Search from', '2026-10-12T08:00:00');
+  await set('Search to', '2026-10-12T09:00:00');
+  await click('Search history');
+  expect(container.querySelector('[role="alert"]')!.textContent).toContain('older than');
+  // A range reaching past retention is trimmed to the retained 24 hours.
+  await set('Search to', '2026-10-14T08:00:00');
+  await click('Search history');
+  expect(search).toHaveBeenCalledTimes(2);
+  expect(search.mock.calls[1][0].from).toBe(Date.now() - 86400000);
+});
+
 it('scans past empty chunks, preserves snapshot cursors and stops at a result page', async () => {
   search
     .mockResolvedValueOnce(page([], 50))

@@ -8,6 +8,27 @@ import {
 import { useDecoders } from '../../services/DecoderRegistry';
 import './HistorySearch.css';
 
+const DAY = 86400000;
+/** A `datetime-local` value (local time, seconds) for a timestamp. */
+const localInput = (ms: number) =>
+  new Date(ms - new Date(ms).getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+
+/** The searched receive-time range, or an error. Disk history keeps 24 hours. */
+function searchRange(
+  windowMs: number | 'custom',
+  custom: { from: string; to: string },
+  now: number,
+): { from: number; to: number } | string {
+  if (windowMs !== 'custom') return { from: now - windowMs, to: now };
+  // Without an offset, datetime-local text parses as local time.
+  const from = new Date(custom.from).getTime();
+  const to = Math.min(new Date(custom.to).getTime(), now);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return 'Enter a start and end time.';
+  if (from >= to) return 'Choose a start time before the end time.';
+  if (to < now - DAY) return 'That range is older than the 24 hours of retained history.';
+  return { from: Math.max(from, now - DAY), to };
+}
+
 export default function HistorySearch({
   connectionId,
   topic,
@@ -24,7 +45,8 @@ export default function HistorySearch({
   const [term, setTerm] = useState('');
   const [mode, setMode] = useState<'text' | 'hex' | 'decoded'>('text');
   const { decoders } = useDecoders();
-  const [windowMs, setWindowMs] = useState(86400000);
+  const [windowMs, setWindowMs] = useState<number | 'custom'>(DAY);
+  const [custom, setCustom] = useState({ from: '', to: '' });
   const [scope, setScope] = useState<'topic' | 'filter'>('topic');
   const [filter, setFilter] = useState('#');
   const [page, setPage] = useState<HistorySearchPage>();
@@ -150,15 +172,15 @@ export default function HistorySearch({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            const to = Date.now();
+            const range = searchRange(windowMs, custom, Date.now());
+            if (typeof range === 'string') return setError(range);
             void scan(
               {
                 connectionId,
                 topic,
                 term,
                 mode,
-                from: to - windowMs,
-                to,
+                ...range,
                 ...(scope === 'filter' && { scope, filter }),
               },
               true,
@@ -235,14 +257,52 @@ export default function HistorySearch({
               value={windowMs}
               onChange={(event) => {
                 reset();
-                setWindowMs(Number(event.target.value));
+                if (event.target.value !== 'custom') return setWindowMs(Number(event.target.value));
+                setWindowMs('custom');
+                // Start from the last hour, unless a custom range was already entered.
+                const now = Date.now();
+                if (!custom.from)
+                  setCustom({ from: localInput(now - 3600000), to: localInput(now) });
               }}
             >
               <option value={300000}>Last 5 minutes</option>
               <option value={3600000}>Last hour</option>
-              <option value={86400000}>Retained 24 hours</option>
+              <option value={DAY}>Retained 24 hours</option>
+              <option value="custom">Custom range</option>
             </select>
           </label>
+          {windowMs === 'custom' && (
+            <>
+              <label>
+                From{' '}
+                <input
+                  className="form-input"
+                  type="datetime-local"
+                  step={1}
+                  aria-label="Search from"
+                  value={custom.from}
+                  onChange={(event) => {
+                    reset();
+                    setCustom({ ...custom, from: event.target.value });
+                  }}
+                />
+              </label>
+              <label>
+                To{' '}
+                <input
+                  className="form-input"
+                  type="datetime-local"
+                  step={1}
+                  aria-label="Search to"
+                  value={custom.to}
+                  onChange={(event) => {
+                    reset();
+                    setCustom({ ...custom, to: event.target.value });
+                  }}
+                />
+              </label>
+            </>
+          )}
           <button
             type="submit"
             className="btn btn-sm btn-primary"
