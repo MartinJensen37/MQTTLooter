@@ -1,4 +1,5 @@
 import { validateJson } from '../../../shared/json-schema';
+import { templateFromSchema } from '../../../shared/schema-template';
 import { expandTemplate } from '../../../shared/template-expansion';
 
 class MessageTemplateService {
@@ -188,8 +189,8 @@ class MessageTemplateService {
     // Generate a flexible default topic - can be easily changed by user
     const topic = `${id}`;
 
-    // Generate empty payload structure from schema
-    const payload = this.generateSampleFromSchema(schema);
+    // Placeholders generate fresh values that satisfy the schema on each Apply.
+    const payload = templateFromSchema(schema);
 
     return {
       id: id,
@@ -398,61 +399,6 @@ class MessageTemplateService {
   // Standards-based JSON Schema validation for the dialect the schema declares.
   validateAgainstSchema(data, schema) {
     return validateJson(data, schema);
-  }
-
-  // Generate sample payload from schema
-  generateSampleFromSchema(schema) {
-    // Handle schema references and metadata
-    let validationSchema = schema;
-    if (schema.$schema || schema.$id || schema.title) {
-      // This is a full JSON Schema document, use it as-is
-      validationSchema = schema;
-    }
-
-    if (!validationSchema || validationSchema.type !== 'object' || !validationSchema.properties) {
-      return '{}';
-    }
-
-    const sample = {};
-
-    for (const [key, propSchema] of Object.entries(validationSchema.properties)) {
-      sample[key] = this.generateSampleValue(propSchema);
-    }
-
-    return JSON.stringify(sample, null, 2);
-  }
-
-  generateSampleValue(schema) {
-    switch (schema.type) {
-      case 'string':
-        if (schema.enum) return schema.enum[0];
-        if (schema.pattern === '^\\d+\\.\\d+\\.\\d+$') return '1.0.0';
-        return 'sample_string';
-
-      case 'number':
-        if (schema.minimum !== undefined && schema.maximum !== undefined) {
-          return Math.round(((schema.minimum + schema.maximum) / 2) * 100) / 100;
-        }
-        return 42.5;
-
-      case 'integer':
-        if (schema.minimum !== undefined && schema.maximum !== undefined) {
-          return Math.round((schema.minimum + schema.maximum) / 2);
-        }
-        return 42;
-
-      case 'boolean':
-        return true;
-
-      case 'array':
-        return [];
-
-      case 'object':
-        return {};
-
-      default:
-        return null;
-    }
   }
 }
 

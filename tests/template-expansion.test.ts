@@ -184,3 +184,27 @@ it('bounds expansion size, variable counts, nesting and placeholder work', () =>
   for (let i = 0; i < 65; i++) value = [value];
   expect(() => expandTemplate({ topic: '', payload: '"{{v}}"' }, { v: value })).toThrow('complex');
 });
+
+it('imports a standalone schema as a template whose applications pass validation', async () => {
+  const service = new MessageTemplateService();
+  const schema = {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    title: 'Pump Reading',
+    type: 'object',
+    required: ['pump', 'flow', 'mode', 'at'],
+    properties: {
+      pump: { type: 'string', format: 'uuid' },
+      flow: { type: 'number', minimum: 0, maximum: 12.5 },
+      mode: { enum: ['auto', 'manual'] },
+      at: { type: 'string', format: 'date-time' },
+    },
+  };
+  const file = { text: async () => JSON.stringify(schema) };
+  await service.importTemplates(file);
+  const template = service.getAllTemplates().find((item) => item.name === 'Pump Reading')!;
+  expect(template.category).toBe('Imported Schemas');
+  for (let run = 0; run < 10; run++) {
+    const { payload } = service.processTemplate(template);
+    expect(service.validatePayload(template.id, payload)).toEqual({ valid: true, errors: [] });
+  }
+});
