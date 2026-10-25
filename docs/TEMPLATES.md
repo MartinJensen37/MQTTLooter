@@ -1,10 +1,12 @@
-# Publishing templates
+# Message schemas
 
-In Publishing, enable **Message Templates** and select a template. Selection fills an editable draft using its variable defaults. Edit the variable fields and choose **Apply template** to rebuild the payload. Applying also refreshes generated values; typing in a field does not replace a draft you may be editing. **Publish** sends the displayed draft without regenerating it.
+A message schema is a JSON Schema with a topic, QoS and retain setting. Its payload template is generated from the schema, so **Fill payload** builds a message that matches it. Two examples are included: **Sensor reading** (`sensors/{{sensorId}}/reading`) and **Device status** (`devices/{{deviceId}}/status`, retained, QoS 1). Unchanged copies of the three earlier examples are replaced by them; edited and custom entries are kept, and a deleted example is not added back.
 
-An empty topic is filled from the template. Further applications update that generated topic until you edit it, load a history entry, or select another topic through auto-load. An existing manually chosen topic is preserved. Template QoS, retain and MQTT 5 properties are applied with the payload; a template without properties clears previous property settings. MQTT 5 properties still require an MQTT 5 connection.
+In Publishing, turn on **Message schemas** and choose a schema. Selection fills an editable draft using its variable defaults. Edit the variable fields and choose **Fill payload** to rebuild the payload. Applying also refreshes generated values; typing in a field does not replace a draft you may be editing. **Publish** sends the displayed draft without regenerating it.
 
-Expansion errors leave the previous draft intact and disable Publish while that template is selected. Correct the variables and apply again, or deselect/hide templates to work directly with the draft. Schema validation is separate from expansion and remains advisory. It uses a standards-based validator for the dialect declared in `$schema` (draft-04, draft-06/07, 2019-09 or 2020-12; 2020-12 when none is declared), including `$ref`/`$defs`, combinators, `const`, `format` and `additionalProperties`. References resolve only within the schema; remote schemas are never fetched. Errors name the failing location as a JSON Pointer, and at most 20 are listed.
+An empty topic is filled from the schema's topic. Further applications update that generated topic until you edit it, load a history entry, or select another topic through auto-load. An existing manually chosen topic is preserved. The schema's QoS, retain and MQTT 5 properties are applied with the payload; one without properties clears previous property settings. MQTT 5 properties still require an MQTT 5 connection.
+
+Expansion errors leave the previous draft intact and disable Publish while that schema is selected. Correct the variables and fill again, or deselect the schema to work directly with the draft. The status below the payload shows **Matches schema** or what differs; it does not block publishing. It uses a standards-based validator for the dialect declared in `$schema` (draft-04, draft-06/07, 2019-09 or 2020-12; 2020-12 when none is declared), including `$ref`/`$defs`, combinators, `const`, `format` and `additionalProperties`. References resolve only within the schema; remote schemas are never fetched. Errors name the failing location as a JSON Pointer, and at most 20 are listed.
 
 ## JSON and raw text
 
@@ -31,7 +33,7 @@ Random functions are sampled per occurrence. Declared variables take precedence 
 
 ## Import example
 
-Save this as a JSON file and use **Import Templates**:
+Save this as a JSON file and use the import button beside the schema menu. Exports use the same format:
 
 ```json
 {
@@ -53,13 +55,13 @@ Save this as a JSON file and use **Import Templates**:
 }
 ```
 
-The library remains compatible with the existing template collection format. Unmodified saved stock Device Status and GPS Location templates gain their missing identifier defaults when loaded. Custom templates remain unchanged. JSON numeric generators now produce numbers instead of numeric strings; use a text variable or surrounding text if a string value is required.
+Entries without a `schema` still work; they fill the payload but cannot check it. JSON numeric generators now produce numbers instead of numeric strings; use a text variable or surrounding text if a string value is required.
 
 Expansion is bounded to 1,048,576 text code units, 128 declared variables and 2,000 placeholder occurrences. Each substituted JSON value is bounded to 10,000 nodes and depth 64. These are editor work limits, not broker payload guarantees. Simulator devices can use the same placeholder syntax for combined payloads; see the simulator guide.
 
 ## Importing a JSON Schema
 
-**Import Templates** also accepts a standalone JSON Schema (a file with `$schema`, `$id`, `title`, or `type` and `properties`). It becomes a template in **Imported Schemas** that keeps the schema for validation. Its payload follows the schema's structure, with placeholders that produce a fresh valid value on each **Apply template**:
+The import button also accepts a standalone JSON Schema (a file with `$schema`, `$id`, `title`, or `type` and `properties`). It becomes a message schema marked **Imported**. Its payload follows the schema's structure, with placeholders that produce a fresh valid value on each **Fill payload**:
 
 | Schema | Generated value |
 | --- | --- |

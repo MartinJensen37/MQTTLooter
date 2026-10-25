@@ -14,16 +14,18 @@ UI cleanup (2026-10-25): Display now switches between message cards, plain log a
 
 User review of the running app. Work through these before the remaining backlog items below.
 
-- [ ] Hide internal connection ids: message cards, the header next to the connection name and the Publishing status.
-- [ ] Publishing payload: one status line, "Valid JSON" with a Format button beside it in the same color.
-- [ ] Dropdowns: one theme for every select, matching the QoS menu (open list, hover and selected rows), and slimmer, about the height of the small toolbar buttons.
-- [ ] Collapsible sections (MQTT 5 publish properties, card properties and similar) use the connection editor's toggle style, like "Enable Last Will Message".
-- [ ] Search fields: one style everywhere (topic tree, stored topics, recordings, plot fields, content search), with a light-gray clear button that shows a pointer.
-- [ ] Hints and placeholders: short, accurate, to the point.
-- [ ] Resize handles: a visible grip on the topic tree divider, the split divider and a new resizable connection sidebar; dragging the sidebar fully in collapses it like the logo button.
-- [ ] Tools > Advanced settings in the app menu: holds rarely changed options (cache size, disk history, delivery details, payload encoding, protobuf decoders). The topic tree loses History & pins and always uses the larger cache unless changed there.
-- [ ] Plot inspection: replace the time slider with a dot and line that follow the pointer, and a card with the sample after a short hover.
-- [ ] Message templates become message schemas, with two clean examples.
+- [x] Hide internal connection ids: message cards, the header next to the connection name and the Publishing status.
+- [x] Publishing payload: one status line, "Valid JSON" with a Format button beside it in the same color.
+- [x] Dropdowns: one theme for every select, matching the QoS menu (open list, hover and selected rows), and slimmer, about the height of the small toolbar buttons. Native selects use Chromium's customizable select, so tests and keyboard behavior are unchanged.
+- [x] Collapsible sections (MQTT 5 publish properties, card properties and similar) use the connection editor's toggle style, like "Enable Last Will Message", through a shared check toggle; cards use a compact variant without the box.
+- [x] Search fields: one style everywhere (topic tree, stored topics, recordings, plot fields, content search), with a light-gray clear button that shows a pointer. The recording topic filter gained a search.
+- [x] Hints and placeholders: short, accurate, to the point.
+- [x] Resize handles: a visible grip on the topic tree divider, the split divider and a new resizable connection sidebar; dragging the sidebar fully in collapses it like the logo button.
+- [x] Tools > Advanced settings in the app menu: holds rarely changed options (cache size, disk history, delivery details, payload encoding, protobuf decoders). The topic tree loses History & pins and uses the larger cache unless changed there; pinning moved to a button in the topic details.
+- [x] Plot inspection: replace the time slider with a dot and line that follow the pointer, and a card with the sample after a short hover.
+- [x] Message templates become message schemas, with two clean examples.
+
+Follow-ups: the simulator's publish timeline still uses an "Inspect bin" slider and could adopt the plot's hover card; the connection editor keeps its own checkbox styles, which could move to the shared toggle.
 
 ## Review findings (2026-10-25)
 
@@ -271,7 +273,6 @@ Done on 2026-10-25, in order: durable recordings, the load harness, credential s
 
 Next, in order:
 
-0. The UI feedback list above.
 1. Installer/upgrade checks and other brokers (Mosquitto checks are in place). The installer changes the system, so it runs only as an agreed release step.
 2. Oversized-payload search and on-demand large payloads.
 3. Cross-recording search.
