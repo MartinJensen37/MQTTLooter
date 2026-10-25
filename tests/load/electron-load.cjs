@@ -135,7 +135,8 @@ function sampler(evaluate, heapUsage) {
         window.electronAPI.history.status(),
         window.electronAPI.recordings.status(),
       ]).then(([traffic, history, recordings]) => ({
-        delivery: traffic.data.pendingMessages + traffic.data.inFlightMessages,
+        delivery:
+          traffic.data.pendingMessages + traffic.data.inFlightMessages + traffic.data.coalescedTopics,
         history: history.data.delivery.pendingMessages + history.data.delivery.inFlightMessages,
         recordings: recordings.data.queuedMessages,
       }))`);
