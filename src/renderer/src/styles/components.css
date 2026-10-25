@@ -256,7 +256,8 @@ select option:hover,
 select option:focus-visible { background: var(--primary-light); color: var(--primary); outline: none; }
 select option:checked { background: var(--primary-light); color: var(--primary); font-weight: 600; }
 select option:disabled { color: var(--text-muted); cursor: default; background: none; }
-select option::checkmark { color: var(--primary); }
+/* The highlight marks the selected row; no tick. */
+select option::checkmark { display: none; }
 
 .form-range {
   appearance: none;
@@ -313,7 +314,6 @@ select option::checkmark { color: var(--primary); }
 }
 .dropdown-option:hover    { background: var(--primary-light); color: var(--primary); }
 .dropdown-option.selected { background: var(--primary-light); color: var(--primary); font-weight: 600; }
-.dropdown-option.selected::before { content: '✓ '; }
 
 /* ── Check toggles: options and optional sections, as in the connection editor ── */
 .check-toggle .check-toggle-label {
