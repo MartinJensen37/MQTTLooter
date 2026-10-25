@@ -60,7 +60,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   decoders: {
     list: () => ipcRenderer.invoke('decoders-list'),
     save: (decoders: unknown[]) => ipcRenderer.invoke('decoders-save', decoders),
-    types: (proto: string) => ipcRenderer.invoke('decoders-types', proto),
+    types: (sources: string[]) => ipcRenderer.invoke('decoders-types', sources),
     decode: (decoderId: string, message: string, encoding: string) =>
       ipcRenderer.invoke('decoders-decode', decoderId, message, encoding),
   },

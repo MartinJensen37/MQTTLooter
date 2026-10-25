@@ -4,12 +4,13 @@ import { DECODER_LIMITS } from '../../../../shared/decoders';
 import { decoderRegistry, useDecoders } from '../../services/DecoderRegistry';
 import './DecoderSettings.css';
 
-/** Protobuf decoders: a `.proto` file and message type applied to an MQTT topic filter. */
+/** Protobuf decoders: `.proto` files and a message type applied to an MQTT topic filter. */
 export default function DecoderSettings({ onClose }: { onClose: () => void }) {
   const { decoders, errors } = useDecoders();
   const [name, setName] = useState('');
   const [topicFilter, setTopicFilter] = useState('#');
-  const [proto, setProto] = useState<{ file: string; text: string } | null>(null);
+  // Every chosen file is compiled together, so files can import each other.
+  const [files, setFiles] = useState<{ name: string; source: string }[]>([]);
   const [types, setTypes] = useState<string[]>([]);
   const [messageType, setMessageType] = useState('');
   const [busy, setBusy] = useState(false);
@@ -31,27 +32,34 @@ export default function DecoderSettings({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const readProto = async (file: File | undefined) => {
+  const readProto = async (chosen: ArrayLike<File> | null | undefined) => {
     setTypes([]);
     setMessageType('');
-    setProto(null);
+    setFiles([]);
     setError('');
-    if (!file) return;
-    if (file.size > DECODER_LIMITS.maxProtoChars) {
-      setError('.proto files must be at most 1 MiB.');
+    const list = Array.from(chosen ?? []);
+    if (!list.length) return;
+    if (list.length > DECODER_LIMITS.maxProtoFiles) {
+      setError('Choose at most 32 .proto files.');
       return;
     }
-    const text = await file.text();
-    const result = await window.electronAPI.decoders.types(text);
+    if (list.some((file) => file.size > DECODER_LIMITS.maxProtoChars)) {
+      setError('.proto files must be at most 1 MiB each.');
+      return;
+    }
+    const read = await Promise.all(
+      list.map(async (file) => ({ name: file.name, source: await file.text() })),
+    );
+    const result = await window.electronAPI.decoders.types(read.map((file) => file.source));
     if (!result.success || !result.data) {
-      setError(`${file.name}: ${result.error}`);
+      setError(result.error ?? 'The .proto files could not be read.');
       return;
     }
     if (!result.data.length) {
-      setError(`${file.name} declares no message types.`);
+      setError('The chosen files declare no message types.');
       return;
     }
-    setProto({ file: file.name, text });
+    setFiles(read);
     setTypes(result.data);
     setMessageType(result.data[0]);
     if (!name) setName(result.data[0].split('.').pop()!);
@@ -59,15 +67,23 @@ export default function DecoderSettings({ onClose }: { onClose: () => void }) {
 
   const filterValid = validTopicFilter(topicFilter);
   const add = async () => {
-    if (!proto || !messageType || !name.trim() || !filterValid) return;
+    if (!files.length || !messageType || !name.trim() || !filterValid) return;
+    const [main, ...imports] = files;
     const added = await save([
       ...decoders,
-      { id: crypto.randomUUID(), name: name.trim(), topicFilter, messageType, proto: proto.text },
+      {
+        id: crypto.randomUUID(),
+        name: name.trim(),
+        topicFilter,
+        messageType,
+        proto: main.source,
+        ...(imports.length && { imports }),
+      },
     ]);
     if (added) {
       setFileInput((value) => value + 1);
       setName('');
-      setProto(null);
+      setFiles([]);
       setTypes([]);
       setMessageType('');
     }
@@ -96,6 +112,13 @@ export default function DecoderSettings({ onClose }: { onClose: () => void }) {
                   <div>
                     <strong>{decoder.name}</strong> <code>{decoder.topicFilter}</code>{' '}
                     <span className="decoder-type">{decoder.messageType}</span>
+                    {decoder.imports?.length ? (
+                      <span className="decoder-type">
+                        {' '}
+                        + {decoder.imports.length} imported file
+                        {decoder.imports.length === 1 ? '' : 's'}
+                      </span>
+                    ) : null}
                     {errors[decoder.id] && <p role="alert">{errors[decoder.id]}</p>}
                   </div>
                   <button
@@ -116,13 +139,14 @@ export default function DecoderSettings({ onClose }: { onClose: () => void }) {
           <fieldset className="decoder-form">
             <legend>Add a protobuf decoder</legend>
             <label>
-              .proto file
+              .proto files (select imported files too)
               <input
                 key={fileInput}
                 type="file"
                 accept=".proto,text/plain"
+                multiple
                 aria-label="Protobuf schema file"
-                onChange={(event) => void readProto(event.target.files?.[0])}
+                onChange={(event) => void readProto(event.target.files)}
               />
             </label>
             <label>
@@ -171,7 +195,7 @@ export default function DecoderSettings({ onClose }: { onClose: () => void }) {
           </button>
           <button
             className="btn btn-md btn-primary"
-            disabled={busy || !proto || !messageType || !name.trim() || !filterValid}
+            disabled={busy || !files.length || !messageType || !name.trim() || !filterValid}
             onClick={() => void add()}
           >
             Add decoder

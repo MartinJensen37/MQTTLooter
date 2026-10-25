@@ -77,7 +77,7 @@ it('shows decoded payloads by default for matching topics and keeps other views'
   expect(container.querySelector('.payload-preview')!.textContent).toBe('plain');
 });
 
-it('adds decoders from a .proto file, reports compile errors and removes decoders', async () => {
+it('adds decoders from .proto files, reports compile errors and removes decoders', async () => {
   saved = [];
   await decoderRegistry.refresh();
   await act(async () => root.render(<DecoderSettings onClose={() => {}} />));
@@ -87,15 +87,17 @@ it('adds decoders from a .proto file, reports compile errors and removes decoder
     )!;
   // jsdom's File has no text(); the dialog only needs these members. The input remounts
   // after each successful add, so attach the file to the current one.
-  const chooseFile = () =>
+  const file = (name: string, text: string) => ({
+    name,
+    size: text.length,
+    text: async () => text,
+  });
+  const chooseFile = (files = [file('demo.proto', 'syntax = "proto3";')]) =>
     act(async () => {
       const input = container.querySelector(
         '[aria-label="Protobuf schema file"]',
       ) as HTMLInputElement;
-      Object.defineProperty(input, 'files', {
-        value: [{ name: 'demo.proto', size: 18, text: async () => 'syntax = "proto3";' }],
-        configurable: true,
-      });
+      Object.defineProperty(input, 'files', { value: files, configurable: true });
       input.dispatchEvent(new Event('change', { bubbles: true }));
     });
   expect(add().disabled).toBe(true);
@@ -109,6 +111,32 @@ it('adds decoders from a .proto file, reports compile errors and removes decoder
   expect(container.querySelector('[aria-label="Saved decoders"]')!.textContent).toContain(
     'demo.Status',
   );
+  expect(add().disabled).toBe(true);
+
+  // Several files compile together; the first is the main file and the rest are its imports.
+  await chooseFile([
+    file('main.proto', 'import "common.proto";'),
+    file('common.proto', 'package c;'),
+  ]);
+  expect(api.types).toHaveBeenLastCalledWith(['import "common.proto";', 'package c;']);
+  await act(async () => add().click());
+  expect(saved[1]).toMatchObject({
+    proto: 'import "common.proto";',
+    imports: [{ name: 'common.proto', source: 'package c;' }],
+  });
+  expect(saved[0]).not.toHaveProperty('imports');
+  expect(container.querySelector('[aria-label="Saved decoders"]')!.textContent).toContain(
+    '+ 1 imported file',
+  );
+  await act(async () =>
+    (
+      container.querySelectorAll('[aria-label="Remove decoder Reading"]')[1] as HTMLButtonElement
+    ).click(),
+  );
+  expect(saved).toHaveLength(1);
+
+  await chooseFile([file('big.proto', 'x'.repeat(1024 * 1024 + 1))]);
+  expect(container.querySelector('[role="alert"]')!.textContent).toContain('1 MiB');
   expect(add().disabled).toBe(true);
 
   await chooseFile();

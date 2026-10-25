@@ -1,9 +1,37 @@
 import protobuf from 'protobufjs';
-import { DECODER_LIMITS, type DecoderDefinition } from '../shared/decoders';
+import { DECODER_LIMITS, decoderSources, type DecoderDefinition } from '../shared/decoders';
 
-/** Message types declared in a `.proto` source, fully qualified. */
-export function protoTypes(proto: string): string[] {
-  const { root } = protobuf.parse(proto, { keepCase: true });
+/**
+ * Compile `.proto` sources into one root, so files can import each other. Google's well-known
+ * types (google/protobuf/*.proto) are built in. Missing imports fail here, naming the type.
+ */
+export function compileProto(sources: string[]): protobuf.Root {
+  const root = new protobuf.Root();
+  const imports = new Set<string>();
+  for (const source of sources)
+    for (const name of protobuf.parse(source, root, { keepCase: true }).imports ?? [])
+      imports.add(name);
+  for (const name of imports) {
+    // Built-in definitions, unless the user supplied their own copy of that file.
+    const nested = protobuf.common.get(name)?.nested as any;
+    const types = Object.keys(nested?.google?.nested?.protobuf?.nested ?? {});
+    if (types.length && types.every((type) => !root.lookup(`google.protobuf.${type}`)))
+      root.addJSON(nested);
+  }
+  try {
+    root.resolveAll();
+  } catch (error) {
+    const declared = [...imports].filter((name) => !name.startsWith('google/protobuf/'));
+    throw new Error(
+      `${(error as Error).message}${declared.length ? `. Select the imported files too: ${declared.join(', ')}` : ''}`,
+    );
+  }
+  return root;
+}
+
+/** Message types declared in `.proto` sources, fully qualified. */
+export function protoTypes(sources: string[]): string[] {
+  const root = compileProto(sources);
   const types: string[] = [];
   const walk = (namespace: protobuf.NamespaceBase) => {
     for (const nested of namespace.nestedArray) {
@@ -28,8 +56,10 @@ export class ProtobufDecoders {
     const types = new Map<string, protobuf.Type>();
     for (const decoder of decoders) {
       try {
-        const { root } = protobuf.parse(decoder.proto, { keepCase: true });
-        types.set(decoder.id, root.lookupType(decoder.messageType));
+        types.set(
+          decoder.id,
+          compileProto(decoderSources(decoder)).lookupType(decoder.messageType),
+        );
       } catch (error) {
         errors[decoder.id] = `${decoder.name}: ${(error as Error).message}`;
       }

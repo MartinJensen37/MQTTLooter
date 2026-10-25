@@ -93,7 +93,7 @@ export interface ElectronAPI {
     save(
       decoders: import('./decoders').DecoderDefinition[],
     ): Promise<IpcResult<import('./decoders').DecoderDefinition[]>>;
-    types(proto: string): Promise<IpcResult<string[]>>;
+    types(sources: string[]): Promise<IpcResult<string[]>>;
     decode(
       decoderId: string,
       message: string,

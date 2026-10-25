@@ -407,10 +407,16 @@ for (const [channel, handler] of Object.entries({
 for (const [channel, handler] of Object.entries({
   'decoders-list': () => decoderService!.list(),
   'decoders-save': (decoders: unknown) => decoderService!.save(decoders),
-  'decoders-types': (proto: unknown) => {
-    if (typeof proto !== 'string' || proto.length > DECODER_LIMITS.maxProtoChars)
-      throw new Error('Invalid .proto source');
-    return decoderService!.types(proto);
+  'decoders-types': (sources: unknown) => {
+    if (
+      !Array.isArray(sources) ||
+      !sources.length ||
+      sources.length > DECODER_LIMITS.maxProtoFiles ||
+      sources.some((source) => typeof source !== 'string') ||
+      sources.reduce((sum, source) => sum + source.length, 0) > DECODER_LIMITS.maxTotalProtoChars
+    )
+      throw new Error('Invalid .proto sources');
+    return decoderService!.types(sources);
   },
   'decoders-decode': (decoderId: unknown, message: unknown, encoding: unknown) => {
     if (

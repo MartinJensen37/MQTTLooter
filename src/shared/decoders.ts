@@ -7,13 +7,23 @@ export interface DecoderDefinition {
   topicFilter: string;
   /** Fully qualified message type, for example `demo.Reading`. */
   messageType: string;
-  /** `.proto` source text. Imports are not resolved; put dependent types in one file. */
+  /** `.proto` source text of the file declaring the message type. */
   proto: string;
+  /** Other `.proto` files it imports, compiled together with it. */
+  imports?: { name: string; source: string }[];
 }
+
+/** Every source of a decoder, main file first. */
+export const decoderSources = (decoder: Pick<DecoderDefinition, 'proto' | 'imports'>) => [
+  decoder.proto,
+  ...(decoder.imports ?? []).map((file) => file.source),
+];
 
 export const DECODER_LIMITS = {
   maxDecoders: 32,
   maxProtoChars: 1024 * 1024,
+  maxProtoFiles: 32,
+  maxTotalProtoChars: 4 * 1024 * 1024,
   maxPayloadBytes: 1024 * 1024,
   maxOutputChars: 1024 * 1024,
 };
@@ -35,6 +45,25 @@ export function validateDecoders(value: unknown): DecoderDefinition[] {
       !text(decoder.proto, DECODER_LIMITS.maxProtoChars)
     )
       throw new Error('Each decoder needs a unique id, a name, a message type and .proto source.');
+    const imports = decoder.imports ?? [];
+    if (
+      !Array.isArray(imports) ||
+      imports.length >= DECODER_LIMITS.maxProtoFiles ||
+      imports.some(
+        (file) =>
+          !file ||
+          !text(file.name, 256) ||
+          typeof file.source !== 'string' ||
+          file.source.length > DECODER_LIMITS.maxProtoChars,
+      ) ||
+      decoderSources({ proto: decoder.proto!, imports }).reduce(
+        (sum, item) => sum + item.length,
+        0,
+      ) > DECODER_LIMITS.maxTotalProtoChars
+    )
+      throw new Error(
+        `${decoder.name}: use at most 32 .proto files of 1 MiB each, 4 MiB in total.`,
+      );
     if (!validTopicFilter(decoder.topicFilter))
       throw new Error(`${decoder.name}: enter an MQTT topic filter, for example sensors/+/data.`);
     ids.add(decoder.id!);
@@ -44,6 +73,9 @@ export function validateDecoders(value: unknown): DecoderDefinition[] {
       topicFilter: decoder.topicFilter!,
       messageType: decoder.messageType!.trim(),
       proto: decoder.proto!,
+      ...(imports.length && {
+        imports: imports.map((file) => ({ name: file.name, source: file.source })),
+      }),
     };
   });
 }
@@ -58,7 +90,7 @@ export function matchDecoder<T extends Pick<DecoderDefinition, 'topicFilter'>>(
 
 export type DecoderRequest =
   | { action: 'configure'; decoders: DecoderDefinition[] }
-  | { action: 'types'; proto: string }
+  | { action: 'types'; sources: string[] }
   | {
       action: 'decode';
       decoderId: string;

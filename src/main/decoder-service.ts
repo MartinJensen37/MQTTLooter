@@ -41,8 +41,9 @@ export class DecoderService {
 
   private async load(): Promise<void> {
     try {
-      if ((await stat(this.file)).size > DECODER_LIMITS.maxDecoders * DECODER_LIMITS.maxProtoChars)
-        throw new Error('Decoder file is too large');
+      // JSON escaping can double the size of .proto text.
+      const maxBytes = DECODER_LIMITS.maxDecoders * DECODER_LIMITS.maxTotalProtoChars * 2;
+      if ((await stat(this.file)).size > maxBytes) throw new Error('Decoder file is too large');
       this.decoders = validateDecoders(JSON.parse(await readFile(this.file, 'utf8')).decoders);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
@@ -93,8 +94,8 @@ export class DecoderService {
     return task;
   }
 
-  types(proto: string): Promise<string[]> {
-    return this.worker.request({ action: 'types', proto });
+  types(sources: string[]): Promise<string[]> {
+    return this.worker.request({ action: 'types', sources });
   }
 
   async decode(decoderId: string, message: string, encoding: PayloadEncoding): Promise<string> {

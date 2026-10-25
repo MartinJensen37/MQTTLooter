@@ -1,6 +1,6 @@
 import protobuf from 'protobufjs';
 import { expect, it } from 'vitest';
-import { ProtobufDecoders, protoTypes } from '../src/main/protobuf-decoders';
+import { compileProto, ProtobufDecoders, protoTypes } from '../src/main/protobuf-decoders';
 import { matchDecoder, validateDecoders } from '../src/shared/decoders';
 
 const proto = `
@@ -30,7 +30,7 @@ const encode = (value: object) => {
 };
 
 it('lists message types and decodes with exact 64-bit integers, base64 bytes and enum names', () => {
-  expect(protoTypes(proto)).toEqual(['demo.Reading', 'demo.Empty']);
+  expect(protoTypes([proto])).toEqual(['demo.Reading', 'demo.Empty']);
   const decoders = new ProtobufDecoders();
   expect(decoders.configure([definition])).toEqual({});
   const decoded = JSON.parse(
@@ -54,6 +54,53 @@ it('lists message types and decodes with exact 64-bit integers, base64 bytes and
     mode: 'MANUAL',
     children: [{ id: 'child' }],
   });
+});
+
+it('compiles types across imported files and built-in well-known types', () => {
+  const common = `syntax = "proto3";
+package common;
+message Location { double lat = 1; double lon = 2; }`;
+  const main = `syntax = "proto3";
+package fleet;
+import "common.proto";
+import "google/protobuf/timestamp.proto";
+message Position { common.Location at = 1; google.protobuf.Timestamp time = 2; }`;
+  expect(protoTypes([main, common])).toEqual(
+    expect.arrayContaining(['fleet.Position', 'common.Location']),
+  );
+  // A missing import names the file to select.
+  expect(() => protoTypes([main])).toThrow(
+    /common\.Location.*Select the imported files too: common\.proto/,
+  );
+
+  const position = {
+    id: 'position',
+    name: 'Position',
+    topicFilter: '#',
+    messageType: 'fleet.Position',
+    proto: main,
+    imports: [{ name: 'common.proto', source: common }],
+  };
+  const decoders = new ProtobufDecoders();
+  expect(decoders.configure([position])).toEqual({});
+  expect(decoders.configure([{ ...position, imports: [] }])).toHaveProperty('position');
+  decoders.configure([position]);
+  const type = compileProto([main, common]).lookupType('fleet.Position');
+  const bytes = type
+    .encode(
+      type.fromObject({ at: { lat: 55.7, lon: 12.6 }, time: { seconds: 1700000000, nanos: 5 } }),
+    )
+    .finish();
+  expect(JSON.parse(decoders.decode('position', bytes))).toEqual({
+    at: { lat: 55.7, lon: 12.6 },
+    time: { seconds: '1700000000', nanos: 5 },
+  });
+  expect(validateDecoders([position])[0].imports).toEqual(position.imports);
+  expect(() =>
+    validateDecoders([
+      { ...position, imports: Array(32).fill({ name: 'common.proto', source: common }) },
+    ]),
+  ).toThrow('32');
 });
 
 it('reports schema, type and payload errors without throwing away other decoders', () => {

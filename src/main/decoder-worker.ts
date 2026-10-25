@@ -14,7 +14,7 @@ parentPort!.on(
           data = decoders.configure(request.decoders);
           break;
         case 'types':
-          data = protoTypes(request.proto);
+          data = protoTypes(request.sources);
           break;
         case 'decode':
           data = decoders.decode(
