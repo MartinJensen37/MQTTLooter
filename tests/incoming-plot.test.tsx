@@ -108,3 +108,72 @@ it('selects a JSON field, pauses polling, bounds zoom and releases polling on cl
   expect(series).toHaveBeenCalledTimes(closedCalls);
   root = createRoot(container);
 });
+
+it('scales fields independently and plots by a validated payload time field', async () => {
+  const series = vi.fn(async (query) => ({
+    success: true,
+    data: {
+      from: query.from,
+      to: query.to,
+      scanned: 3,
+      truncated: false,
+      availablePaths: [['a'], ['b']],
+      timeRejected: query.timePath ? 2 : undefined,
+      outsideWindow: query.timePath ? 1 : undefined,
+      series: query.paths.map((path, index) => ({
+        path,
+        points: [
+          { x: query.to - 10, y: index ? 1000 : 1 },
+          { x: query.to, y: index ? 2000 : 2 },
+        ],
+        valid: 2,
+        gaps: 0,
+      })),
+    },
+  }));
+  (window as any).electronAPI = { history: { series } };
+  await act(async () => root.render(<IncomingPlot connectionId="a" topic="t" />));
+  const set = async (label: string, value: string, event = 'change') =>
+    act(async () => {
+      const element = container.querySelector(`[aria-label="${label}"]`) as
+        | HTMLInputElement
+        | HTMLSelectElement;
+      const prototype =
+        element.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(element, value);
+      element.dispatchEvent(new Event(event, { bubbles: true }));
+    });
+  await set('Numeric field path', '/b', 'input');
+  await click('Add field');
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  const axis = () => [...container.querySelectorAll('svg text')].map((node) => node.textContent);
+  expect(axis()).toContain('2000');
+  await set('Plot scale', 'independent');
+  expect(axis()).toContain('100%');
+  expect(container.querySelector('.incoming-plot-readout')!.textContent).toContain(
+    'range 1000 to 2000',
+  );
+  expect(
+    (container.querySelector('[aria-label="Payload time unit"]') as HTMLSelectElement).disabled,
+  ).toBe(true);
+  await set('Payload time field', 'not a pointer', 'input');
+  await act(async () =>
+    container
+      .querySelector('[aria-label="Payload time field"]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })),
+  );
+  expect(container.querySelector('[role="alert"]')!.textContent).toContain('JSON pointer');
+  await set('Payload time field', '/meta/ts', 'input');
+  await act(async () =>
+    container
+      .querySelector('[aria-label="Payload time field"]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })),
+  );
+  await set('Payload time unit', 'iso');
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  expect(series.mock.calls.at(-1)![0]).toMatchObject({
+    timePath: ['meta', 'ts'],
+    timeUnit: 'iso',
+  });
+  expect(container.textContent).toContain('2 messages without a valid time and 1 outside');
+});

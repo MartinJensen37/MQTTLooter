@@ -25,7 +25,8 @@ export default function LinePlot({
   onInspect,
 }: {
   points?: PlotPoint[];
-  series?: { id: string; color: string; points: PlotPoint[] }[];
+  /** A series with its own min/max uses an independent scale; shared labels are then hidden. */
+  series?: { id: string; color: string; points: PlotPoint[]; min?: number; max?: number }[];
   min: number;
   max: number;
   duration: number;
@@ -42,16 +43,19 @@ export default function LinePlot({
   const right = width - (compact ? 2 : 18);
   const top = compact ? 3 : 12;
   const bottom = compact ? 21 : height - 34;
-  // Scale before subtraction so finite values near +/- Number.MAX_VALUE stay drawable.
-  const scale = Math.max(Math.abs(min), Math.abs(max), 1);
-  const range = max / scale - min / scale;
+  const independent = series?.some((item) => item.min !== undefined) ?? false;
   const plots = (series ?? [{ id: 'signal', color: 'currentColor', points }]).map((item) => {
+    const low = (item as { min?: number }).min ?? min;
+    const high = (item as { max?: number }).max ?? max;
+    // Scale before subtraction so finite values near +/- Number.MAX_VALUE stay drawable.
+    const scale = Math.max(Math.abs(low), Math.abs(high), 1);
+    const range = high / scale - low / scale;
     const coordinates = item.points.map(({ x, y, breakBefore }) => ({
       x: left + (x / (duration || 1)) * (right - left),
       y:
         range === 0
           ? (top + bottom) / 2
-          : bottom - ((y / scale - min / scale) / range) * (bottom - top),
+          : bottom - ((y / scale - low / scale) / range) * (bottom - top),
       breakBefore,
     }));
     const path = coordinates
@@ -101,7 +105,9 @@ export default function LinePlot({
                 y2={top + (index * (bottom - top)) / 4}
               />
               <text x={left - 8} y={top + (index * (bottom - top)) / 4 + 4} textAnchor="end">
-                {axisNumber(max * (1 - index / 4) + min * (index / 4))}
+                {independent
+                  ? `${100 - index * 25}%`
+                  : axisNumber(max * (1 - index / 4) + min * (index / 4))}
               </text>
             </g>
           ))}
