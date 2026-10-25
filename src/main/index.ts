@@ -257,6 +257,18 @@ for (const [channel, handler] of Object.entries({
     return historyService!.request({ action: 'persist', enabled });
   },
   'history-resume': () => historyService!.resume(),
+  'history-export-search': async (query: HistorySearchQuery, format: unknown, name: unknown) => {
+    validateSearch(query);
+    if ((format !== 'json' && format !== 'csv') || typeof name !== 'string' || name.length > 256)
+      throw new Error('Invalid search export');
+    const result = await dialog.showSaveDialog(mainWindow!, {
+      defaultPath: `mqtt-search-${new Date().toISOString().slice(0, 10)}.${format}`,
+      filters: [{ name: format.toUpperCase(), extensions: [format] }],
+    });
+    if (result.canceled || !result.filePath) return { saved: false };
+    const exported = await historyService!.exportSearch(query, format, result.filePath, name);
+    return { saved: true, path: result.filePath, ...exported };
+  },
   'history-export': async (
     connectionId: unknown,
     topic: unknown,

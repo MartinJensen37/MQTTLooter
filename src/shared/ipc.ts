@@ -63,6 +63,19 @@ export interface ElectronAPI {
     clear(connectionId: string, topic?: string): Promise<IpcResult>;
     persist(enabled: boolean): Promise<IpcResult>;
     resume(): Promise<IpcResult>;
+    exportSearch(
+      query: import('./history-search').HistorySearchQuery,
+      format: 'json' | 'csv',
+      connectionName: string,
+    ): Promise<
+      IpcResult<{
+        saved: boolean;
+        path?: string;
+        count?: number;
+        scanned?: number;
+        skipped?: number;
+      }>
+    >;
     export(
       connectionId: string,
       topic: string,

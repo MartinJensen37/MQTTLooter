@@ -1,6 +1,7 @@
 import { open, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { CSV_HEADER } from '../shared/message-export';
+import { CSV_HEADER, csvRow, exportRow } from '../shared/message-export';
+import type { HistorySearchPage, HistorySearchQuery } from '../shared/history-search';
 import { MessageDelivery } from './message-delivery';
 import { WorkerClient } from './worker-client';
 import type { IncomingPublish } from '../shared/traffic';
@@ -8,6 +9,7 @@ import {
   HISTORY_QUEUE,
   type HistoryDrop,
   type HistoryExportChunk,
+  type HistoryExportQuery,
   type HistoryRequest,
   type HistoryStatus,
   type HistoryStoreStatus,
@@ -113,39 +115,27 @@ export class HistoryService {
     return this.store!;
   }
 
-  /** Stream a topic's retained history to a file; the target is replaced only when complete. */
-  async exportTo(
-    connectionId: string,
-    topic: string,
-    format: 'json' | 'csv',
+  /**
+   * Write `pieces` (comma-joined JSON entries or newline-joined CSV rows) to a file. The target
+   * is replaced only when the export completes.
+   */
+  private async writeExport(
     path: string,
-    connectionName: string,
+    format: 'json' | 'csv',
+    header: Record<string, unknown>,
+    pieces: AsyncIterable<{ text: string; count: number }>,
   ): Promise<number> {
-    await this.flush();
     const temporary = `${path}.${process.pid}.tmp`;
     const handle = await open(temporary, 'w');
     let count = 0;
     try {
-      await handle.write(
-        format === 'csv'
-          ? CSV_HEADER
-          : `{"exportDate":${JSON.stringify(new Date().toISOString())},"connectionName":${JSON.stringify(connectionName)},"topic":${JSON.stringify(topic)},"messages":[`,
-      );
-      let after = 0;
-      let snapshot: number | undefined;
-      for (;;) {
-        const chunk: HistoryExportChunk = await this.request({
-          action: 'export-chunk',
-          query: { connectionId, topic, format, after, snapshot },
-        });
-        snapshot = chunk.snapshot;
-        if (chunk.count) {
-          const separator = format === 'csv' ? '\n' : count ? ',' : '';
-          await handle.write(separator + chunk.text);
-        }
-        count += chunk.count;
-        if (chunk.cursor === null) break;
-        after = chunk.cursor;
+      const fields = JSON.stringify({ exportDate: new Date().toISOString(), ...header });
+      await handle.write(format === 'csv' ? CSV_HEADER : `${fields.slice(0, -1)},"messages":[`);
+      for await (const piece of pieces) {
+        if (!piece.count) continue;
+        const separator = format === 'csv' ? '\n' : count ? ',' : '';
+        await handle.write(separator + piece.text);
+        count += piece.count;
       }
       if (format === 'json') await handle.write(`],"messageCount":${count}}`);
       await handle.sync();
@@ -157,6 +147,82 @@ export class HistoryService {
       await unlink(temporary).catch(() => {});
       throw error;
     }
+  }
+
+  /** Stream a topic's retained history, oldest first, from a fixed snapshot. */
+  async exportTo(
+    connectionId: string,
+    topic: string,
+    format: 'json' | 'csv',
+    path: string,
+    connectionName: string,
+  ): Promise<number> {
+    await this.flush();
+    const request = (query: HistoryExportQuery): Promise<HistoryExportChunk> =>
+      this.request({ action: 'export-chunk', query });
+    return this.writeExport(
+      path,
+      format,
+      { connectionName, topic },
+      (async function* () {
+        let after = 0;
+        let snapshot: number | undefined;
+        for (;;) {
+          const chunk = await request({ connectionId, topic, format, after, snapshot });
+          snapshot = chunk.snapshot;
+          yield chunk;
+          if (chunk.cursor === null) return;
+          after = chunk.cursor;
+        }
+      })(),
+    );
+  }
+
+  /** Stream every match of a content search, newest first, through its bounded chunks. */
+  async exportSearch(
+    query: HistorySearchQuery,
+    format: 'json' | 'csv',
+    path: string,
+    connectionName: string,
+  ): Promise<{ count: number; scanned: number; skipped: number }> {
+    await this.flush();
+    const request = (cursor: HistorySearchQuery): Promise<HistorySearchPage> =>
+      this.request({ action: 'search', query: cursor });
+    let scanned = 0;
+    let skipped = 0;
+    const { topic, term, mode, from, to, scope, filter } = query;
+    const count = await this.writeExport(
+      path,
+      format,
+      {
+        connectionName,
+        search: { topic: scope === 'filter' ? filter : topic, term, mode, from, to },
+      },
+      (async function* () {
+        let cursor: HistorySearchQuery = { ...query, before: undefined, snapshot: undefined };
+        for (;;) {
+          const page = await request(cursor);
+          scanned += page.scanned;
+          skipped += page.skippedLarge + page.skippedBinary;
+          const rows = page.messages.map((message) => ({ ...message, connectionId: message.id }));
+          yield {
+            text:
+              format === 'csv'
+                ? rows.map(csvRow).join('\n')
+                : rows.map((row) => JSON.stringify(exportRow(row))).join(','),
+            count: rows.length,
+          };
+          if (page.nextBefore === null) return;
+          cursor = {
+            ...cursor,
+            before: page.nextBefore,
+            snapshot: page.snapshot,
+            generation: page.generation,
+          };
+        }
+      })(),
+    );
+    return { count, scanned, skipped };
   }
 
   async close(): Promise<void> {
