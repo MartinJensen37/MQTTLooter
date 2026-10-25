@@ -130,6 +130,12 @@ By default samples are placed at their receive time. To use a time inside the pa
 
 Extrema-preserving buckets retain short spikes, with a point budget that follows the chart's width (up to 1,024 points per field). Invalid values and reconnect boundaries break lines conservatively. Queries scan at most 20,000 messages, 8 MiB of payloads or a 75 ms work target; a notice appears when older samples are omitted. Narrow the window to inspect that range. Payloads larger than 64 KiB and invalid UTF-8 are skipped as gaps. Plotted numbers use JavaScript floating-point precision. Disk retention and capture gaps still apply; a chart cannot recover expired or dropped data.
 
+### Decoding protobuf payloads
+
+In Logging, choose **Decoders** to add a protobuf decoder: pick a `.proto` file, choose one of its message types and enter the MQTT topic filter it applies to (for example `plant/+/reading`). Message cards on matching topics then open in **View > Decoded**, and Text/Hex remain available. The first decoder whose filter matches is used; the list is numbered in that order.
+
+Decoding runs in a main-process worker, because generated protobuf code is not allowed under the window's content security policy. It never changes stored or exported bytes. Decoded JSON keeps 64-bit integers exact as strings, shows bytes as base64 and enums by name, and omits fields left at their default value. Payloads above 1 MiB and decoded output above 1 MiB are not decoded. Imports inside a `.proto` file are not resolved, so put dependent types in one file. Definitions are saved in `decoders.json` in Electron's user-data directory, and a definition that does not compile is rejected rather than saved. Plotting decoded fields and Sparkplug B are not supported yet.
+
 ### Inspecting and copying payloads
 
 Message cards offer Text, Hex and Pretty JSON. JSON formatting is bounded and preserves numeric spelling (including integers beyond JavaScript's safe range), strings and duplicate keys. Formatting changes the preview only; copy/export retains the original payload. Expand **Inspect payload** and drag its lower edge to resize it. Collapsed previews adapt to panel width.

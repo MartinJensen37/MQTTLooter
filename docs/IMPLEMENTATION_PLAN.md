@@ -78,7 +78,7 @@ Broker passwords, TLS private keys and passphrases are encrypted with `safeStora
 | Recordings in a database | Main-owned capture into `recordings.sqlite` with per-batch commits, crash recovery, durable queue/outage/storage gaps, paged playback, streamed export and one-time JSON/localStorage migration. Kept up with 5,000 msg/s for 60 s under load. | Streaming import above 10 MiB. |
 | Responsive disconnect control | MQTT clients run in main; storage runs in workers. Measured disconnect is 1-2 ms during 50k-topic floods and 5,000 msg/s streams. | Repeat with decoding and plots active once those land. |
 | Multiple tiled panels | Not implemented; current tabs preserve mounted workspaces. | Dockable layout with explicit panel lifecycle and persistence. |
-| Protobuf / Sparkplug B | Not implemented. | Schema-selected decoding first; Sparkplug B remains an optional later feature. |
+| Protobuf / Sparkplug B | User-provided `.proto` decoders mapped to MQTT topic filters, compiled and applied in a main-process worker (the renderer CSP forbids generated code), with a Decoded payload view, 1 MiB input/output limits and exact 64-bit integers. | Plotting and searching decoded fields; `.proto` imports; Sparkplug B stays optional. |
 | Password visibility and credentials | Shared show/hide controls; passwords, TLS keys and passphrases encrypted with `safeStorage` in main, migrated from localStorage. | WebSocket header and MQTT 5 authentication secrets once those settings exist. |
 | CSS cleanup and refactoring | Shared tokens/controls and simulator scoping exist; older globals and broad JS types remain. | Incremental cleanup in touched features, scoped styles, typed service boundaries. |
 | Lazy loading | Virtual topic/signal rows, paged history and lazily mounted property details. | Panel modules, recording metadata/payload pages and decoder assets. |
@@ -250,14 +250,14 @@ Every phase includes targeted regression tests, typecheck/lint/build where relev
 
 ## Delivery order
 
-Done on 2026-10-25, in order: durable recordings, the load harness, credential storage, renderer heap profiling, chunked history clears, JSON Schema validation, simulator payload templates, plot time sources and scales, cross-topic search, drift-free playback, negotiated topic aliases, whole-topic export and the transport test matrix.
+Done on 2026-10-25, in order: durable recordings, the load harness, credential storage, renderer heap profiling, chunked history clears, JSON Schema validation, simulator payload templates, plot time sources and scales, cross-topic search, drift-free playback, negotiated topic aliases, whole-topic export, the transport test matrix, Mosquitto interoperability tests, schema-built publishing templates and protobuf decoding.
 
 Next, in order:
 
 1. Installer/upgrade checks and other brokers (Mosquitto checks are in place).
 2. Building simulator payload templates from an imported schema (publishing templates already do).
 3. Full-result export for content search; streaming recording import above 10 MiB.
-4. Tiled workspaces, then decoding (protobuf descriptors first; decoding must run where the renderer CSP allows it).
+4. Tiled workspaces. Then plotting decoded protobuf fields through the numeric series adapter.
 
 Original order: start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
 
