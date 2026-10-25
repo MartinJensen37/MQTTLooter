@@ -102,6 +102,25 @@ function Workspace(props: any) {
     setCursors([{}]);
     setRefresh((value) => value + 1);
   };
+  const exportStored = async (format: 'json' | 'csv') => {
+    if (!connectionId || topic === undefined) return;
+    try {
+      const result = await window.electronAPI.history.export(
+        connectionId,
+        topic,
+        format,
+        props.connectionName ?? 'Unknown',
+      );
+      if (!result.success) throw new Error(result.error ?? 'Export failed');
+      if (result.data?.saved)
+        props.showFeedback?.(
+          `Exported ${result.data.count?.toLocaleString()} stored messages to ${result.data.path}`,
+          'success',
+        );
+    } catch (reason) {
+      setError((reason as Error).message);
+    }
+  };
   const clearStored = async () => {
     if (!connectionId || topic === undefined) return;
     const result = await window.electronAPI.history.clear(connectionId, topic);
@@ -304,6 +323,7 @@ function Workspace(props: any) {
               : props.selectedTopic
           }
           onClearMessages={stored ? clearStored : props.onClearMessages}
+          onExportAll={stored ? exportStored : undefined}
         />
       )}
     </div>

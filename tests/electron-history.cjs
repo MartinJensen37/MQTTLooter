@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 
-module.exports = async ({ evaluate, waitFor, field, send, captureSearch }) => {
+module.exports = async ({ evaluate, waitFor, field, send, captureSearch, saveTo }) => {
   for (let i = 0; i < 650; i++) send('archive/series', String(i));
   await waitFor(async () => {
     const result = await evaluate(
@@ -56,6 +57,17 @@ module.exports = async ({ evaluate, waitFor, field, send, captureSearch }) => {
     () => evaluate("document.querySelector('.message-item')?.textContent.includes('649')"),
     'newer page UI',
   );
+  // Export every stored message, not just the displayed page, through main's streamed export.
+  const exportFile = saveTo('archive-export.json');
+  await evaluate(`document.querySelector('[title="Export topic data"]').click()`);
+  await evaluate(
+    "[...document.querySelectorAll('.message-export-wrapper .dropdown-option')].find(button => button.textContent.includes('Export all stored as JSON')).click()",
+  );
+  await waitFor(() => fs.existsSync(exportFile), 'whole-topic export file');
+  const exported = JSON.parse(fs.readFileSync(exportFile, 'utf8'));
+  assert.equal(exported.topic, 'archive/series');
+  assert.equal(exported.messageCount, 650);
+  assert.deepEqual([exported.messages[0].payload, exported.messages.at(-1).payload], ['0', '649']);
 
   const status = await evaluate('window.electronAPI.history.status()');
   await evaluate(

@@ -26,10 +26,20 @@ class HiddenWindow extends BrowserWindow {
     this.focus = () => {};
   }
 }
+// Save dialogs return a path chosen by the test instead of opening.
+const saveDialog = { path: null };
 const Module = require('node:module');
 const load = Module._load;
 Module._load = function (request, ...args) {
-  if (request === 'electron') return { ...electron, BrowserWindow: HiddenWindow };
+  if (request === 'electron')
+    return {
+      ...electron,
+      BrowserWindow: HiddenWindow,
+      dialog: {
+        ...electron.dialog,
+        showSaveDialog: async () => ({ canceled: !saveDialog.path, filePath: saveDialog.path }),
+      },
+    };
   return load.call(this, request, ...args);
 };
 
@@ -815,6 +825,10 @@ async function run() {
     evaluate,
     waitFor,
     field,
+    saveTo: (file) => {
+      saveDialog.path = path.join(temporary, file);
+      return saveDialog.path;
+    },
     send: (topic, payload) => {
       for (const socket of sockets)
         socket.write(

@@ -17,6 +17,7 @@ function MessagePanel({
   plotContent = null,
   onPlotChange = undefined,
   clearLabel = 'Clear Messages',
+  onExportAll = undefined,
 }) {
   const plotting = Boolean(plotContent);
   const panelRef = useRef(null);
@@ -295,6 +296,21 @@ function MessagePanel({
                       <button type="button" className="dropdown-option" onClick={exportTopicAsCSV}>
                         <i className="fas fa-file-csv"></i> Export as CSV
                       </button>
+                      {onExportAll &&
+                        ['json', 'csv'].map((format) => (
+                          <button
+                            key={format}
+                            type="button"
+                            className="dropdown-option"
+                            onClick={() => {
+                              setShowTopicExportMenu(false);
+                              onExportAll(format);
+                            }}
+                          >
+                            <i className="fas fa-database"></i> Export all stored as{' '}
+                            {format.toUpperCase()}
+                          </button>
+                        ))}
                     </div>
                   )}
                 </div>
