@@ -4,6 +4,10 @@ export const TABS = ['logging', 'publishing', 'recording', 'simulation'] as cons
 export type Tab = (typeof TABS)[number];
 const isTab = (value: unknown): value is Tab => TABS.includes(value as Tab);
 export const SPLIT_LIMITS = { min: 0.25, max: 0.75 };
+/** Connection list width; dragging it narrower than `collapseBelow` collapses it. */
+export const SIDEBAR_LIMITS = { min: 200, max: 420, initial: 260, collapseBelow: 140 };
+const clampSidebar = (value: number) =>
+  Math.round(Math.min(SIDEBAR_LIMITS.max, Math.max(SIDEBAR_LIMITS.min, value)));
 const clampRatio = (value: number) => Math.min(SPLIT_LIMITS.max, Math.max(SPLIT_LIMITS.min, value));
 /** A pinned second pane keeps this connection and topic instead of following the sidebar. */
 export interface PanePin {
@@ -20,6 +24,11 @@ export function useUIState(selectedConnection: string | null) {
     }
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(Boolean(initialState.collapsed));
+  const [sidebarWidth, setSidebarWidthState] = useState(
+    Number.isFinite(initialState.sidebarWidth)
+      ? clampSidebar(initialState.sidebarWidth)
+      : SIDEBAR_LIMITS.initial,
+  );
   const [topicTreeWidth, setTopicTreeWidth] = useState(
     Number.isFinite(initialState.topicTreeWidth) ? Math.max(50, initialState.topicTreeWidth) : 500,
   );
@@ -43,12 +52,25 @@ export function useUIState(selectedConnection: string | null) {
     try {
       localStorage.setItem(
         'mqtt-sidebar-state',
-        JSON.stringify({ collapsed: sidebarCollapsed, topicTreeWidth, splitTab, splitRatio }),
+        JSON.stringify({
+          collapsed: sidebarCollapsed,
+          sidebarWidth,
+          topicTreeWidth,
+          splitTab,
+          splitRatio,
+        }),
       );
     } catch {
       /* Layout persistence is optional. */
     }
-  }, [sidebarCollapsed, topicTreeWidth, splitTab, splitRatio]);
+  }, [sidebarCollapsed, sidebarWidth, topicTreeWidth, splitTab, splitRatio]);
+
+  /** Dragging the connection list fully in collapses it, like the logo button. */
+  const resizeSidebar = useCallback((width: number) => {
+    if (width < SIDEBAR_LIMITS.collapseBelow) return setSidebarCollapsed(true);
+    setSidebarCollapsed(false);
+    setSidebarWidthState(clampSidebar(width));
+  }, []);
 
   /** Choosing the tab shown in the second pane swaps the two panes and ends its pin. */
   const setActiveTab = useCallback(
@@ -94,6 +116,8 @@ export function useUIState(selectedConnection: string | null) {
   return {
     sidebarCollapsed,
     setSidebarCollapsed,
+    sidebarWidth,
+    resizeSidebar,
     topicTreeWidth,
     setTopicTreeWidth,
     showTopicTree,

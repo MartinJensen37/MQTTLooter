@@ -66,6 +66,24 @@ it('ends a pane pin when the panes swap or the split closes', async () => {
   expect(JSON.parse(localStorage.getItem('mqtt-sidebar-state')!)).not.toHaveProperty('panePin');
 });
 
+it('resizes the connection list and collapses it when dragged fully in', async () => {
+  await render();
+  expect([state.sidebarWidth, state.sidebarCollapsed]).toEqual([260, false]);
+  await act(async () => state.resizeSidebar(1000));
+  expect(state.sidebarWidth).toBe(420);
+  await act(async () => state.resizeSidebar(150));
+  expect([state.sidebarWidth, state.sidebarCollapsed]).toEqual([200, false]);
+  // Narrower than the collapse threshold: collapsed, keeping the last width for later.
+  await act(async () => state.resizeSidebar(90));
+  expect([state.sidebarWidth, state.sidebarCollapsed]).toEqual([200, true]);
+  await act(async () => state.resizeSidebar(300));
+  expect([state.sidebarWidth, state.sidebarCollapsed]).toEqual([300, false]);
+  expect(JSON.parse(localStorage.getItem('mqtt-sidebar-state')!)).toMatchObject({
+    sidebarWidth: 300,
+    collapsed: false,
+  });
+});
+
 it('restores the split layout after a restart', async () => {
   await render();
   await act(async () => state.setSplitTab('simulation'));

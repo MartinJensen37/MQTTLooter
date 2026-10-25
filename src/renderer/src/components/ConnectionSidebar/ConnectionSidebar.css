@@ -9,9 +9,9 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  width: 260px;
-  min-width: 260px;
-  max-width: 260px;
+  width: var(--sidebar-width, 260px);
+  min-width: var(--sidebar-width, 260px);
+  max-width: var(--sidebar-width, 260px);
   flex-shrink: 0;
 }
 

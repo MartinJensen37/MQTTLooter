@@ -89,6 +89,8 @@ function App() {
 
   const {
     sidebarCollapsed,
+    sidebarWidth,
+    resizeSidebar,
     topicTreeWidth,
     setTopicTreeWidth,
     showTopicTree,
@@ -370,8 +372,8 @@ function App() {
           className={activeTab === 'simulation' ? 'simulation-workspace' : ''}
           direction="horizontal"
           resizable={activeTab !== 'simulation'}
-          dividerSize={activeTab === 'simulation' ? 0 : 1}
-          dividerStyle={activeTab === 'simulation' ? { display: 'none' } : undefined}
+          dividerSize={activeTab === 'simulation' ? 0 : 9}
+          dividerStyle={activeTab === 'simulation' ? { display: 'none' } : { width: '9px' }}
           onResize={(sizes) => setTopicTreeWidth(sizes[0])}
           dividerClassName="resizer-divider"
         >
@@ -432,7 +434,7 @@ function App() {
         ))}
       </div>
 
-      <div className="app-layout">
+      <div className="app-layout" style={{ '--sidebar-width': `${sidebarWidth}px` }}>
         <ConnectionSidebar
           connections={connections}
           activeConnections={activeConnections}
@@ -443,6 +445,33 @@ function App() {
           selectedConnectionId={selectedConnection}
           isCollapsed={sidebarCollapsed}
           onToggleCollapse={handleToggleSidebarCollapse}
+        />
+        <div
+          className="sidebar-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize connection list"
+          aria-valuemin={0}
+          aria-valuemax={420}
+          aria-valuenow={sidebarCollapsed ? 0 : sidebarWidth}
+          tabIndex={0}
+          title="Drag to resize; drag fully in to collapse"
+          onPointerDown={(event) => {
+            event.preventDefault();
+            const left = event.currentTarget.parentElement.getBoundingClientRect().left;
+            const move = (moveEvent) => resizeSidebar(moveEvent.clientX - left);
+            const stop = () => {
+              window.removeEventListener('pointermove', move);
+              window.removeEventListener('pointerup', stop);
+            };
+            window.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', stop);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowLeft' && !sidebarCollapsed) resizeSidebar(sidebarWidth - 20);
+            if (event.key === 'ArrowRight')
+              resizeSidebar(sidebarCollapsed ? sidebarWidth : sidebarWidth + 20);
+          }}
         />
 
         <div className="main-content">
