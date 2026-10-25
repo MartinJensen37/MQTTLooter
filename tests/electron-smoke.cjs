@@ -933,6 +933,45 @@ async function run() {
       ),
     'return from plot to messages',
   );
+  await require('./electron-split.cjs')({
+    evaluate,
+    waitFor,
+    field,
+    capture: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      fs.writeFileSync(
+        path.join(workspace, '.tmp', 'electron-split.png'),
+        (await window.webContents.capturePage()).toPNG(),
+      );
+      window.setSize(800, 600);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      // Too narrow for side-by-side panes: they stack, each at full width.
+      const narrow = await evaluate(`(() => {
+        const header = document.querySelector('.main-header');
+        const split = document.querySelector('.split-controls').getBoundingClientRect();
+        const active = document.querySelector('.tab-content.active').getBoundingClientRect();
+        const secondary = document.querySelector('.tab-content.secondary').getBoundingClientRect();
+        return { scroll: header.scrollWidth, client: header.clientWidth, right: split.right,
+          stacked: !!document.querySelector('.tab-content-container.stacked'),
+          activeBottom: active.bottom, secondaryTop: secondary.top,
+          widths: [active.width, secondary.width] };
+      })()`);
+      assert.ok(
+        narrow.scroll <= narrow.client + 1 &&
+          narrow.right <= 801 &&
+          narrow.stacked &&
+          narrow.activeBottom <= narrow.secondaryTop + 1 &&
+          narrow.widths.every((width) => width >= 300),
+        JSON.stringify(narrow),
+      );
+      fs.writeFileSync(
+        path.join(workspace, '.tmp', 'electron-split-small.png'),
+        (await window.webContents.capturePage()).toPNG(),
+      );
+      window.setSize(1400, 900);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    },
+  });
   await require('./electron-reload.cjs')({
     window,
     evaluate,

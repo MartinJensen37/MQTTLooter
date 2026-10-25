@@ -14,6 +14,13 @@ import { useMessages } from '../../hooks/useMessages';
 import { useUIState } from '../../hooks/useUIState';
 import './App.css';
 
+const TAB_LIST = [
+  { id: 'logging', icon: 'fa-list', label: 'Logging', key: 'F1' },
+  { id: 'publishing', icon: 'fa-paper-plane', label: 'Publishing', key: 'F2' },
+  { id: 'recording', icon: 'fa-video', label: 'Recording', key: 'F3' },
+  { id: 'simulation', icon: 'fa-microchip', label: 'Simulation', key: 'F4' },
+];
+
 function App() {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -68,8 +75,42 @@ function App() {
     setTopicTreeReady,
     activeTab,
     setActiveTab,
+    splitTab,
+    setSplitTab,
+    splitRatio,
+    setSplitRatio,
     handleToggleSidebarCollapse,
   } = useUIState(selectedConnection);
+  const tabContainerRef = useRef(null);
+  // Below 560 px of content width the panes stack instead of sitting side by side.
+  const [stacked, setStacked] = useState(false);
+  useEffect(() => {
+    const element = tabContainerRef.current;
+    if (!splitTab || !element || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => setStacked(entry.contentRect.width < 560));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [splitTab, selectedConnection]);
+  // Split view places two tabs side by side with CSS, so no panel is remounted or duplicated.
+  const placement = (tab) =>
+    tab === activeTab ? 'active' : tab === splitTab ? 'secondary' : 'hidden';
+  const visible = (tab) => tab === activeTab || tab === splitTab;
+  const startSplitDrag = (event) => {
+    event.preventDefault();
+    const rect = tabContainerRef.current.getBoundingClientRect();
+    const move = (moveEvent) =>
+      setSplitRatio(
+        stacked
+          ? (moveEvent.clientY - rect.top) / rect.height
+          : (moveEvent.clientX - rect.left) / rect.width,
+      );
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+  };
 
   // ── MQTT event listeners ─────────────────────────────────────────────────
   const notices = useRef(new ConnectionNotices());
@@ -158,10 +199,14 @@ function App() {
   const isConnected = connections.find((c) => c.id === selectedConnection)?.isConnected || false;
 
   const renderTabContent = () => (
-    <div className="tab-content-container">
-      <div className={`tab-content ${activeTab === 'logging' ? 'active' : 'hidden'}`}>
+    <div
+      ref={tabContainerRef}
+      className={`tab-content-container${splitTab ? ' split' : ''}${splitTab && stacked ? ' stacked' : ''}`}
+      style={splitTab ? { '--split': `${splitRatio * 100}%` } : undefined}
+    >
+      <div className={`tab-content ${placement('logging')}`}>
         <MessagePanel
-          active={activeTab === 'logging'}
+          active={visible('logging')}
           connectionId={selectedConnection}
           messages={connectionMessages}
           selectedTopic={liveSelectedTopic}
@@ -170,7 +215,7 @@ function App() {
           showFeedback={showFeedback}
         />
       </div>
-      <div className={`tab-content ${activeTab === 'publishing' ? 'active' : 'hidden'}`}>
+      <div className={`tab-content ${placement('publishing')}`}>
         <PublishingPanel
           protocolVersion={
             isConnected
@@ -186,7 +231,7 @@ function App() {
           showFeedback={showFeedback}
         />
       </div>
-      <div className={`tab-content ${activeTab === 'recording' ? 'active' : 'hidden'}`}>
+      <div className={`tab-content ${placement('recording')}`}>
         <RecordingPanel
           connectionName={getConnectionName()}
           selectedTopic={liveSelectedTopic}
@@ -196,7 +241,7 @@ function App() {
           showFeedback={showFeedback}
         />
       </div>
-      <div className={`tab-content ${activeTab === 'simulation' ? 'active' : 'hidden'}`}>
+      <div className={`tab-content ${placement('simulation')}`}>
         <SimulationPanel
           key={selectedConnection}
           connectionId={selectedConnection}
@@ -206,6 +251,24 @@ function App() {
           showFeedback={showFeedback}
         />
       </div>
+      {splitTab && (
+        <div
+          className="split-divider"
+          role="separator"
+          aria-orientation={stacked ? 'horizontal' : 'vertical'}
+          aria-label="Resize split view"
+          aria-valuemin={25}
+          aria-valuemax={75}
+          aria-valuenow={Math.round(splitRatio * 100)}
+          tabIndex={0}
+          onPointerDown={startSplitDrag}
+          onKeyDown={(event) => {
+            if (event.key === (stacked ? 'ArrowUp' : 'ArrowLeft')) setSplitRatio(splitRatio - 0.05);
+            if (event.key === (stacked ? 'ArrowDown' : 'ArrowRight'))
+              setSplitRatio(splitRatio + 0.05);
+          }}
+        />
+      )}
     </div>
   );
 
@@ -313,22 +376,43 @@ function App() {
             {selectedConnection && (
               <div className="header-controls">
                 <div className="main-tabs">
-                  {[
-                    { id: 'logging', icon: 'fa-list', label: 'Logging', key: 'F1' },
-                    { id: 'publishing', icon: 'fa-paper-plane', label: 'Publishing', key: 'F2' },
-                    { id: 'recording', icon: 'fa-video', label: 'Recording', key: 'F3' },
-                    { id: 'simulation', icon: 'fa-microchip', label: 'Simulation', key: 'F4' },
-                  ].map((tab) => (
+                  {TAB_LIST.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+                      className={`tab-btn ${activeTab === tab.id ? 'active' : tab.id === splitTab ? 'secondary' : ''}`}
                       title={`${tab.key} - ${tab.label} Panel`}
                     >
                       <i className={`fas ${tab.icon}`}></i> {tab.label}{' '}
                       <span className="shortcut-hint">{tab.key}</span>
                     </button>
                   ))}
+                </div>
+                <div className="split-controls">
+                  {splitTab && (
+                    <select
+                      aria-label="Second pane"
+                      className="custom-select-button form-select form-select-compact"
+                      value={splitTab}
+                      onChange={(event) => setSplitTab(event.target.value)}
+                    >
+                      {TAB_LIST.filter((tab) => tab.id !== activeTab).map((tab) => (
+                        <option key={tab.id} value={tab.id}>
+                          {tab.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    className={`btn btn-sm ${splitTab ? 'btn-primary' : 'btn-secondary'}`}
+                    aria-pressed={Boolean(splitTab)}
+                    title={splitTab ? 'Close split view' : 'Show a second tab beside this one'}
+                    onClick={() =>
+                      setSplitTab(splitTab ? null : TAB_LIST.find((tab) => tab.id !== activeTab).id)
+                    }
+                  >
+                    <i className="fas fa-columns"></i> Split
+                  </button>
                 </div>
               </div>
             )}
