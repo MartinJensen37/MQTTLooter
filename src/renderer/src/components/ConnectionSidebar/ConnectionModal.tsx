@@ -29,10 +29,46 @@ function ConnectionModal({ connection, onSave, onCancel }: ConnectionModalProps)
   );
   const firstInputRef = useRef<HTMLInputElement>(null);
 
+  const [credentialNotice, setCredentialNotice] = useState('');
+
   // Seed the form from the connection being edited (or defaults for a new one).
   useEffect(() => {
     setFormData(buildInitialFormData(connection));
     setErrors({});
+    setCredentialNotice('');
+    const api = window.electronAPI?.credentials;
+    if (!api) return;
+    let cancelled = false;
+    void (async () => {
+      const status = await api.status();
+      if (cancelled) return;
+      if (status.success && !status.data?.available)
+        setCredentialNotice(
+          'OS encryption is unavailable, so passwords and keys are saved unencrypted with this connection.',
+        );
+      if (!connection?.id) return;
+      // Stored secrets reach the renderer only while their connection is being edited.
+      const result = await api.get(connection.id);
+      if (cancelled) return;
+      if (!result.success) {
+        setCredentialNotice(result.error ?? 'Saved credentials could not be loaded.');
+        return;
+      }
+      const secrets = result.data;
+      if (!secrets) return;
+      setFormData((previous) => ({
+        ...previous,
+        password: previous.password || secrets.password || '',
+        tls: {
+          ...previous.tls,
+          key: previous.tls.key?.content ? previous.tls.key : (secrets.tlsKey ?? previous.tls.key),
+          passphrase: previous.tls.passphrase || secrets.passphrase || '',
+        },
+      }));
+    })().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [connection]);
 
   // Focus the first field shortly after mount.
@@ -266,6 +302,11 @@ function ConnectionModal({ connection, onSave, onCancel }: ConnectionModalProps)
                   />
                 </div>
               </div>
+              {credentialNotice && (
+                <div className="mqtt-field-hint" role="status">
+                  {credentialNotice}
+                </div>
+              )}
             </div>
 
             <TlsSection

@@ -1,7 +1,9 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
 import { join } from 'path';
 import { MQTTConnectionManager } from './mqtt-connection-manager';
 import { RecordingService } from './recording-service';
+import { CredentialStore } from './credential-store';
+import { mergeSecrets, validateSecrets } from '../shared/credentials';
 import { HistoryService } from './history-service';
 import { validateSearch, type HistorySearchQuery } from '../shared/history-search';
 import { MessageDelivery } from './message-delivery';
@@ -23,6 +25,14 @@ const historyService = primaryInstance
   ? new HistoryService(join(app.getPath('userData'), 'history'))
   : null;
 const recordingService = primaryInstance ? new RecordingService(app.getPath('userData')) : null;
+// Linux without a keyring falls back to a fixed key; treat that as unavailable.
+const credentialStore = new CredentialStore(join(app.getPath('userData'), 'credentials.json'), {
+  available: () =>
+    safeStorage.isEncryptionAvailable() &&
+    !(process.platform === 'linux' && safeStorage.getSelectedStorageBackend?.() === 'basic_text'),
+  encrypt: (text) => safeStorage.encryptString(text),
+  decrypt: (data) => safeStorage.decryptString(data),
+});
 if (!primaryInstance) app.quit();
 app.on('second-instance', () => {
   if (mainWindow?.isMinimized()) mainWindow.restore();
@@ -253,8 +263,12 @@ for (const [channel, handler] of Object.entries({
 
 handleIPC('mqtt-connect', async (_event, connectionId, config) => {
   try {
+    if (!validId(connectionId) || !config || typeof config !== 'object')
+      throw new Error('Invalid connection request');
     console.log(`IPC: Connecting ${connectionId} with protocol version ${config.protocolVersion}`);
-    const result = await mqttManager.connect(connectionId, config);
+    // Secrets stay in main: the renderer's config omits them once they are stored.
+    const secrets = await credentialStore.get(connectionId);
+    const result = await mqttManager.connect(connectionId, mergeSecrets(config, secrets));
     console.log(`IPC: Successfully connected ${connectionId}`);
     return { success: true, data: result };
   } catch (error) {
@@ -319,6 +333,26 @@ app.on('ready', () => {
   createSplashWindow();
   setTimeout(createWindow, 100);
 });
+
+for (const [channel, handler] of Object.entries({
+  'credentials-status': () => credentialStore.status(),
+  'credentials-get': (connectionId: unknown) => {
+    if (!validId(connectionId)) throw new Error('Invalid connection');
+    return credentialStore.get(connectionId);
+  },
+  'credentials-set': (connectionId: unknown, secrets: unknown) => {
+    if (!validId(connectionId)) throw new Error('Invalid connection');
+    return credentialStore.set(connectionId, secrets === null ? null : validateSecrets(secrets));
+  },
+})) {
+  handleIPC(channel, async (_event, ...args) => {
+    try {
+      return { success: true, data: await (handler as (...args: any[]) => unknown)(...args) };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+}
 
 const validRecordingId = (value: unknown): value is number =>
   Number.isSafeInteger(value) && (value as number) > 0;

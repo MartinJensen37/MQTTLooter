@@ -64,6 +64,14 @@ export interface ElectronAPI {
     persist(enabled: boolean): Promise<IpcResult>;
     resume(): Promise<IpcResult>;
   };
+  credentials: {
+    status(): Promise<IpcResult<import('./credentials').CredentialStatus>>;
+    get(connectionId: string): Promise<IpcResult<import('./credentials').ConnectionSecrets | null>>;
+    set(
+      connectionId: string,
+      secrets: import('./credentials').ConnectionSecrets | null,
+    ): Promise<IpcResult>;
+  };
   recordings: {
     status(): Promise<IpcResult<import('./recording').RecordingStatus>>;
     start(

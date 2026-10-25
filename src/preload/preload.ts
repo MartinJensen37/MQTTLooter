@@ -53,6 +53,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     persist: (enabled: boolean) => ipcRenderer.invoke('history-persist', enabled),
     resume: () => ipcRenderer.invoke('history-resume'),
   },
+  credentials: {
+    status: () => ipcRenderer.invoke('credentials-status'),
+    get: (connectionId: string) => ipcRenderer.invoke('credentials-get', connectionId),
+    set: (connectionId: string, secrets: unknown) =>
+      ipcRenderer.invoke('credentials-set', connectionId, secrets),
+  },
   recordings: {
     status: () => ipcRenderer.invoke('recordings-status'),
     start: (connectionId: string, connectionName: string, name: string) =>

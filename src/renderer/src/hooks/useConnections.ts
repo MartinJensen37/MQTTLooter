@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import MQTTService from '../services/MQTTService';
 import TopicTreeService from '../services/TopicTreeService';
 import type { ConnectionConfig } from '../../../shared/ipc';
+import { splitSecrets } from '../../../shared/credentials';
 
 type ShowFeedback = (message: string, type?: string) => void;
 type ConnectionFormData = ConnectionConfig & { id?: string };
@@ -33,6 +34,49 @@ export function useConnections(
   });
   const [selectedConnection, setSelectedConnection] = useState<string | null>(null);
   const [lastSelectedTopics, setLastSelectedTopics] = useState<Record<string, unknown>>({});
+  const secureStorage = useRef(false);
+  const initialConnections = useRef(connections);
+
+  // Move secrets saved by earlier versions from localStorage into main's encrypted store.
+  // A connection keeps its secrets locally until main confirms they are stored.
+  useEffect(() => {
+    const api = window.electronAPI?.credentials;
+    if (!api) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const status = await api.status();
+        if (cancelled || !status.success || !status.data?.available) return;
+        secureStorage.current = true;
+        const moved = new Map<string, ConnectionConfig>();
+        for (const connection of initialConnections.current) {
+          const { config, secrets } = splitSecrets(connection.config);
+          if (!secrets) continue;
+          const result = await api.set(connection.id, secrets);
+          if (result.success) moved.set(connection.id, config);
+        }
+        if (!cancelled && moved.size)
+          setConnections((previous) =>
+            previous.map((c) => (moved.has(c.id) ? { ...c, config: moved.get(c.id)! } : c)),
+          );
+      } catch {
+        /* Secrets stay where they were; connecting still works. */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Store secrets in main when possible; otherwise keep them in the saved config as before. */
+  const storeSecrets = async (connectionId: string, data: ConnectionConfig) => {
+    const { config, secrets } = splitSecrets(data);
+    if (!secureStorage.current) return data;
+    const result = await window.electronAPI.credentials.set(connectionId, secrets);
+    if (result.success) return config;
+    showFeedback(`Credentials could not be stored securely: ${result.error}`, 'error');
+    return data;
+  };
 
   const activeConnections = useMemo(
     () => connections.filter((c) => c.isConnected || c.status === 'connected').map((c) => c.id),
@@ -90,6 +134,7 @@ export function useConnections(
     try {
       const isUpdate = !!connectionData.id;
       const connectionId = connectionData.id || `connection_${crypto.randomUUID()}`;
+      connectionData = await storeSecrets(connectionId, connectionData);
 
       if (isUpdate) {
         setConnections((prev) =>
@@ -211,6 +256,7 @@ export function useConnections(
     try {
       await MQTTService.deleteConnection(connectionId);
       TopicTreeService.removeTopicTree(connectionId);
+      if (secureStorage.current) await window.electronAPI.credentials.set(connectionId, null);
 
       setLastSelectedTopics((prev) => {
         const next = { ...prev };

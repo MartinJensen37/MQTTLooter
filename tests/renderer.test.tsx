@@ -171,6 +171,40 @@ describe('renderer state', () => {
     );
   });
 
+  it('moves saved secrets into encrypted storage only when the OS can encrypt', async () => {
+    const saved = [
+      { id: 'a', config: { name: 'A', password: 'hunter2', tls: { enabled: false, key: null } } },
+      { id: 'b', config: { name: 'B' } },
+    ];
+    const credentials = (available: boolean) => ({
+      status: vi.fn(async () => ({ success: true, data: { available, stored: {} } })),
+      get: vi.fn(),
+      set: vi.fn(async () => ({ success: true })),
+    });
+    function Harness() {
+      useConnections(feedback, null, () => {});
+      return null;
+    }
+    for (const available of [false, true]) {
+      localStorage.setItem('mqtt-connections', JSON.stringify(saved));
+      const api = credentials(available);
+      Object.assign(window.electronAPI, { credentials: api });
+      await act(async () => root.render(<Harness key={String(available)} />));
+      await settle();
+      const stored = localStorage.getItem('mqtt-connections')!;
+      if (!available) {
+        // Without OS encryption, nothing moves and nothing is lost.
+        expect(api.set).not.toHaveBeenCalled();
+        expect(stored).toContain('hunter2');
+      } else {
+        expect(api.set).toHaveBeenCalledOnce();
+        expect(api.set).toHaveBeenCalledWith('a', { password: 'hunter2' });
+        expect(stored).not.toContain('hunter2');
+        expect(JSON.parse(stored).map((c: any) => c.config.name)).toEqual(['A', 'B']);
+      }
+    }
+  });
+
   it('preserves saved profiles on mount and refresh in StrictMode', async () => {
     localStorage.setItem(
       'mqtt-connections',

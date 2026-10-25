@@ -36,6 +36,7 @@ Module._load = function (request, ...args) {
 const sockets = new Set();
 const binaryPayload = Buffer.from([0, 255, 128, 13, 10]);
 const published = [];
+const connectPasswords = [];
 const broker = net.createServer((socket) => {
   sockets.add(socket);
   socket.on('close', () => sockets.delete(socket));
@@ -46,6 +47,7 @@ const broker = net.createServer((socket) => {
   const send = (packet) => socket.write(codec.generate(packet, { protocolVersion }));
   parser.on('packet', (packet) => {
     if (packet.cmd === 'connect') {
+      connectPasswords.push(packet.password?.toString());
       protocolVersion = packet.protocolVersion;
       send({ cmd: 'connack', sessionPresent: false, returnCode: 0, reasonCode: 0 });
     } else if (packet.cmd === 'subscribe') {
@@ -152,6 +154,8 @@ async function run() {
     protocolVersion: 5,
     reconnectPeriod: 0,
     subscriptions: [{ topic: '#', qos: 0 }],
+    username: 'smoke-user',
+    password: 'smoke-secret',
   };
   await evaluate(
     `localStorage.setItem('mqtt-connections', JSON.stringify([{id:'smoke',config:${JSON.stringify(config)}}]))`,
@@ -180,11 +184,21 @@ async function run() {
   assert.ok(!fs.existsSync(path.join(temporary, 'recordings.json')));
   assert.ok(fs.existsSync(path.join(temporary, 'recordings.json.migrated')));
   assert.ok(fs.existsSync(path.join(temporary, 'recordings.sqlite')));
+  // The saved password moves to main's encrypted store and still reaches the broker.
+  await waitFor(
+    async () =>
+      !(await evaluate("localStorage.getItem('mqtt-connections')")).includes('smoke-secret'),
+    'credential migration',
+  );
+  assert.ok(
+    !fs.readFileSync(path.join(temporary, 'credentials.json'), 'utf8').includes('smoke-secret'),
+  );
   await evaluate("document.querySelector('.connection-card .toggle-btn').click()");
   await waitFor(
     () => evaluate("document.querySelector('.topic-tree-stats')?.textContent.includes('4 topics')"),
     'MQTT 5 topics',
   );
+  assert.equal(connectPasswords.at(-1), 'smoke-secret');
   await evaluate('document.querySelector(\'[title="Expand all topics"]\').click()');
   await waitFor(
     () => evaluate("document.querySelectorAll('.topic-tree-node.has-messages').length === 4"),
