@@ -211,11 +211,12 @@ export default function HistorySearch({
           <label>
             Payload{' '}
             <input
-              className="form-input"
+              className="form-input search-input"
+              type="search"
               aria-label="Search message contents"
               value={term}
               maxLength={1024}
-              placeholder={mode === 'hex' ? '00 ff 80' : 'Case-sensitive literal text'}
+              placeholder={mode === 'hex' ? 'Hex bytes, e.g. 00 ff 80' : 'Text (case-sensitive)'}
               onChange={(event) => {
                 reset();
                 setTerm(event.target.value);

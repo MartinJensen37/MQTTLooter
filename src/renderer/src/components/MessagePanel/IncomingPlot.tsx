@@ -269,7 +269,8 @@ export default function IncomingPlot({
         <label>
           Field{' '}
           <input
-            className="form-input"
+            type="search"
+            className="form-input search-input"
             aria-label="Numeric field path"
             list={fieldListId}
             placeholder="Whole payload or /field/path"

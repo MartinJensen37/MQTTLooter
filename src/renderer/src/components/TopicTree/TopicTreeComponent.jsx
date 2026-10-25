@@ -194,9 +194,9 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
         <div className="topic-search">
           <input
             type="search"
-            className="form-input"
+            className="form-input search-input"
             aria-label="Search topics"
-            placeholder="Search topic paths..."
+            placeholder="Search topics"
             value={search}
             onChange={(event) => {
               searchRef.current = event.target.value;

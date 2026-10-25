@@ -144,6 +144,32 @@
 .form-group input.error,
 .form-group select.error { border-color: var(--danger); }
 
+/* ── Search fields: one look for every search ── */
+.form-input.search-input {
+  height: 32px;
+  padding: 0 10px 0 32px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='4.5' fill='none' stroke='%23adb5bd' stroke-width='1.6'/%3E%3Cpath d='m10.5 10.5 3.5 3.5' stroke='%23adb5bd' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat 11px center;
+}
+.search-input::placeholder { color: var(--gray-500); }
+/* The clear button: light gray, darker on hover, with a pointer. */
+.search-input::-webkit-search-cancel-button {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16'%3E%3Cpath d='m4.5 4.5 7 7m0-7-7 7' stroke='%23adb5bd' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center;
+  cursor: pointer;
+}
+/* Chromium shows it only on hover or focus; keep it visible while there is text to clear. */
+.search-input:not(:placeholder-shown)::-webkit-search-cancel-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+.search-input::-webkit-search-cancel-button:hover {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16'%3E%3Cpath d='m4.5 4.5 7 7m0-7-7 7' stroke='%236c757d' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
 .form-textarea { resize: vertical; min-height: 100px; font-family: var(--font-mono); }
 
 .form-row { display: flex; gap: var(--spacing-lg); }

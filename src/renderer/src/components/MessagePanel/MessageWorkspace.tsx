@@ -261,9 +261,10 @@ function Workspace(props: any) {
         <div className="message-history-catalog">
           <input
             type="search"
-            className="form-input"
+            className="form-input search-input"
             aria-label="Search stored topics"
-            placeholder="Search stored topics (case sensitive)"
+            placeholder="Search stored topics"
+            title="Case-sensitive"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
