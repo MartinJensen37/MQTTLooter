@@ -78,7 +78,7 @@ Broker passwords, TLS private keys and passphrases are encrypted with `safeStora
 | Memory and throttling | Acknowledged transport batches, per-connection/shared budgets, protected topic metadata, worker-owned disk history and recordings with durable gap records. A load harness measures working sets, V8 heaps, input latency, queues and accounting. | Replaceable-update coalescing for retained floods; optional per-message allocation reduction. |
 | Recordings in a database | Main-owned capture into `recordings.sqlite` with per-batch commits, crash recovery, durable queue/outage/storage gaps, paged playback, streamed export and one-time JSON/localStorage migration. Kept up with 5,000 msg/s for 60 s under load. | Cross-recording search. |
 | Responsive disconnect control | MQTT clients run in main; storage runs in workers. Measured disconnect is 1-2 ms during 50k-topic floods and 5,000 msg/s streams. | Repeat with decoding and plots active once those land. |
-| Multiple tiled panels | Split view shows two tabs side by side (stacked when narrow) with a resizable, keyboard-accessible divider and a persisted layout. Panels stay mounted once and are only placed by CSS, so no simulator or recording is duplicated or restarted. | Per-pane connection/topic selection and more than two panes, which need panel state moved out of the components first. |
+| Multiple tiled panels | Split view shows two tabs side by side (stacked when narrow) with a resizable, keyboard-accessible divider and a persisted layout. Panels stay mounted once and are only placed by CSS, so no simulator or recording is duplicated or restarted. The second pane can be pinned to a connection and topic, which the topic cache protects like the main selection. | The same tab in both panes and more than two panes, which need panel state moved out of the components first. |
 | Protobuf / Sparkplug B | User-provided `.proto` decoders mapped to MQTT topic filters, compiled and applied in a main-process worker (the renderer CSP forbids generated code), with a Decoded payload view, 1 MiB input/output limits and exact 64-bit integers. | Decoded fields also plot and are searchable (decoded in the history worker), and decoders compile from several `.proto` files that import each other. Sparkplug B stays optional. |
 | Password visibility and credentials | Shared show/hide controls; passwords, TLS keys and passphrases encrypted with `safeStorage` in main, migrated from localStorage. | WebSocket header and MQTT 5 authentication secrets once those settings exist. |
 | CSS cleanup and refactoring | Shared tokens/controls and simulator scoping exist; older globals and broad JS types remain. | Incremental cleanup in touched features, scoped styles, typed service boundaries. |
@@ -251,12 +251,14 @@ Every phase includes targeted regression tests, typecheck/lint/build where relev
 
 ## Delivery order
 
-Done on 2026-10-25, in order: durable recordings, the load harness, credential storage, renderer heap profiling, chunked history clears, JSON Schema validation, simulator payload templates, plot time sources and scales, cross-topic search, drift-free playback, negotiated topic aliases, whole-topic export, the transport test matrix, Mosquitto interoperability tests, schema-built publishing and simulator templates, protobuf decoding, full search-result export, streamed recording import, split view, decoded-field plots, decoded search and multi-file `.proto` decoders.
+Done on 2026-10-25, in order: durable recordings, the load harness, credential storage, renderer heap profiling, chunked history clears, JSON Schema validation, simulator payload templates, plot time sources and scales, cross-topic search, drift-free playback, negotiated topic aliases, whole-topic export, the transport test matrix, Mosquitto interoperability tests, schema-built publishing and simulator templates, protobuf decoding, full search-result export, streamed recording import, split view, decoded-field plots, decoded search, multi-file `.proto` decoders and pinned split panes.
 
 Next, in order:
 
-1. Installer/upgrade checks and other brokers (Mosquitto checks are in place).
-2. Per-pane selection in split view, after panel state moves into services.
+1. Installer/upgrade checks and other brokers (Mosquitto checks are in place). The installer changes the system, so it runs only as an agreed release step.
+2. Load measurements with decoders, decoded plots and a pinned pane active.
+3. Custom time ranges for content search.
+4. Lazy-loaded panel modules.
 
 Original order: start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
 
