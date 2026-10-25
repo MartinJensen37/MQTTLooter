@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './RecordingPanel.css';
-import MQTTService from '../../services/MQTTService';
-import RecordingCapture from '../../services/RecordingCapture';
-import { useRecordingLibrary } from '../../hooks/useRecordingLibrary';
+import { useRecordingLibrary, unwrap } from '../../hooks/useRecordingLibrary';
+import { RecordingCursor } from '../../services/RecordingCursor';
 import { parseRecording } from './recordingPanel/parseRecording';
-import type { Recording, CurrentPlayback } from './recordingPanel/types';
-import { getFilteredMessagesFor } from './recordingPanel/recordingHelpers';
+import type {
+  PlaybackState,
+  RecordingSummary,
+  StoredRecordingMessage,
+} from './recordingPanel/types';
+import { formatBytes } from './recordingPanel/recordingHelpers';
 import RecordingControls from './recordingPanel/RecordingControls';
 import RecordingItem from './recordingPanel/RecordingItem';
 import PlaybackControls from './recordingPanel/PlaybackControls';
@@ -19,6 +22,8 @@ interface RecordingPanelProps {
   activeConnectionId?: string | null;
 }
 
+const api = () => window.electronAPI.recordings;
+
 function RecordingPanel({
   connectionName,
   showFeedback,
@@ -26,26 +31,18 @@ function RecordingPanel({
   isConnected = false,
   activeConnectionId = null,
 }: RecordingPanelProps) {
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingStart, setRecordingStart] = useState<Date | null>(null);
-  const captureRef = useRef<RecordingCapture | null>(null);
-  const [captureCounts, setCaptureCounts] = useState({ messages: 0, topics: 0 });
+  const { recordings, status, ready, error: storageError, refresh, retry } = useRecordingLibrary();
+  const [busy, setBusy] = useState(false);
   const [republish, setRepublish] = useState(false);
-  const {
-    recordings,
-    setRecordings,
-    addRecording,
-    ready,
-    status,
-    error: storageError,
-    retry,
-  } = useRecordingLibrary();
 
-  // Playback state.
+  // Playback state. Messages are read through a cursor over main's database.
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [currentPlayback, setCurrentPlayback] = useState<CurrentPlayback | null>(null);
+  const [playback, setPlayback] = useState<PlaybackState | null>(null);
+  const cursorRef = useRef<RecordingCursor | null>(null);
+  const [cursorVersion, setCursorVersion] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentMessage, setCurrentMessage] = useState<StoredRecordingMessage | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [stepSize, setStepSize] = useState(1);
 
@@ -56,166 +53,190 @@ function RecordingPanel({
   const [editingRecording, setEditingRecording] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
 
-  const isRecordingDisabled = !isConnected || !activeConnectionId || !ready;
+  const capture = status?.active.find((item) => item.connectionId === activeConnectionId);
+  const isRecording = Boolean(capture);
+  const isRecordingDisabled =
+    !isConnected || !activeConnectionId || !ready || Boolean(status?.error);
   const playbackGeneration = useRef(0);
 
-  const stopRecording = useCallback(() => {
-    const recording = captureRef.current?.finish();
-    captureRef.current = null;
-    setIsRecording(false);
-    setRecordingStart(null);
-    setCaptureCounts({ messages: 0, topics: 0 });
-    if (recording) addRecording(recording);
-  }, [addRecording]);
-
+  // Captures stopped by main (storage limit or failure) are reported once.
+  const seenNotice = useRef<number | null>(null);
   useEffect(() => {
-    const generation = playbackGeneration;
-    const onMessage = (data: any) => {
-      if (captureRef.current && !captureRef.current.add(data)) {
-        stopRecording();
-        showFeedback?.('Recording stopped at the 10,000-message or 2 MB capture limit.', 'info');
-      }
-    };
-    const onDisconnect = (data: any) => {
-      if (captureRef.current?.connectionId === data.id) stopRecording();
-    };
-    const onGap = (data: any) => {
-      const capture = captureRef.current;
-      if (!capture || capture.connectionId !== data.id) return;
-      capture.incompleteReason = 'Incoming message delivery has a gap.';
-      stopRecording();
-      showFeedback?.(
-        'Recording stopped: incoming message delivery has a gap. The saved capture is incomplete.',
-        'error',
-      );
-    };
-    MQTTService.onAny('delivery-gap', onGap);
-    MQTTService.onAny('message', onMessage);
-    MQTTService.onAny('disconnected', onDisconnect);
-    const timer = setInterval(() => {
-      const capture = captureRef.current;
-      if (capture)
-        setCaptureCounts({ messages: capture.messages.length, topics: capture.topics.size });
-    }, 250);
-    return () => {
-      generation.current++;
-      MQTTService.off('*', 'delivery-gap', onGap);
-      MQTTService.off('*', 'message', onMessage);
-      MQTTService.off('*', 'disconnected', onDisconnect);
-      clearInterval(timer);
-    };
-  }, [stopRecording, showFeedback]);
+    if (!status) return;
+    const last = status.notices.at(-1)?.id ?? 0;
+    if (seenNotice.current !== null)
+      for (const notice of status.notices)
+        if (notice.id > seenNotice.current)
+          showFeedback?.(`Recording stopped: ${notice.reason}`, 'error');
+    seenNotice.current = Math.max(seenNotice.current ?? 0, last);
+  }, [status, showFeedback]);
 
   useEffect(() => {
     playbackGeneration.current++;
-    if (
-      captureRef.current &&
-      (isRecordingDisabled || captureRef.current.connectionId !== activeConnectionId)
-    )
-      stopRecording();
     setIsPlaying(false);
     setIsPaused(false);
     setRepublish(false);
-  }, [activeConnectionId, isRecordingDisabled, stopRecording]);
+  }, [activeConnectionId, isRecordingDisabled]);
 
+  // A new cursor and filtered total whenever the expanded recording or topic filter changes.
+  const filterKey = JSON.stringify(selectedTopicsFilter);
   useEffect(() => {
     playbackGeneration.current++;
     setIsPlaying(false);
     setIsPaused(false);
-    setCurrentPlayback((prev) =>
-      prev
-        ? { ...prev, messages: getFilteredMessagesFor(prev.originalMessages, selectedTopicsFilter) }
-        : null,
-    );
     setCurrentIndex(0);
-  }, [selectedTopicsFilter]);
+    setCurrentMessage(null);
+    if (expandedRecording === null) {
+      cursorRef.current = null;
+      setPlayback(null);
+      return;
+    }
+    const recordingId = expandedRecording;
+    const topics: string[] | undefined = JSON.parse(filterKey);
+    const filter = topics?.length ? topics : undefined;
+    cursorRef.current = new RecordingCursor(async (query) =>
+      unwrap(await api().page({ recordingId, ...query, topics: filter })),
+    );
+    setCursorVersion((value) => value + 1);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [topicList, total, list] = await Promise.all([
+          api().topics(recordingId),
+          api().count(recordingId, filter),
+          api().list(),
+        ]);
+        const recording = unwrap(list).find((item) => item.id === recordingId);
+        if (cancelled || !recording) return;
+        const { topics: available, total: topicTotal } = unwrap(topicList);
+        setPlayback({
+          recording,
+          topics: available.map((item) => item.topic),
+          topicTotal,
+          total: unwrap(total),
+        });
+      } catch (error) {
+        if (!cancelled)
+          showFeedback?.(`Recording could not be loaded: ${(error as Error).message}`, 'error');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [expandedRecording, filterKey, showFeedback]);
+
+  // The message last played or stepped over.
+  useEffect(() => {
+    const cursor = cursorRef.current;
+    if (!cursor || currentIndex === 0) {
+      setCurrentMessage(null);
+      return;
+    }
+    let cancelled = false;
+    void cursor
+      .at(currentIndex - 1)
+      .then((message) => {
+        if (!cancelled) setCurrentMessage(message ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [currentIndex, cursorVersion]);
+
+  const publish = useCallback(
+    async (message: StoredRecordingMessage) => {
+      if (republish && isConnected && onPublishMessage)
+        await onPublishMessage({
+          topic: message.topic,
+          payload: message.message,
+          encoding: message.encoding ?? 'utf8',
+          qos: message.qos,
+          retain: message.retain,
+        });
+    },
+    [republish, isConnected, onPublishMessage],
+  );
 
   // Only one timer is live. Publishing is never performed inside a React state updater.
   useEffect(() => {
-    if (!isPlaying || !currentPlayback) return;
-    const msg = currentPlayback.messages[currentIndex];
-    if (!msg) {
-      setIsPlaying(false);
-      setIsPaused(false);
-      return;
-    }
-    const previous = currentPlayback.messages[currentIndex - 1];
-    const delay = previous
-      ? Math.max(
-          0,
-          (new Date(msg.timestamp).getTime() - new Date(previous.timestamp).getTime()) /
-            playbackSpeed,
-        )
-      : 0;
+    const cursor = cursorRef.current;
+    if (!isPlaying || !cursor) return;
     let cancelled = false;
-    const timer = setTimeout(
-      async () => {
-        try {
-          if (republish && isConnected && onPublishMessage) {
-            await onPublishMessage({
-              topic: msg.topic,
-              payload: msg.message,
-              encoding: msg.encoding ?? 'utf8',
-              qos: msg.qos,
-              retain: msg.retain,
-            });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stop = (error?: Error) => {
+      if (cancelled) return;
+      setIsPlaying(false);
+      if (error) showFeedback?.(`Playback publish failed: ${error.message}`, 'error');
+      else setIsPaused(false);
+    };
+    void (async () => {
+      const message = await cursor.at(currentIndex);
+      const previous = currentIndex > 0 ? await cursor.at(currentIndex - 1) : undefined;
+      if (cancelled) return;
+      if (!message) return stop();
+      const delay = previous
+        ? Math.max(0, (message.timestamp - previous.timestamp) / playbackSpeed)
+        : 0;
+      timer = setTimeout(
+        async () => {
+          try {
+            await publish(message);
+            if (!cancelled) setCurrentIndex(currentIndex + 1);
+          } catch (error) {
+            stop(error as Error);
           }
-          if (!cancelled) setCurrentIndex(currentIndex + 1);
-        } catch (error) {
-          if (!cancelled) {
-            setIsPlaying(false);
-            showFeedback?.(`Playback publish failed: ${(error as Error).message}`, 'error');
-          }
-        }
-      },
-      Math.min(delay, 2_147_483_647),
-    );
+        },
+        Math.min(delay, 2_147_483_647),
+      );
+    })().catch((error: Error) => {
+      if (!cancelled) {
+        setIsPlaying(false);
+        showFeedback?.(`Playback failed: ${error.message}`, 'error');
+      }
+    });
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [
-    isPlaying,
-    currentPlayback,
-    currentIndex,
-    playbackSpeed,
-    republish,
-    isConnected,
-    onPublishMessage,
-    showFeedback,
-  ]);
+  }, [isPlaying, cursorVersion, currentIndex, playbackSpeed, publish, showFeedback]);
 
-  const startRecording = () => {
+  const startRecording = async () => {
     if (isRecordingDisabled || !activeConnectionId) return;
-    captureRef.current = new RecordingCapture(activeConnectionId, connectionName || 'Unknown');
-    setRecordingStart(captureRef.current.startTime);
-    setCaptureCounts({ messages: 0, topics: 0 });
-    setIsRecording(true);
+    setBusy(true);
+    try {
+      unwrap(
+        await api().start(
+          activeConnectionId,
+          connectionName || 'Unknown',
+          `Recording ${new Date().toLocaleString()}`,
+        ),
+      );
+      await refresh();
+    } catch (error) {
+      showFeedback?.(`Recording could not start: ${(error as Error).message}`, 'error');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const selectRecording = (recording: Recording) => {
-    playbackGeneration.current++;
-    setIsPlaying(false);
-    if (expandedRecording === recording.id) {
-      setIsPlaying(false);
-      setExpandedRecording(null);
-      setCurrentPlayback(null);
-    } else {
-      const sortedMessages = [...recording.messages].sort(
-        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-      );
-      setExpandedRecording(recording.id);
-      setCurrentPlayback({
-        ...recording,
-        messages: sortedMessages,
-        originalMessages: sortedMessages,
-      });
-      setCurrentIndex(0);
-      setIsPlaying(false);
-      setIsPaused(false);
-      setSelectedTopicsFilter([]);
-      setShowTopicFilter(false);
+  const stopRecording = async () => {
+    if (!activeConnectionId) return;
+    setBusy(true);
+    try {
+      unwrap(await api().stop(activeConnectionId));
+      await refresh();
+    } catch (error) {
+      showFeedback?.(`Recording could not stop: ${(error as Error).message}`, 'error');
+    } finally {
+      setBusy(false);
     }
+  };
+
+  const selectRecording = (recording: RecordingSummary) => {
+    setExpandedRecording((current) => (current === recording.id ? null : recording.id));
+    setSelectedTopicsFilter([]);
+    setShowTopicFilter(false);
   };
 
   const resetPlayback = () => {
@@ -226,8 +247,8 @@ function RecordingPanel({
   };
 
   const startRealtimePlayback = () => {
-    if (!currentPlayback?.messages.length) return;
-    if (currentIndex >= currentPlayback.messages.length) setCurrentIndex(0);
+    if (!playback?.total) return;
+    if (currentIndex >= playback.total) setCurrentIndex(0);
     setIsPlaying(true);
     setIsPaused(false);
   };
@@ -237,29 +258,22 @@ function RecordingPanel({
     setIsPlaying(false);
     setIsPaused(true);
   };
-  const resumePlayback = startRealtimePlayback;
 
   const stepForward = async (e?: React.MouseEvent) => {
     e?.preventDefault();
     setIsPlaying(false);
-    if (!currentPlayback) return;
+    const cursor = cursorRef.current;
+    if (!cursor || !playback) return;
     const generation = ++playbackGeneration.current;
-    const nextIndex = Math.min(currentIndex + stepSize, currentPlayback.messages.length);
+    const nextIndex = Math.min(currentIndex + stepSize, playback.total);
     try {
-      for (let i = currentIndex; i < nextIndex; i++) {
-        if (playbackGeneration.current !== generation) return;
-        const msg = currentPlayback.messages[i];
-        if (republish && isConnected && onPublishMessage) {
-          await onPublishMessage({
-            topic: msg.topic,
-            payload: msg.message,
-            encoding: msg.encoding ?? 'utf8',
-            qos: msg.qos,
-            retain: msg.retain,
-          });
-        }
+      let index = currentIndex;
+      for (; index < nextIndex; index++) {
+        const message = await cursor.at(index);
+        if (playbackGeneration.current !== generation || !message) break;
+        await publish(message);
       }
-      if (playbackGeneration.current === generation) setCurrentIndex(nextIndex);
+      if (playbackGeneration.current === generation) setCurrentIndex(index);
     } catch (error) {
       showFeedback?.(`Playback publish failed: ${(error as Error).message}`, 'error');
     }
@@ -280,22 +294,23 @@ function RecordingPanel({
 
   const clearTopicFilter = () => setSelectedTopicsFilter([]);
 
-  const startEditingRecording = (recording: Recording, e: React.MouseEvent) => {
+  const startEditingRecording = (recording: RecordingSummary, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingRecording(recording.id);
     setEditingName(recording.name);
   };
 
-  const saveRecordingName = (recordingId: number) => {
-    if (editingName.trim()) {
-      setRecordings((prev) =>
-        prev.map((recording) =>
-          recording.id === recordingId ? { ...recording, name: editingName.trim() } : recording,
-        ),
-      );
-    }
+  const saveRecordingName = async (recordingId: number) => {
+    const name = editingName.trim();
     setEditingRecording(null);
     setEditingName('');
+    if (!name) return;
+    try {
+      unwrap(await api().rename(recordingId, name));
+      await refresh();
+    } catch (error) {
+      showFeedback?.(`Recording could not be renamed: ${(error as Error).message}`, 'error');
+    }
   };
 
   const cancelEditingRecording = () => {
@@ -305,44 +320,19 @@ function RecordingPanel({
 
   const handleNameKeyPress = (e: React.KeyboardEvent, recordingId: number) => {
     if (e.key === 'Enter') {
-      saveRecordingName(recordingId);
+      void saveRecordingName(recordingId);
     } else if (e.key === 'Escape') {
       cancelEditingRecording();
     }
   };
 
-  const saveRecordingToFile = (recording: Recording) => {
-    const exportData = {
-      recordingInfo: {
-        name: recording.name,
-        startTime: recording.startTime,
-        endTime: recording.endTime,
-        duration: recording.endTime.getTime() - recording.startTime.getTime(),
-        messageCount: recording.messageCount,
-        topic: recording.topic,
-        connectionName: recording.connectionName,
-        incompleteReason: recording.incompleteReason,
-      },
-      messages: recording.messages.map((msg) => ({
-        timestamp: msg.timestamp,
-        topic: msg.topic,
-        payload: msg.message,
-        encoding: msg.encoding ?? 'utf8',
-        qos: msg.qos,
-        retain: msg.retain,
-        connectionId: msg.connectionId,
-      })),
-    };
-
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `mqtt-recording-${recording.id}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const saveRecordingToFile = async (recording: RecordingSummary) => {
+    try {
+      const result = unwrap(await api().export(recording.id));
+      if (result.saved) showFeedback?.(`Recording exported to ${result.path}`, 'success');
+    } catch (error) {
+      showFeedback?.(`Recording could not be exported: ${(error as Error).message}`, 'error');
+    }
   };
 
   const loadRecordingFromFile = () => {
@@ -357,17 +347,18 @@ function RecordingPanel({
         return;
       }
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const data = JSON.parse(e.target?.result as string);
-          if (data.recordingInfo && data.messages) {
-            const recording = parseRecording(data);
-            recording.name += ' (Imported)';
-            addRecording(recording);
-            showFeedback?.('Recording imported. Check the save status before closing.', 'info');
-          } else {
+          if (!data.recordingInfo || !data.messages) {
             alert('Invalid recording file format.');
+            return;
           }
+          const recording = parseRecording(data);
+          recording.name += ' (Imported)';
+          unwrap(await api().import(recording));
+          await refresh();
+          showFeedback?.('Recording imported.', 'success');
         } catch (error: any) {
           alert('Error reading recording file: ' + error.message);
         }
@@ -377,15 +368,29 @@ function RecordingPanel({
     input.click();
   };
 
-  const deleteRecording = (recordingId: number) => {
-    playbackGeneration.current++;
-    setRecordings((prev) => prev.filter((r) => r.id !== recordingId));
-    if (expandedRecording === recordingId) {
-      setIsPlaying(false);
-      setExpandedRecording(null);
-      setCurrentPlayback(null);
+  const deleteRecording = async (recordingId: number) => {
+    if (expandedRecording === recordingId) setExpandedRecording(null);
+    try {
+      unwrap(await api().delete(recordingId));
+      await refresh();
+    } catch (error) {
+      showFeedback?.(`Recording could not be deleted: ${(error as Error).message}`, 'error');
     }
   };
+
+  // Live counts for active captures; the list itself refreshes when captures start or stop.
+  const live = (recording: RecordingSummary): RecordingSummary => {
+    const active = status?.active.find((item) => item.recordingId === recording.id);
+    return active && recording.state === 'active'
+      ? {
+          ...recording,
+          messageCount: active.messageCount,
+          topicCount: active.topicCount,
+          dropped: Math.max(recording.dropped, active.dropped),
+        }
+      : recording;
+  };
+  const storageMessage = status?.error ?? status?.migrationError;
 
   return (
     <div className={`recording-main-panel ${isRecordingDisabled ? 'recording-disabled' : ''}`}>
@@ -393,35 +398,45 @@ function RecordingPanel({
         <div className="header-left">
           <h2>Recording & Playback</h2>
         </div>
+        {status?.databaseBytes !== undefined && (
+          <span className="recording-storage-usage">
+            {formatBytes(status.databaseBytes)} of {formatBytes(status.maxDatabaseBytes)} used
+          </span>
+        )}
       </div>
 
-      {status !== 'saved' && (
-        <div className="recording-storage-status" role={status === 'error' ? 'alert' : 'status'}>
-          {status === 'loading' && 'Loading saved recordings...'}
-          {status === 'saving' && 'Saving recordings to disk...'}
-          {status === 'error' && (
+      {!ready && (
+        <div className="recording-storage-status" role={storageError ? 'alert' : 'status'}>
+          {storageError ? (
             <>
               <span>
-                Recordings could not be {ready ? 'saved' : 'loaded'}: {storageError}.{' '}
-                {ready
-                  ? 'Unsaved changes remain in memory; retry or export recordings before closing.'
-                  : 'Existing storage has been kept.'}
+                Recordings could not be loaded: {storageError}. Existing storage has been kept.
               </span>
               <button className="btn btn-sm" onClick={retry}>
                 Retry storage
               </button>
             </>
+          ) : (
+            'Loading saved recordings...'
           )}
+        </div>
+      )}
+      {storageMessage && (
+        <div className="recording-storage-status" role="alert">
+          <span>{storageMessage}</span>
         </div>
       )}
 
       <RecordingControls
-        storageReady={ready}
+        storageReady={ready && !status?.error}
         isRecording={isRecording}
         isRecordingDisabled={isRecordingDisabled}
-        recordingStart={recordingStart}
-        messageCount={captureCounts.messages}
-        topicCount={captureCounts.topics}
+        recordingStart={capture ? new Date(capture.startTime) : null}
+        messageCount={capture?.messageCount ?? 0}
+        topicCount={capture?.topicCount ?? 0}
+        dropped={capture?.dropped ?? 0}
+        otherRecordings={(status?.active.length ?? 0) - (capture ? 1 : 0)}
+        busy={busy}
         startRecording={startRecording}
         stopRecording={stopRecording}
       />
@@ -463,7 +478,7 @@ function RecordingPanel({
               {recordings.map((recording) => (
                 <RecordingItem
                   key={recording.id}
-                  recording={recording}
+                  recording={live(recording)}
                   isExpanded={expandedRecording === recording.id}
                   editingRecording={editingRecording}
                   editingName={editingName}
@@ -475,9 +490,10 @@ function RecordingPanel({
                   saveRecordingToFile={saveRecordingToFile}
                   deleteRecording={deleteRecording}
                   expandedContent={
-                    expandedRecording === recording.id && currentPlayback ? (
+                    expandedRecording === recording.id && playback ? (
                       <PlaybackControls
-                        currentPlayback={currentPlayback}
+                        playback={playback}
+                        currentMessage={currentMessage}
                         currentIndex={currentIndex}
                         isPlaying={isPlaying}
                         isPaused={isPaused}
@@ -494,7 +510,7 @@ function RecordingPanel({
                         toggleTopicFilter={toggleTopicFilter}
                         stepBackward={stepBackward}
                         resetPlayback={resetPlayback}
-                        resumePlayback={resumePlayback}
+                        resumePlayback={startRealtimePlayback}
                         startRealtimePlayback={startRealtimePlayback}
                         pausePlayback={pausePlayback}
                         stepForward={stepForward}

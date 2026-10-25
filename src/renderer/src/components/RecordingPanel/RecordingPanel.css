@@ -154,8 +154,13 @@
 }
 
 @keyframes recording-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 
 .recording-live-info {
@@ -614,7 +619,6 @@
   transform: scale(1.1);
 }
 
-
 .recording-step-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -914,4 +918,22 @@
   padding: 8px 16px;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.recording-storage-usage {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.recording-item-state {
+  padding: 0 var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.recording-item-live {
+  color: var(--danger-red);
 }

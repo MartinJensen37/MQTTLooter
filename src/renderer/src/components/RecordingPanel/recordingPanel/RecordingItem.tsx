@@ -1,18 +1,18 @@
 import React from 'react';
-import type { Recording } from './types';
-import { getUniqueTopics } from './recordingHelpers';
+import type { RecordingSummary } from './types';
+import { incompleteDescription } from './recordingHelpers';
 
 interface Props {
-  recording: Recording;
+  recording: RecordingSummary;
   isExpanded: boolean;
   editingRecording: number | null;
   editingName: string;
   setEditingName: React.Dispatch<React.SetStateAction<string>>;
-  onSelect: (recording: Recording) => void;
-  startEditingRecording: (recording: Recording, e: React.MouseEvent) => void;
+  onSelect: (recording: RecordingSummary) => void;
+  startEditingRecording: (recording: RecordingSummary, e: React.MouseEvent) => void;
   saveRecordingName: (recordingId: number) => void;
   handleNameKeyPress: (e: React.KeyboardEvent, recordingId: number) => void;
-  saveRecordingToFile: (recording: Recording) => void;
+  saveRecordingToFile: (recording: RecordingSummary) => void;
   deleteRecording: (recordingId: number) => void;
   expandedContent: React.ReactNode;
 }
@@ -31,7 +31,9 @@ function RecordingItem({
   deleteRecording,
   expandedContent,
 }: Props) {
-  const topicCount = getUniqueTopics(recording.messages).length;
+  const active = recording.state === 'active';
+  const end = recording.endTime ?? Date.now();
+  const incomplete = incompleteDescription(recording);
 
   return (
     <div className={`recording-saved-item ${isExpanded ? 'recording-item-expanded' : ''}`}>
@@ -39,11 +41,12 @@ function RecordingItem({
       <div className="recording-item-header" onClick={() => onSelect(recording)}>
         <div className="recording-item-title">
           <i className={`fas fa-${isExpanded ? 'chevron-down' : 'chevron-right'}`}></i>
-          <i className="fas fa-video"></i>
+          <i className={`fas ${active ? 'fa-circle recording-item-live' : 'fa-video'}`}></i>
           {editingRecording === recording.id ? (
             <input
               type="text"
               value={editingName}
+              maxLength={256}
               onChange={(e) => setEditingName(e.target.value)}
               onBlur={() => saveRecordingName(recording.id)}
               onKeyDown={(e) => handleNameKeyPress(e, recording.id)}
@@ -79,7 +82,8 @@ function RecordingItem({
           <button
             onClick={() => deleteRecording(recording.id)}
             className="btn btn-sm btn-danger"
-            title="Delete recording"
+            title={active ? 'Stop the recording before deleting it' : 'Delete recording'}
+            disabled={active}
           >
             <i className="fas fa-trash"></i>
           </button>
@@ -90,24 +94,27 @@ function RecordingItem({
       <div className="recording-item-summary">
         <div className="recording-item-stats">
           <span>
-            <i className="fas fa-envelope"></i> {recording.messageCount} messages
+            <i className="fas fa-envelope"></i> {recording.messageCount.toLocaleString()} messages
           </span>
           <span>
-            <i className="fas fa-clock"></i>{' '}
-            {Math.round((recording.endTime.getTime() - recording.startTime.getTime()) / 1000)}s
+            <i className="fas fa-clock"></i> {Math.round((end - recording.startTime) / 1000)}s
           </span>
           <span>
-            <i className="fas fa-tag"></i> {topicCount} {topicCount === 1 ? 'topic' : 'topics'}
+            <i className="fas fa-tag"></i> {recording.topicCount.toLocaleString()}{' '}
+            {recording.topicCount === 1 ? 'topic' : 'topics'}
           </span>
+          {active && <span className="recording-item-state">Recording</span>}
+          {recording.state === 'interrupted' && (
+            <span className="recording-item-state">Interrupted</span>
+          )}
         </div>
         <div className="recording-item-time">
-          {recording.startTime.toLocaleString()} - {recording.endTime.toLocaleString()}
+          {new Date(recording.startTime).toLocaleString()} -{' '}
+          {active ? 'now' : new Date(end).toLocaleString()}
         </div>
       </div>
 
-      {recording.incompleteReason && (
-        <p className="history-limit-notice">Incomplete capture: {recording.incompleteReason}</p>
-      )}
+      {incomplete && <p className="history-limit-notice">Incomplete capture: {incomplete}</p>}
 
       {/* Expanded playback area (supplied by the container) */}
       {expandedContent}

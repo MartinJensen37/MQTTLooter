@@ -1,11 +1,12 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { join } from 'path';
 import { MQTTConnectionManager } from './mqtt-connection-manager';
-import { RecordingStore } from './recording-store';
+import { RecordingService } from './recording-service';
 import { HistoryService } from './history-service';
 import { validateSearch, type HistorySearchQuery } from '../shared/history-search';
 import { MessageDelivery } from './message-delivery';
 import type { IncomingPublish } from '../shared/traffic';
+import { RECORDING_LIMITS, type RecordingPageQuery } from '../shared/recording';
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
@@ -16,12 +17,12 @@ const messageDelivery = new MessageDelivery((batch) => {
   } else messageDelivery.reset();
 });
 messageDelivery.pause();
-const recordingStore = new RecordingStore(join(app.getPath('userData'), 'recordings.json'));
-// One main process owns the library; renderer revisions prevent stale snapshots within it.
+// One main process owns each user-data directory and its storage workers.
 const primaryInstance = app.requestSingleInstanceLock();
 const historyService = primaryInstance
   ? new HistoryService(join(app.getPath('userData'), 'history'))
   : null;
+const recordingService = primaryInstance ? new RecordingService(app.getPath('userData')) : null;
 if (!primaryInstance) app.quit();
 app.on('second-instance', () => {
   if (mainWindow?.isMinimized()) mainWindow.restore();
@@ -134,8 +135,14 @@ function setupMQTTEventForwarding() {
     'unsubscribed',
   ];
   mqttManager.on('message', (message: IncomingPublish) => {
+    recordingService?.capture(message);
     historyService?.append(message);
     messageDelivery.enqueue(message);
+  });
+  mqttManager.on('disconnected', ({ id }: { id: string }) => recordingService?.connectionLost(id));
+  mqttManager.on('connected', ({ id }: { id: string }) => recordingService?.connectionRestored(id));
+  mqttManager.on('closed', ({ id }: { id: string }) => {
+    void recordingService?.stop(id).catch(() => {});
   });
   events.forEach((event) => {
     mqttManager.on(event, (data: unknown) => {
@@ -313,11 +320,84 @@ app.on('ready', () => {
   setTimeout(createWindow, 100);
 });
 
+const validRecordingId = (value: unknown): value is number =>
+  Number.isSafeInteger(value) && (value as number) > 0;
+const validTopics = (value: unknown): value is string[] | undefined =>
+  value === undefined ||
+  (Array.isArray(value) &&
+    value.length <= RECORDING_LIMITS.maxFilterTopics &&
+    value.every(validTopic));
+const validName = (value: unknown): value is string =>
+  typeof value === 'string' && value.length <= RECORDING_LIMITS.maxNameLength;
+const recording = (id: unknown) => {
+  if (!validRecordingId(id)) throw new Error('Invalid recording');
+  return id;
+};
 for (const [channel, handler] of Object.entries({
-  'recordings-load': () => recordingStore.load(),
-  'recordings-migrate': (recordings: unknown) => recordingStore.migrate(recordings),
-  'recordings-save': (recordings: unknown, revision: number) =>
-    recordingStore.save(recordings, revision),
+  'recordings-status': () => recordingService!.refresh(),
+  'recordings-start': (connectionId: unknown, connectionName: unknown, name: unknown) => {
+    if (!validId(connectionId) || !validName(connectionName) || !validName(name))
+      throw new Error('Invalid recording request');
+    if (!mqttManager.getConnection(connectionId)?.isConnected)
+      throw new Error('Connect to the broker before recording');
+    return recordingService!.start(connectionId, connectionName, name);
+  },
+  'recordings-stop': (connectionId: unknown) => {
+    if (!validId(connectionId)) throw new Error('Invalid recording request');
+    return recordingService!.stop(connectionId);
+  },
+  'recordings-list': () => recordingService!.request({ action: 'list' }),
+  'recordings-topics': (id: unknown) =>
+    recordingService!.request({ action: 'topics', recordingId: recording(id) }),
+  'recordings-gaps': (id: unknown) =>
+    recordingService!.request({ action: 'gaps', recordingId: recording(id) }),
+  'recordings-count': (id: unknown, topics: unknown) => {
+    if (!validTopics(topics)) throw new Error('Invalid topic filter');
+    return recordingService!.request({ action: 'count', recordingId: recording(id), topics });
+  },
+  'recordings-page': (query: RecordingPageQuery) => {
+    const bound = (value: unknown) =>
+      value === undefined || (Number.isSafeInteger(value) && (value as number) >= 0);
+    if (
+      !query ||
+      !validRecordingId(query.recordingId) ||
+      !bound(query.after) ||
+      !bound(query.before) ||
+      (query.after !== undefined && query.before !== undefined) ||
+      !Number.isSafeInteger(query.limit) ||
+      query.limit < 1 ||
+      query.limit > RECORDING_LIMITS.maxPageMessages ||
+      !validTopics(query.topics)
+    )
+      throw new Error('Invalid recording page');
+    const { recordingId, after, before, limit, topics } = query;
+    return recordingService!.request({
+      action: 'page',
+      query: { recordingId, after, before, limit, topics },
+    });
+  },
+  'recordings-rename': (id: unknown, name: unknown) => {
+    if (!validName(name)) throw new Error('Invalid recording name');
+    return recordingService!.request({ action: 'rename', recordingId: recording(id), name });
+  },
+  'recordings-delete': (id: unknown) =>
+    recordingService!.request({ action: 'delete', recordingId: recording(id) }),
+  'recordings-import': (data: unknown) =>
+    recordingService!.request({ action: 'import', recording: data as never }),
+  'recordings-migrate': (recordings: unknown) => {
+    if (!Array.isArray(recordings)) throw new Error('Invalid legacy recording library');
+    return recordingService!.request({ action: 'import-legacy', recordings });
+  },
+  'recordings-export': async (id: unknown) => {
+    const recordingId = recording(id);
+    const result = await dialog.showSaveDialog(mainWindow!, {
+      defaultPath: `mqtt-recording-${recordingId}.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return { saved: false };
+    await recordingService!.exportTo(recordingId, result.filePath);
+    return { saved: true, path: result.filePath };
+  },
 })) {
   handleIPC(channel, async (_event, ...args) => {
     try {
@@ -336,8 +416,7 @@ app.on('before-quit', (event) => {
   if (shutdownStarted) return;
   shutdownStarted = true;
   void Promise.allSettled([
-    mqttManager.disconnectAll(),
-    recordingStore.flush(),
+    mqttManager.disconnectAll().then(() => recordingService?.close()),
     historyService?.close(),
   ]).then(() => {
     finishingQuit = true;

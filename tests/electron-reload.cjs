@@ -15,6 +15,11 @@ module.exports = async function checkReload({ window, evaluate, waitFor, send })
   });
   let sequence = 0;
   const timer = setInterval(() => send('reload/live', String(++sequence)), 10);
+  // Captures run in main, so a renderer reload must not stop or thin out a recording.
+  const started = await evaluate(
+    "window.electronAPI.recordings.start('smoke', 'Smoke broker', 'Across reload')",
+  );
+  assert.equal(started.success, true, started.error);
   try {
     window.webContents.reload();
     await waitFor(() => !window.webContents.isLoading(), 'reload with incoming traffic');
@@ -43,6 +48,25 @@ module.exports = async function checkReload({ window, evaluate, waitFor, send })
     );
     const status = await evaluate('window.electronAPI.mqtt.getTrafficStatus()');
     assert.ok(status.data.connections.smoke.processed > 0);
+    const recording = await evaluate('window.electronAPI.recordings.status()');
+    assert.deepEqual(
+      recording.data.active.map((capture) => capture.recordingId),
+      [started.data.id],
+    );
+    const stopped = await evaluate("window.electronAPI.recordings.stop('smoke')");
+    assert.equal(stopped.data.state, 'complete');
+    assert.equal(stopped.data.dropped, 0);
+    const values = [];
+    for (let after = 0; ; ) {
+      const page = await evaluate(
+        `window.electronAPI.recordings.page({ recordingId: ${started.data.id}, after: ${after}, limit: 512 })`,
+      );
+      values.push(...page.data.messages.map((message) => Number(message.message)));
+      if (page.data.cursor === null) break;
+      after = page.data.cursor;
+    }
+    assert.ok(values.length > 20, `captured ${values.length} messages across reload`);
+    values.forEach((value, index) => index && assert.equal(value, values[index - 1] + 1));
   } finally {
     clearInterval(timer);
     webRequest.onBeforeRequest(null);

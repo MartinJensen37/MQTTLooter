@@ -1,7 +1,15 @@
-import type { Recording, RecordedMessage } from '../../../../../shared/recording';
-export type { Recording, RecordedMessage };
+import type {
+  Recording,
+  RecordedMessage,
+  RecordingSummary,
+  StoredRecordingMessage,
+} from '../../../../../shared/recording';
+export type { Recording, RecordedMessage, RecordingSummary, StoredRecordingMessage };
 
-/** A recording prepared for playback. */
-export interface CurrentPlayback extends Recording {
-  originalMessages: RecordedMessage[];
+/** The expanded recording: available topics and the size of the current filter. */
+export interface PlaybackState {
+  recording: RecordingSummary;
+  topics: string[];
+  topicTotal: number;
+  total: number;
 }

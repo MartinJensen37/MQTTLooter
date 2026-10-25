@@ -1,10 +1,11 @@
 import React from 'react';
 import { formatPayloadBytes } from '../../../../../shared/payload';
-import type { CurrentPlayback } from './types';
-import { getUniqueTopics, formatPayload } from './recordingHelpers';
+import type { PlaybackState, StoredRecordingMessage } from './types';
+import { formatPayload } from './recordingHelpers';
 
 interface Props {
-  currentPlayback: CurrentPlayback;
+  playback: PlaybackState;
+  currentMessage: StoredRecordingMessage | null;
   currentIndex: number;
   isPlaying: boolean;
   isPaused: boolean;
@@ -28,7 +29,8 @@ interface Props {
 }
 
 function PlaybackControls({
-  currentPlayback,
+  playback,
+  currentMessage,
   currentIndex,
   isPlaying,
   isPaused,
@@ -50,7 +52,7 @@ function PlaybackControls({
   pausePlayback,
   stepForward,
 }: Props) {
-  const currentMessage = currentPlayback.messages[Math.max(0, currentIndex - 1)] || null;
+  const { topics, total } = playback;
 
   return (
     <div className="recording-expanded-area">
@@ -68,15 +70,13 @@ function PlaybackControls({
           className="btn btn-md btn-secondary"
         >
           <i className="fas fa-filter"></i> Topic Filter ({selectedTopicsFilter.length} of{' '}
-          {getUniqueTopics(currentPlayback.originalMessages).length} selected)
+          {playback.topicTotal.toLocaleString()} selected)
         </button>
         {showTopicFilter && (
           <div className="recording-topic-filter-panel">
             <div className="recording-filter-actions">
               <button
-                onClick={() =>
-                  setSelectedTopicsFilter(getUniqueTopics(currentPlayback.originalMessages))
-                }
+                onClick={() => setSelectedTopicsFilter(topics)}
                 className="btn btn-sm btn-success"
               >
                 Select All
@@ -86,7 +86,7 @@ function PlaybackControls({
               </button>
             </div>
             <div className="recording-topic-list">
-              {getUniqueTopics(currentPlayback.originalMessages).map((topic) => (
+              {topics.map((topic) => (
                 <label key={topic} className="recording-topic-checkbox">
                   <input
                     type="checkbox"
@@ -98,8 +98,10 @@ function PlaybackControls({
               ))}
             </div>
             <div className="recording-filter-summary">
-              Filtered messages: {currentPlayback.messages.length} of{' '}
-              {currentPlayback.originalMessages.length}
+              Filtered messages: {total.toLocaleString()} of{' '}
+              {playback.recording.messageCount.toLocaleString()}
+              {topics.length < playback.topicTotal &&
+                ` (first ${topics.length.toLocaleString()} topics listed)`}
             </div>
           </div>
         )}
@@ -113,16 +115,11 @@ function PlaybackControls({
             <div
               className="recording-progress-fill"
               style={{
-                width: `${currentPlayback.messages.length === 0 ? 0 : (currentIndex / currentPlayback.messages.length) * 100}%`,
+                width: `${total === 0 ? 0 : Math.min(100, (currentIndex / total) * 100)}%`,
               }}
             ></div>
           </div>
-          <span>
-            {currentPlayback.messages.length === 0
-              ? 0
-              : Math.round((currentIndex / currentPlayback.messages.length) * 100)}
-            %
-          </span>
+          <span>{total === 0 ? 0 : Math.min(100, Math.round((currentIndex / total) * 100))}%</span>
         </div>
 
         {/* Main controls */}
@@ -164,7 +161,7 @@ function PlaybackControls({
           <button
             onClick={stepForward}
             className="btn btn-md btn-secondary"
-            disabled={currentIndex >= currentPlayback.messages.length}
+            disabled={currentIndex >= total}
           >
             <i className="fas fa-step-forward"></i>
           </button>
@@ -209,7 +206,7 @@ function PlaybackControls({
             <div className="recording-message-position">
               <strong>Position:</strong>
               <span>
-                Message {Math.max(1, currentIndex)} of {currentPlayback.messages.length}
+                Message {Math.max(1, currentIndex).toLocaleString()} of {total.toLocaleString()}
               </span>
             </div>
             <div className="recording-message-details">

@@ -7,6 +7,9 @@ interface Props {
   recordingStart: Date | null;
   messageCount: number;
   topicCount: number;
+  dropped?: number;
+  otherRecordings?: number;
+  busy?: boolean;
   startRecording: () => void;
   stopRecording: () => void;
 }
@@ -18,6 +21,9 @@ function RecordingControls({
   recordingStart,
   messageCount,
   topicCount,
+  dropped = 0,
+  otherRecordings = 0,
+  busy = false,
   startRecording,
   stopRecording,
 }: Props) {
@@ -55,6 +61,13 @@ function RecordingControls({
               <span>Started: {recordingStart?.toLocaleTimeString()}</span>
               <span>Messages: {messageCount}</span>
               <span>Topics: {topicCount}</span>
+              {dropped > 0 && <span>Not recorded: {dropped}</span>}
+            </div>
+          )}
+          {otherRecordings > 0 && (
+            <div className="recording-live-info">
+              Also recording {otherRecordings} other{' '}
+              {otherRecordings === 1 ? 'connection' : 'connections'}
             </div>
           )}
         </div>
@@ -63,7 +76,7 @@ function RecordingControls({
             <button
               onClick={startRecording}
               className="btn btn-lg btn-success"
-              disabled={isRecordingDisabled}
+              disabled={isRecordingDisabled || busy}
               title={
                 !storageReady
                   ? 'Wait for recording storage to load'
@@ -75,7 +88,7 @@ function RecordingControls({
               <i className="fas fa-record-vinyl"></i> Record
             </button>
           ) : (
-            <button onClick={stopRecording} className="btn btn-lg btn-danger">
+            <button onClick={stopRecording} className="btn btn-lg btn-danger" disabled={busy}>
               <i className="fas fa-stop"></i> Stop
             </button>
           )}

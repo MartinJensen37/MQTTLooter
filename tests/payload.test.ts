@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { encodePayload, payloadBytes, formatPayloadBytes } from '../src/shared/payload';
-import RecordingCapture from '../src/renderer/src/services/RecordingCapture';
 import { parseRecording } from '../src/renderer/src/components/RecordingPanel/recordingPanel/parseRecording';
 
 describe('payload fidelity', () => {
@@ -37,18 +36,17 @@ describe('payload fidelity', () => {
     expect(formatPayloadBytes('/wAB', 'base64', 'hex', 1)).toContain('2 more bytes');
   });
 
-  it('preserves binary bytes through capture, JSON export and import', () => {
+  it('preserves binary bytes through saved and exported recording formats', () => {
     const bytes = Uint8Array.of(0, 255, 128, 13, 10);
-    const capture = new RecordingCapture('broker', 'Broker');
-    capture.add({
-      id: 'broker',
-      topic: 'bytes',
-      ...encodePayload(bytes),
-      qos: 0,
-      retain: true,
-      timestamp: 1,
-    });
-    const recording = capture.finish()!;
+    const { message, encoding } = encodePayload(bytes);
+    const recording = {
+      id: 1,
+      name: 'Bytes',
+      startTime: new Date(1),
+      endTime: new Date(2),
+      connectionName: 'Broker',
+      messages: [{ topic: 'bytes', message, encoding, qos: 0, retain: true, timestamp: 1 }],
+    };
     const exported = JSON.parse(
       JSON.stringify({
         recordingInfo: recording,

@@ -65,24 +65,27 @@ export interface ElectronAPI {
     resume(): Promise<IpcResult>;
   };
   recordings: {
-    load(): Promise<
-      IpcResult<{
-        revision: number;
-        legacyMigrated: boolean;
-        recordings: import('./recording').Recording[];
-      }>
-    >;
-    migrate(recordings: unknown[]): Promise<
-      IpcResult<{
-        revision: number;
-        legacyMigrated: boolean;
-        recordings: import('./recording').Recording[];
-      }>
-    >;
-    save(
-      recordings: import('./recording').Recording[],
-      revision: number,
-    ): Promise<IpcResult<number>>;
+    status(): Promise<IpcResult<import('./recording').RecordingStatus>>;
+    start(
+      connectionId: string,
+      connectionName: string,
+      name: string,
+    ): Promise<IpcResult<import('./recording').RecordingSummary>>;
+    stop(connectionId: string): Promise<IpcResult<import('./recording').RecordingSummary | null>>;
+    list(): Promise<IpcResult<import('./recording').RecordingSummary[]>>;
+    topics(
+      id: number,
+    ): Promise<IpcResult<{ topics: { topic: string; messages: number }[]; total: number }>>;
+    gaps(id: number): Promise<IpcResult<import('./recording').RecordingGap[]>>;
+    count(id: number, topics?: string[]): Promise<IpcResult<number>>;
+    page(
+      query: import('./recording').RecordingPageQuery,
+    ): Promise<IpcResult<import('./recording').RecordingPage>>;
+    rename(id: number, name: string): Promise<IpcResult<import('./recording').RecordingSummary>>;
+    delete(id: number): Promise<IpcResult>;
+    import(recording: unknown): Promise<IpcResult<import('./recording').RecordingSummary>>;
+    migrate(recordings: unknown[]): Promise<IpcResult<{ imported: number; skipped: boolean }>>;
+    export(id: number): Promise<IpcResult<{ saved: boolean; path?: string }>>;
   };
   mqtt: {
     connect(connectionId: string, config: ConnectionConfig): Promise<IpcResult<ConnectResultData>>;

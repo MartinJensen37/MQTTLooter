@@ -114,6 +114,26 @@ async function waitFor(check, label) {
 }
 
 async function run() {
+  // A pre-SQLite JSON library is imported once and kept as a recovery copy.
+  fs.writeFileSync(
+    path.join(temporary, 'recordings.json'),
+    JSON.stringify({
+      version: 1,
+      revision: 3,
+      legacyMigrated: false,
+      legacyMigrations: [],
+      recordings: [
+        {
+          id: 7,
+          name: 'File library capture',
+          startTime: 1000,
+          endTime: 2000,
+          connectionName: 'Old',
+          messages: [{ topic: 'file/a', message: 'from file', timestamp: 1500 }],
+        },
+      ],
+    }),
+  );
   require(path.join(workspace, 'out/main/index.js'));
   await new Promise((resolve) => broker.listen(0, '127.0.0.1', resolve));
   await app.whenReady();
@@ -147,16 +167,19 @@ async function run() {
     'saved profile',
   );
   await evaluate("document.querySelector('.connection-card').click()");
+  const recordingNames = () =>
+    evaluate(
+      "[...document.querySelectorAll('.recording-name-text')].map(node => node.textContent)",
+    );
   await waitFor(
-    () =>
-      evaluate(
-        "document.querySelector('.recording-name-text')?.textContent === 'Legacy binary capture'",
-      ),
+    async () => (await recordingNames()).includes('Legacy binary capture'),
     'recording migration',
   );
+  assert.ok((await recordingNames()).includes('File library capture'));
   assert.equal(await evaluate("localStorage.getItem('mqtt-recordings')"), null);
-  const recordingFile = path.join(temporary, 'recordings.json');
-  assert.equal(JSON.parse(fs.readFileSync(recordingFile, 'utf8')).legacyMigrated, true);
+  assert.ok(!fs.existsSync(path.join(temporary, 'recordings.json')));
+  assert.ok(fs.existsSync(path.join(temporary, 'recordings.json.migrated')));
+  assert.ok(fs.existsSync(path.join(temporary, 'recordings.sqlite')));
   await evaluate("document.querySelector('.connection-card .toggle-btn').click()");
   await waitFor(
     () => evaluate("document.querySelector('.topic-tree-stats')?.textContent.includes('4 topics')"),
@@ -292,13 +315,45 @@ async function run() {
   );
   await evaluate("document.querySelector('.recording-action-buttons button').click()");
   await waitFor(
-    () => JSON.parse(fs.readFileSync(recordingFile, 'utf8')).recordings.length === 2,
+    async () => (await evaluate('window.electronAPI.recordings.list()')).data.length === 3,
     'capture disk save',
   );
-  const savedCapture = JSON.parse(fs.readFileSync(recordingFile, 'utf8')).recordings[1];
-  const savedBinary = savedCapture.messages.find((message) => message.topic === 'binary');
+  const [savedCapture] = (await evaluate('window.electronAPI.recordings.list()')).data;
+  assert.equal(savedCapture.state, 'complete');
+  assert.equal(savedCapture.messageCount, 4);
+  const savedPage = await evaluate(
+    `window.electronAPI.recordings.page({ recordingId: ${savedCapture.id}, limit: 10 })`,
+  );
+  const savedBinary = savedPage.data.messages.find((message) => message.topic === 'binary');
   assert.equal(savedBinary.encoding, 'base64');
   assert.deepEqual(Buffer.from(savedBinary.message, 'base64'), binaryPayload);
+  assert.equal(savedBinary.properties.responseTopic, 'reply//binary');
+  await evaluate("document.querySelector('.recording-item-header').click()");
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.recording-filter-summary, .recording-playback-section') !== null",
+      ),
+    'paged playback controls',
+  );
+  window.setSize(800, 600);
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  const recordingLayout = await evaluate(`(() => {
+    const panel = document.querySelector('.recording-main-panel');
+    return { scroll: panel.scrollWidth, client: panel.clientWidth };
+  })()`);
+  assert.ok(recordingLayout.scroll <= recordingLayout.client + 1, JSON.stringify(recordingLayout));
+  fs.writeFileSync(
+    path.join(workspace, '.tmp', 'electron-recordings.png'),
+    (await window.webContents.capturePage()).toPNG(),
+  );
+  window.setSize(1400, 900);
+  await new Promise((resolve) => setTimeout(resolve, 2500));
+  fs.writeFileSync(
+    path.join(workspace, '.tmp', 'electron-recordings-wide.png'),
+    (await window.webContents.capturePage()).toPNG(),
+  );
+  await evaluate("document.querySelector('.recording-item-header').click()");
   await evaluate(
     "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1', bubbles: true }))",
   );
@@ -332,7 +387,7 @@ async function run() {
   );
   await evaluate("document.querySelector('.connection-card').click()");
   await waitFor(
-    () => evaluate("document.querySelectorAll('.recording-saved-item').length === 2"),
+    () => evaluate("document.querySelectorAll('.recording-saved-item').length === 3"),
     'saved recording recovery',
   );
   assert.equal(await evaluate("localStorage.getItem('mqtt-recordings')"), null);

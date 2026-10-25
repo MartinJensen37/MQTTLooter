@@ -1,50 +1,52 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import RecordingCapture from '../src/renderer/src/services/RecordingCapture';
 import { generateValue } from '../src/renderer/src/utils/valueGenerators';
 import { parseRecording } from '../src/renderer/src/components/RecordingPanel/recordingPanel/parseRecording';
 import MessageTemplateService from '../src/renderer/src/services/MessageTemplateService';
 
 afterEach(() => vi.restoreAllMocks());
 
-describe('recording capture', () => {
-  const message = {
-    id: 'a',
-    topic: 'topic',
-    message: 'payload',
-    timestamp: 100,
-    qos: 1,
-    retain: true,
-  };
-  it('captures every message for its broker independently of browsing history', () => {
-    const capture = new RecordingCapture('a', 'Broker A');
-    capture.add({ ...message, id: 'b' });
-    for (let i = 0; i < 500; i++) capture.add(message);
-    const recording = capture.finish()!;
-    expect(recording.messageCount).toBe(500);
-    expect(recording.messages[0]).toMatchObject({ connectionId: 'a', qos: 1, retain: true });
-    expect(recording.connectionName).toBe('Broker A');
-  });
-  it('preserves a delivery-gap warning through save and export import', () => {
-    const capture = new RecordingCapture('a', 'A');
-    capture.add(message);
-    capture.incompleteReason = 'Incoming message delivery has a gap.';
-    const recording = capture.finish()!;
+describe('recording files', () => {
+  it('preserves an incomplete-capture warning through save and export import', () => {
+    const recording = {
+      id: 1,
+      name: 'A',
+      startTime: new Date(0),
+      endTime: new Date(1),
+      connectionName: 'A',
+      incompleteReason: 'Incoming message delivery has a gap.',
+      messages: [{ topic: 'topic', message: 'payload', timestamp: 100, qos: 1, retain: true }],
+    };
     expect(parseRecording(JSON.parse(JSON.stringify(recording))).incompleteReason).toBe(
-      capture.incompleteReason,
+      recording.incompleteReason,
     );
     expect(
       parseRecording({
         recordingInfo: recording,
         messages: recording.messages.map((m) => ({ ...m, payload: m.message })),
       }).incompleteReason,
-    ).toBe(capture.incompleteReason);
+    ).toBe(recording.incompleteReason);
   });
-  it('stops at count and byte limits without dropping captured data', () => {
-    const capture = new RecordingCapture('a', 'A', 1);
-    expect(capture.add(message)).toBe(true);
-    expect(capture.add(message)).toBe(false);
-    expect(capture.finish()?.messageCount).toBe(1);
-    expect(new RecordingCapture('a', 'A', 10, 1).add(message)).toBe(false);
+  it('keeps MQTT 5 metadata and rejects malformed metadata on import', () => {
+    const data = {
+      recordingInfo: { name: 'Props', startTime: 0, endTime: 1 },
+      messages: [
+        {
+          topic: 't',
+          payload: 'x',
+          timestamp: 1,
+          protocolVersion: 5,
+          properties: { contentType: 'text/plain' },
+        },
+      ],
+    };
+    expect(parseRecording(data).messages[0]).toMatchObject({
+      protocolVersion: 5,
+      properties: { contentType: 'text/plain' },
+    });
+    for (const bad of [{ protocolVersion: 6 }, { properties: [] }, { properties: null }])
+      expect(() =>
+        parseRecording({ ...data, messages: [{ ...data.messages[0], ...bad }] }),
+      ).toThrow('message');
   });
 });
 

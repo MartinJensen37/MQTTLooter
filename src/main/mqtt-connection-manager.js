@@ -523,6 +523,8 @@ class MQTTConnectionManager extends EventEmitter {
       Object.entries(handlers).forEach(([event, handler]) =>
         connection.removeListener(event, handler),
       );
+    // Unlike 'disconnected', which automatic reconnects also emit, the connection is gone.
+    this.emit('closed', { id });
     return true;
   }
 

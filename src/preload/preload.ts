@@ -54,10 +54,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     resume: () => ipcRenderer.invoke('history-resume'),
   },
   recordings: {
-    load: () => ipcRenderer.invoke('recordings-load'),
+    status: () => ipcRenderer.invoke('recordings-status'),
+    start: (connectionId: string, connectionName: string, name: string) =>
+      ipcRenderer.invoke('recordings-start', connectionId, connectionName, name),
+    stop: (connectionId: string) => ipcRenderer.invoke('recordings-stop', connectionId),
+    list: () => ipcRenderer.invoke('recordings-list'),
+    topics: (id: number) => ipcRenderer.invoke('recordings-topics', id),
+    gaps: (id: number) => ipcRenderer.invoke('recordings-gaps', id),
+    count: (id: number, topics?: string[]) => ipcRenderer.invoke('recordings-count', id, topics),
+    page: (query: unknown) => ipcRenderer.invoke('recordings-page', query),
+    rename: (id: number, name: string) => ipcRenderer.invoke('recordings-rename', id, name),
+    delete: (id: number) => ipcRenderer.invoke('recordings-delete', id),
+    import: (recording: unknown) => ipcRenderer.invoke('recordings-import', recording),
     migrate: (recordings: unknown[]) => ipcRenderer.invoke('recordings-migrate', recordings),
-    save: (recordings: unknown[], revision: number) =>
-      ipcRenderer.invoke('recordings-save', recordings, revision),
+    export: (id: number) => ipcRenderer.invoke('recordings-export', id),
   },
   mqtt: {
     connect: (connectionId: string, config: unknown) =>
