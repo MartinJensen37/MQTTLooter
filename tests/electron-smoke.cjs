@@ -331,6 +331,11 @@ async function run() {
   await evaluate(
     "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }))",
   );
+  // Publishing loads on first use.
+  await waitFor(
+    () => evaluate("!!document.querySelector('.publish-form-load-topic-btn')"),
+    'publishing panel',
+  );
   await evaluate("document.querySelector('.publish-form-load-topic-btn').click()");
   await waitFor(
     () => evaluate("document.querySelector('#publish-encoding').value === 'base64'"),
@@ -514,6 +519,10 @@ async function run() {
   });
   await evaluate(
     "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', bubbles: true }))",
+  );
+  await waitFor(
+    () => evaluate('!!document.querySelector(\'[title="Add Simulated Device"]\')'),
+    'simulation panel',
   );
   await evaluate('document.querySelector(\'[title="Add Simulated Device"]\').click()');
   const field = async (selector, value) =>

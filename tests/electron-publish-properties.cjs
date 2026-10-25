@@ -13,6 +13,11 @@ module.exports = async ({ evaluate, waitFor, published, capture }) => {
       `[...document.querySelectorAll('.publish-properties label')].find(label=>label.textContent.trim()===${JSON.stringify(text)}).querySelector('input').click()`,
     );
   await evaluate("document.dispatchEvent(new KeyboardEvent('keydown', {key:'F2',bubbles:true}))");
+  // The window was reloaded, so Publishing loads again on first use.
+  await waitFor(
+    () => evaluate("!!document.querySelector('.publish-properties details')"),
+    'publishing panel',
+  );
   await evaluate("document.querySelector('.publish-properties details').open=true");
   await field('#topic', 'smoke/properties');
   await check('Include MQTT 5 properties');
