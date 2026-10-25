@@ -269,7 +269,8 @@ export default function IncomingPlot({
           <input
             className="form-input"
             aria-label="Payload time field"
-            placeholder="Receive time, or /time/path"
+            placeholder="Receive time or /field"
+            title="Empty uses the receive time. A field such as /time uses the payload's time."
             value={timeCandidate}
             onChange={(event) => setTimeCandidate(event.target.value)}
             onBlur={applyTimeField}
@@ -312,7 +313,8 @@ export default function IncomingPlot({
             className="form-input search-input"
             aria-label="Numeric field path"
             list={fieldListId}
-            placeholder="Whole payload or /field/path"
+            placeholder="/field, e.g. /value"
+            title="A JSON field such as /value. Empty plots the whole payload as a number."
             value={candidate}
             onChange={(event) => {
               setCandidate(event.target.value);

@@ -31,7 +31,7 @@ function LastWillSection({
           <span className="mqtt-connection-modal-checkbox-text">Enable Last Will Message</span>
         </label>
         <div className="mqtt-field-hint">
-          The broker will publish this message if the client disconnects unexpectedly
+          The broker publishes this message if the connection drops unexpectedly.
         </div>
       </div>
 
@@ -141,13 +141,13 @@ function LastWillSection({
                 id="willDelayInterval"
                 type="number"
                 value={formData.willDelayInterval}
-                onChange={(e) => handleInputChange('willDelayInterval', parseInt(e.target.value) || 0)}
+                onChange={(e) =>
+                  handleInputChange('willDelayInterval', parseInt(e.target.value) || 0)
+                }
                 min="0"
                 placeholder="0"
               />
-              <div className="mqtt-field-hint">
-                Delay before publishing the will message after disconnect
-              </div>
+              <div className="mqtt-field-hint">Seconds the broker waits before publishing it.</div>
             </div>
 
             {formData.protocolVersion === 5 && (
@@ -163,9 +163,7 @@ function LastWillSection({
                   min="0"
                   placeholder="0"
                 />
-                <div className="mqtt-field-hint">
-                  0 = Will message never expires (MQTT 5.0 only)
-                </div>
+                <div className="mqtt-field-hint">0: never expires. MQTT 5 only.</div>
               </div>
             )}
           </div>

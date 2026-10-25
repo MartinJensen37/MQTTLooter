@@ -24,7 +24,7 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             min="0"
             placeholder="0"
           />
-          <div className="mqtt-field-hint">0 = Session expires when network connection closes</div>
+          <div className="mqtt-field-hint">0: the session ends when the connection closes.</div>
         </div>
 
         <div className="mqtt-form-group">
@@ -38,7 +38,7 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             max="65535"
             placeholder="65535"
           />
-          <div className="mqtt-field-hint">Maximum number of QoS 1 and 2 publications</div>
+          <div className="mqtt-field-hint">QoS 1 and 2 messages the broker may send at once.</div>
         </div>
       </div>
 
@@ -55,7 +55,7 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             min="1"
             placeholder="268435455"
           />
-          <div className="mqtt-field-hint">Maximum packet size this client will accept</div>
+          <div className="mqtt-field-hint">Largest packet this client accepts, in bytes.</div>
         </div>
 
         <div className="mqtt-form-group">
@@ -69,7 +69,9 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             max="65535"
             placeholder="0"
           />
-          <div className="mqtt-field-hint">0 = No topic aliases supported</div>
+          <div className="mqtt-field-hint">
+            Aliases the broker may use for messages to this client. 0: none.
+          </div>
         </div>
       </div>
 
@@ -86,7 +88,7 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
               Request Response Information
             </span>
           </label>
-          <div className="mqtt-field-hint">Request server to return response information</div>
+          <div className="mqtt-field-hint">Ask the broker for response information.</div>
         </div>
 
         <div className="mqtt-form-group">
@@ -100,7 +102,7 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             <span className="mqtt-connection-modal-checkbox-text">Request Problem Information</span>
           </label>
           <div className="mqtt-field-hint">
-            Request server to return problem information in case of failures
+            Ask the broker to explain errors with reason strings.
           </div>
         </div>
       </div>
@@ -119,7 +121,7 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             </span>
           </label>
           <div className="mqtt-field-hint">
-            Within the broker's limit from CONNACK; aliases reset on every reconnect
+            Shortens repeated topics within the broker's limit. Reset on every reconnect.
           </div>
         </div>
       </div>

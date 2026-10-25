@@ -41,7 +41,7 @@ function PayloadEditor({
         id="payload"
         value={payload}
         onChange={(e) => setPayload(e.target.value)}
-        placeholder="Enter message payload (JSON, text, etc.)"
+        placeholder="Text or JSON"
         className="payload-input"
         rows={6}
         disabled={isPublishing}

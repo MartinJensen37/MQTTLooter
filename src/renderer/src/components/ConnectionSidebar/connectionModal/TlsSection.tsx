@@ -9,7 +9,12 @@ interface Props {
   clearCertificateFile: (fileType: CertFileType) => void;
 }
 
-function TlsSection({ formData, handleInputChange, handleFileSelect, clearCertificateFile }: Props) {
+function TlsSection({
+  formData,
+  handleInputChange,
+  handleFileSelect,
+  clearCertificateFile,
+}: Props) {
   return (
     <div className="mqtt-form-section">
       <h3 className="mqtt-section-title">TLS/SSL Configuration</h3>
@@ -19,13 +24,15 @@ function TlsSection({ formData, handleInputChange, handleFileSelect, clearCertif
           <input
             type="checkbox"
             checked={formData.tls.enabled}
-            onChange={(e) => handleInputChange('tls', { ...formData.tls, enabled: e.target.checked })}
+            onChange={(e) =>
+              handleInputChange('tls', { ...formData.tls, enabled: e.target.checked })
+            }
           />
           <div className="mqtt-connection-modal-checkbox-custom"></div>
           <span className="mqtt-connection-modal-checkbox-text">Enable TLS/SSL</span>
         </label>
         <div className="mqtt-field-hint">
-          Enable secure connection using TLS/SSL (required for mqtts:// and wss://)
+          Encrypts the connection. Required for mqtts:// and wss://.
         </div>
       </div>
 
@@ -37,14 +44,17 @@ function TlsSection({ formData, handleInputChange, handleFileSelect, clearCertif
                 type="checkbox"
                 checked={formData.tls.rejectUnauthorized}
                 onChange={(e) =>
-                  handleInputChange('tls', { ...formData.tls, rejectUnauthorized: e.target.checked })
+                  handleInputChange('tls', {
+                    ...formData.tls,
+                    rejectUnauthorized: e.target.checked,
+                  })
                 }
               />
               <div className="mqtt-connection-modal-checkbox-custom"></div>
               <span className="mqtt-connection-modal-checkbox-text">Verify Server Certificate</span>
             </label>
             <div className="mqtt-field-hint">
-              Uncheck to allow self-signed certificates (not recommended for production)
+              Turn off only to test with self-signed certificates.
             </div>
           </div>
 
@@ -57,12 +67,10 @@ function TlsSection({ formData, handleInputChange, handleFileSelect, clearCertif
               onChange={(e) =>
                 handleInputChange('tls', { ...formData.tls, servername: e.target.value })
               }
-              placeholder="Optional - override hostname for SNI"
+              placeholder="Defaults to the host"
               autoComplete="off"
             />
-            <div className="mqtt-field-hint">
-              Server Name Indication - leave empty to use hostname
-            </div>
+            <div className="mqtt-field-hint">Name checked against the broker's certificate.</div>
           </div>
 
           {/* CA Certificate */}
@@ -100,7 +108,7 @@ function TlsSection({ formData, handleInputChange, handleFileSelect, clearCertif
               )}
             </div>
             <div className="mqtt-field-hint">
-              Certificate Authority certificate for server verification
+              Certificate of the authority that signed the broker's certificate.
             </div>
           </div>
 
@@ -138,9 +146,7 @@ function TlsSection({ formData, handleInputChange, handleFileSelect, clearCertif
                 </div>
               )}
             </div>
-            <div className="mqtt-field-hint">
-              Client certificate for mutual TLS authentication
-            </div>
+            <div className="mqtt-field-hint">For brokers that require a client certificate.</div>
           </div>
 
           {/* Private Key */}
@@ -177,9 +183,7 @@ function TlsSection({ formData, handleInputChange, handleFileSelect, clearCertif
                 </div>
               )}
             </div>
-            <div className="mqtt-field-hint">
-              Private key corresponding to the client certificate
-            </div>
+            <div className="mqtt-field-hint">Private key of the client certificate.</div>
           </div>
 
           {/* Passphrase for private key */}
@@ -193,10 +197,10 @@ function TlsSection({ formData, handleInputChange, handleFileSelect, clearCertif
                 onChange={(e) =>
                   handleInputChange('tls', { ...formData.tls, passphrase: e.target.value })
                 }
-                placeholder="Leave empty if key is not encrypted"
+                placeholder="Only for an encrypted key"
                 autoComplete="new-password"
               />
-              <div className="mqtt-field-hint">Passphrase for encrypted private key</div>
+              <div className="mqtt-field-hint">Unlocks an encrypted private key.</div>
             </div>
           )}
         </>

@@ -89,7 +89,7 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }: Props) {
               type="text"
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
-              placeholder="Temperature Sensor"
+              placeholder="e.g. Room sensor"
               className="form-input"
               required
               autoFocus
@@ -103,7 +103,7 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }: Props) {
               type="text"
               value={deviceTopic}
               onChange={(e) => setDeviceTopic(e.target.value)}
-              placeholder="sensors/room"
+              placeholder="e.g. sensors/room1"
               className="form-input"
               required
             />

@@ -309,8 +309,8 @@ function MessagePanel({
                     onClick={() => setAutoScroll((v) => !v)}
                     title={
                       autoScroll
-                        ? 'Auto-scroll ON — click to pin'
-                        : 'Auto-scroll OFF — click to follow'
+                        ? 'Following new messages. Click to stop.'
+                        : 'Click to follow new messages.'
                     }
                   >
                     <i className={`fas ${autoScroll ? 'fa-arrow-up' : 'fa-thumbtack'}`}></i>

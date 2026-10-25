@@ -63,7 +63,7 @@ export default function PublishPropertiesEditor({
                 aria-label="Publish expiry"
                 value={draft.expiry}
                 maxLength={10}
-                placeholder="Blank: no expiry"
+                placeholder="Empty: never expires"
                 onChange={(event) => change({ expiry: event.target.value })}
               />
             </label>

@@ -38,7 +38,7 @@ function SubscriptionsSection({
               type="text"
               value={subscription.topic}
               onChange={(e) => handleSubscriptionChange(index, 'topic', e.target.value)}
-              placeholder="Topic (e.g., sensors/+/temperature)"
+              placeholder="Topic filter, e.g. sensors/+/temperature"
               className={errors[`subscription_${index}`] ? 'error' : ''}
               autoComplete="off"
             />

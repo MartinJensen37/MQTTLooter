@@ -90,9 +90,7 @@ function ConnectionDetailsSection({
             className={errors.wsPath ? 'error' : ''}
             autoComplete="off"
           />
-          <div className="mqtt-field-hint">
-            Path on the server where WebSocket MQTT is available (e.g., /mqtt, /ws, /websocket)
-          </div>
+          <div className="mqtt-field-hint">WebSocket path on the broker, usually /mqtt.</div>
           {errors.wsPath && <span className="mqtt-error-text">{errors.wsPath}</span>}
         </div>
       )}
@@ -135,7 +133,9 @@ function ConnectionDetailsSection({
             <span className="select-value">
               {formData.protocolVersion === 5 ? 'MQTT 5.0' : 'MQTT 3.1.1'}
             </span>
-            <i className={`fas fa-chevron-down ${protocolVersionDropdownOpen ? 'rotated' : ''}`}></i>
+            <i
+              className={`fas fa-chevron-down ${protocolVersionDropdownOpen ? 'rotated' : ''}`}
+            ></i>
           </button>
           {protocolVersionDropdownOpen && (
             <div className="custom-select-dropdown">
@@ -164,8 +164,8 @@ function ConnectionDetailsSection({
         </div>
         <div className="mqtt-field-hint">
           {formData.protocolVersion === 5
-            ? 'MQTT 5.0 includes enhanced features like user properties, message expiry, and topic aliases'
-            : 'MQTT 3.1.1 is the stable, widely-supported version'}
+            ? 'Adds message properties, expiry and topic aliases.'
+            : 'Supported by almost every broker.'}
         </div>
       </div>
     </div>

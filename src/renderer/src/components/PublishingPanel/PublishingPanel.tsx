@@ -512,7 +512,7 @@ function PublishingPanel({
                     generatedTopic.current = null;
                     setTopic(e.target.value);
                   }}
-                  placeholder="Enter MQTT topic (e.g., sensors/temperature)"
+                  placeholder="Topic, e.g. sensors/room1/temperature"
                   className="topic-input"
                   disabled={isPublishing}
                 />
