@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createHash } from 'node:crypto';
 import { serializeProperties } from '../shared/history';
-import { encodePayload, payloadBytes } from '../shared/payload';
+import { encodePayload, payloadBytes, type PayloadEncoding } from '../shared/payload';
 import {
   parseRecording,
   RECORDING_LIMITS,
@@ -16,6 +16,19 @@ import {
 import type { IncomingPublish } from '../shared/traffic';
 
 export type CaptureMessage = IncomingPublish & { recordingId: number };
+
+/** A message to store, from a live capture or an imported file. */
+interface StoredInput {
+  topic: string;
+  message: string;
+  encoding?: PayloadEncoding;
+  timestamp: number;
+  qos?: number;
+  retain?: boolean;
+  protocolVersion?: number;
+  sessionId?: string;
+  properties?: Record<string, unknown>;
+}
 type Row = Record<string, unknown>;
 
 export const STORAGE_FULL = 'Recording storage limit reached. Export or delete older recordings.';
@@ -26,6 +39,8 @@ export class RecordingDatabase {
   private db: DatabaseSync;
   /** Active captures: next sequence number and running counts. */
   private active = new Map<number, { seq: number; messages: number; topics: number }>();
+  /** Streaming imports in progress: the last written sequence. */
+  private importing = new Map<number, number>();
   readonly recovered: number;
 
   constructor(
@@ -75,6 +90,9 @@ export class RecordingDatabase {
       PRAGMA user_version=1;
     `);
     this.recovered = this.recover();
+    // An import interrupted by a crash is incomplete; its messages are purged.
+    for (const row of this.db.prepare("SELECT id FROM recordings WHERE state='importing'").all())
+      this.delete(Number(row.id));
   }
 
   /** Captures left active by a crash end at their last committed message. */
@@ -161,60 +179,78 @@ export class RecordingDatabase {
       }
       return { counts: this.counts(), stopped };
     }
-    const insert = this.db.prepare(`INSERT INTO recording_messages
-      (recording_id, seq, timestamp, topic, payload, qos, retain, protocol, session_id, properties)
-      VALUES(?,?,?,?,?,?,?,?,?,?)`);
-    const topic = this.db.prepare(`INSERT INTO recording_topics VALUES(?,?,?)
-      ON CONFLICT DO UPDATE SET messages=messages+excluded.messages RETURNING messages`);
-    const update = this.db.prepare(`UPDATE recordings SET message_count=message_count+?,
-      payload_bytes=payload_bytes+?, topic_count=topic_count+?, last_seq=? WHERE id=?`);
-    const changes = new Map<
-      number,
-      { seq: number; messages: number; bytes: number; added: number; topics: Map<string, number> }
-    >();
-    this.transaction(() => {
+    const groups = new Map<number, CaptureMessage[]>();
+    for (const message of messages)
+      if (this.active.has(message.recordingId)) {
+        const group = groups.get(message.recordingId);
+        if (group) group.push(message);
+        else groups.set(message.recordingId, [message]);
+      }
+    const written = this.transaction(() => {
       for (const drop of drops)
         if (this.active.has(drop.recordingId))
           this.insertGap(drop.recordingId, drop.at, 'queue', drop.dropped);
-      for (const message of messages) {
-        const state = this.active.get(message.recordingId);
-        if (!state) continue;
-        let change = changes.get(message.recordingId);
-        if (!change) {
-          change = { seq: state.seq, messages: 0, bytes: 0, added: 0, topics: new Map() };
-          changes.set(message.recordingId, change);
-        }
-        const payload = payloadBytes(message.message, message.encoding);
-        insert.run(
-          message.recordingId,
-          ++change.seq,
-          message.timestamp,
-          message.topic,
-          payload,
-          message.qos,
-          Number(message.retain),
-          message.protocolVersion,
-          message.sessionId,
-          serializeProperties(message.properties),
-        );
-        change.messages++;
-        change.bytes += payload.byteLength;
-        change.topics.set(message.topic, (change.topics.get(message.topic) ?? 0) + 1);
-      }
-      for (const [recordingId, change] of changes) {
-        for (const [path, count] of change.topics)
-          if (Number(topic.get(recordingId, path, count)!.messages) === count) change.added++;
-        update.run(change.messages, change.bytes, change.added, change.seq, recordingId);
-      }
+      return [...groups].map(
+        ([recordingId, group]) =>
+          [
+            recordingId,
+            this.writeMessages(recordingId, this.active.get(recordingId)!.seq, group),
+          ] as const,
+      );
     });
     // Advance in-memory state only after the commit succeeds.
-    for (const [recordingId, change] of changes) {
+    for (const [recordingId, change] of written) {
       const state = this.active.get(recordingId)!;
       state.seq = change.seq;
       state.messages += change.messages;
       state.topics += change.added;
     }
     return { counts: this.counts(), stopped };
+  }
+
+  /**
+   * Insert messages after sequence `seq` and update the recording's counts. Call inside a
+   * transaction. Returns the last sequence, messages written and topics added.
+   */
+  private writeMessages(
+    recordingId: number,
+    seq: number,
+    messages: StoredInput[],
+  ): { seq: number; messages: number; added: number } {
+    const insert = this.db.prepare(`INSERT INTO recording_messages
+      (recording_id, seq, timestamp, topic, payload, qos, retain, protocol, session_id, properties)
+      VALUES(?,?,?,?,?,?,?,?,?,?)`);
+    const topic = this.db.prepare(`INSERT INTO recording_topics VALUES(?,?,?)
+      ON CONFLICT DO UPDATE SET messages=messages+excluded.messages RETURNING messages`);
+    const topics = new Map<string, number>();
+    let bytes = 0;
+    for (const message of messages) {
+      const payload = payloadBytes(message.message, message.encoding ?? 'utf8');
+      insert.run(
+        recordingId,
+        ++seq,
+        message.timestamp,
+        message.topic,
+        payload,
+        message.qos ?? 0,
+        Number(message.retain ?? false),
+        message.protocolVersion ?? null,
+        message.sessionId ?? null,
+        serializeProperties(message.properties),
+      );
+      bytes += payload.byteLength;
+      topics.set(message.topic, (topics.get(message.topic) ?? 0) + 1);
+    }
+    let added = 0;
+    for (const [path, count] of topics)
+      if (Number(topic.get(recordingId, path, count)!.messages) === count) added++;
+    this.db
+      .prepare(
+        `UPDATE recordings SET message_count=message_count+?, payload_bytes=payload_bytes+?,
+      topic_count=topic_count+?, last_seq=? WHERE id=?`,
+      )
+      .run(messages.length, bytes, added, seq, recordingId);
+    return { seq, messages: messages.length, added };
   }
 
   private counts() {
@@ -308,7 +344,10 @@ export class RecordingDatabase {
 
   list(): RecordingSummary[] {
     return this.db
-      .prepare(`${RecordingDatabase.SUMMARY} ORDER BY r.started_at DESC, r.id DESC LIMIT 10000`)
+      .prepare(
+        `${RecordingDatabase.SUMMARY} WHERE r.state != 'importing'
+        ORDER BY r.started_at DESC, r.id DESC LIMIT 10000`,
+      )
       .all()
       .map((row) => this.toSummary(row));
   }
@@ -499,35 +538,71 @@ export class RecordingDatabase {
           recording.incompleteReason ?? null,
         )!.id,
     );
-    const insert = this.db.prepare(`INSERT INTO recording_messages
-      (recording_id, seq, timestamp, topic, payload, qos, retain, protocol, session_id, properties)
-      VALUES(?,?,?,?,?,?,?,?,NULL,?)`);
-    const topics = new Map<string, number>();
-    let bytes = 0;
-    messages.forEach(({ message, time }, index) => {
-      const payload = payloadBytes(message.message, message.encoding ?? 'utf8');
-      bytes += payload.byteLength;
-      topics.set(message.topic, (topics.get(message.topic) ?? 0) + 1);
-      insert.run(
-        id,
-        index + 1,
-        time,
-        message.topic,
-        payload,
-        message.qos ?? 0,
-        Number(message.retain ?? false),
-        message.protocolVersion ?? null,
-        serializeProperties(message.properties),
-      );
-    });
-    const topic = this.db.prepare('INSERT INTO recording_topics VALUES(?,?,?)');
-    for (const [path, count] of topics) topic.run(id, path, count);
+    this.writeMessages(
+      id,
+      0,
+      messages.map(({ message, time }) => ({ ...message, timestamp: time })),
+    );
+    return id;
+  }
+
+  /** A hidden recording that receives streamed messages until finishImport makes it visible. */
+  beginImport(at = Date.now()): number {
+    const id = Number(
+      this.db
+        .prepare(
+          `INSERT INTO recordings(name, connection_id, connection_name, state, started_at)
+        VALUES('', NULL, '', 'importing', ?) RETURNING id`,
+        )
+        .get(at)!.id,
+    );
+    this.importing.set(id, 0);
+    return id;
+  }
+
+  appendImport(recordingId: number, messages: StoredInput[]): void {
+    const seq = this.importing.get(recordingId);
+    if (seq === undefined) throw new Error('This import is no longer running');
+    const estimate = messages.reduce(
+      (total, message) => total + message.message.length + message.topic.length * 2 + 128,
+      0,
+    );
+    if (this.usedBytes() + estimate > this.limits.maxDatabaseBytes) throw new Error(STORAGE_FULL);
+    const written = this.transaction(() => this.writeMessages(recordingId, seq, messages));
+    this.importing.set(recordingId, written.seq);
+  }
+
+  finishImport(
+    recordingId: number,
+    info: {
+      name: string;
+      connectionName: string;
+      startTime: Date;
+      endTime: Date;
+      incompleteReason?: string;
+    },
+  ): RecordingSummary {
+    if (!this.importing.has(recordingId)) throw new Error('This import is no longer running');
     this.db
       .prepare(
-        `UPDATE recordings SET message_count=?, payload_bytes=?, topic_count=?, last_seq=? WHERE id=?`,
+        `UPDATE recordings SET name=?, connection_name=?, started_at=?, ended_at=?,
+      incomplete_reason=?, state='complete' WHERE id=?`,
       )
-      .run(messages.length, bytes, topics.size, messages.length, id);
-    return id;
+      .run(
+        info.name.slice(0, this.limits.maxNameLength),
+        info.connectionName.slice(0, this.limits.maxNameLength),
+        info.startTime.getTime(),
+        info.endTime.getTime(),
+        info.incompleteReason ?? null,
+        recordingId,
+      );
+    this.importing.delete(recordingId);
+    return this.summary(recordingId)!;
+  }
+
+  abortImport(recordingId: number): void {
+    if (!this.importing.delete(recordingId)) return;
+    this.delete(recordingId);
   }
 
   private checkQuota(recordings: Recording[]): void {

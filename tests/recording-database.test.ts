@@ -272,3 +272,56 @@ it('renames, refuses to delete active captures and purges deleted messages in st
   expect(steps).toBeGreaterThanOrEqual(3);
   expect(() => database.page({ recordingId: id, limit: 5 })).toThrow('not found');
 });
+
+it('streams imports into a hidden recording that appears only when finished', () => {
+  const info = {
+    name: 'Streamed',
+    connectionName: 'Old broker',
+    startTime: new Date(1000),
+    endTime: new Date(5000),
+  };
+  const batch = (start: number, count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      topic: `t/${(start + i) % 3}`,
+      message: `m${start + i}`,
+      encoding: 'utf8' as const,
+      timestamp: 1000 + start + i,
+    }));
+  const id = database.beginImport();
+  database.appendImport(id, batch(0, 600));
+  database.appendImport(id, batch(600, 400));
+  expect(database.list()).toEqual([]);
+  expect(database.finishImport(id, info)).toMatchObject({
+    name: 'Streamed',
+    state: 'complete',
+    messageCount: 1000,
+    topicCount: 3,
+    startTime: 1000,
+    endTime: 5000,
+  });
+  expect(
+    database.page({ recordingId: id, after: 998, limit: 5 }).messages.map((m) => m.message),
+  ).toEqual(['m998', 'm999']);
+
+  const aborted = database.beginImport();
+  database.appendImport(aborted, batch(0, 10));
+  database.abortImport(aborted);
+  expect(() => database.appendImport(aborted, batch(0, 1))).toThrow('no longer running');
+  // An import cut short by a crash is discarded on the next start.
+  const crashed = database.beginImport();
+  database.appendImport(crashed, batch(0, 10));
+  database.close();
+  database = new RecordingDatabase(path);
+  expect(database.list().map((recording) => recording.id)).toEqual([id]);
+  expect(() => database.page({ recordingId: crashed, limit: 5 })).toThrow('not found');
+});
+
+it('stops a streamed import at the storage limit', () => {
+  database.close();
+  database = new RecordingDatabase(path, { ...RECORDING_LIMITS, maxDatabaseBytes: 256 * 1024 });
+  const id = database.beginImport();
+  const big = [{ topic: 't', message: 'x'.repeat(64 * 1024), timestamp: 1 }];
+  expect(() => {
+    for (let i = 0; i < 10; i++) database.appendImport(id, big);
+  }).toThrow(STORAGE_FULL);
+});
