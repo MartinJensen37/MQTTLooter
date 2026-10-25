@@ -432,10 +432,10 @@ class MQTTConnection extends EventEmitter {
     });
   }
 
+  // Sent over IPC: never include the config, which holds passwords and private keys.
   getStatus() {
     return {
       id: this.id,
-      config: this.config,
       isConnected: this.isConnected,
       subscriptions: Object.fromEntries(this.subscriptions),
       reconnectAttempts: this.reconnectAttempts,

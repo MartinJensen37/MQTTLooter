@@ -188,4 +188,17 @@ describe('MQTT lifecycle', () => {
     await expect(manager.publish('a', 'binary', 'bad', { encoding: 'base64' })).rejects.toThrow();
     expect(client.publish).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps credentials out of connection status', async () => {
+    const result = manager.connect('a', {
+      brokerUrl: 'mqtt://localhost',
+      password: 'secret-password',
+      tls: { enabled: true, key: { content: 'secret-key' }, passphrase: 'secret-phrase' },
+    });
+    client.emit('connect', {});
+    await result;
+    const status = JSON.stringify(manager.getAllConnections());
+    expect(status).toContain('"isConnected":true');
+    expect(status).not.toMatch(/secret/);
+  });
 });
