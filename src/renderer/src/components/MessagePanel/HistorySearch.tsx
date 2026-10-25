@@ -59,6 +59,9 @@ export default function HistorySearch({
   const next = useRef<HistorySearchQuery>();
   // The current search's criteria, without cursors, for exporting every match.
   const started = useRef<HistorySearchQuery>();
+  // Where each result page's scan started, newest page first. Within the fixed snapshot a
+  // page is reproducible from its start, so newer pages are shown again by rescanning.
+  const pageStarts = useRef<HistorySearchQuery[]>([]);
   const invalidate = useCallback(() => {
     generation.current++;
   }, []);
@@ -74,14 +77,16 @@ export default function HistorySearch({
   const reset = () => {
     generation.current++;
     next.current = undefined;
+    pageStarts.current = [];
     setBusy(false);
     setPage(undefined);
     setError('');
     setStats({ scanned: 0, large: 0, binary: 0 });
     setStatus('Search settings changed. Start a new search.');
   };
-  const scan = async (initial: HistorySearchQuery, fresh: boolean) => {
+  const scan = async (initial: HistorySearchQuery, direction: 'new' | 'older' | 'newer') => {
     const run = ++generation.current;
+    const fresh = direction === 'new';
     try {
       validateSearch(initial);
     } catch (reason) {
@@ -97,6 +102,13 @@ export default function HistorySearch({
     }
     next.current = initial;
     if (fresh) started.current = initial;
+    const starts = pageStarts.current;
+    if (fresh) pageStarts.current = [initial];
+    // After a stopped scan nothing was shown, so continuing replaces that page's start.
+    else if (direction === 'older') {
+      if (page && starts.length < 1000) starts.push(initial);
+      else starts[starts.length - 1] = initial;
+    }
     let cursor = initial;
     try {
       while (generation.current === run) {
@@ -105,6 +117,14 @@ export default function HistorySearch({
         if (!response.success || !response.data)
           throw new Error(response.error || 'History search failed.');
         const data = response.data;
+        // Replaying the first page must reuse its snapshot rather than take a new one.
+        const top = pageStarts.current.length - 1;
+        if (pageStarts.current[top]?.snapshot === undefined)
+          pageStarts.current[top] = {
+            ...pageStarts.current[top],
+            snapshot: data.snapshot,
+            generation: data.generation,
+          };
         next.current =
           data.nextBefore === null
             ? undefined
@@ -184,7 +204,7 @@ export default function HistorySearch({
                 ...range,
                 ...(scope === 'filter' && { scope, filter }),
               },
-              true,
+              'new',
             );
           }}
         >
@@ -322,8 +342,19 @@ export default function HistorySearch({
           <button
             type="button"
             className="btn btn-sm btn-secondary"
+            disabled={busy || !active || pageStarts.current.length < 2}
+            onClick={() => {
+              pageStarts.current.pop();
+              void scan(pageStarts.current.at(-1)!, 'newer');
+            }}
+          >
+            Newer matches
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-secondary"
             disabled={busy || !active || !next.current}
-            onClick={() => next.current && void scan(next.current, false)}
+            onClick={() => next.current && void scan(next.current, 'older')}
           >
             Continue search
           </button>

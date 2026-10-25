@@ -136,6 +136,35 @@ it('scans past empty chunks, preserves snapshot cursors and stops at a result pa
   expect(container.textContent).toContain('Reached the end');
 });
 
+it('shows newer result pages again from the same snapshot', async () => {
+  const found = (message: string, nextBefore: number | null) =>
+    page([{ sessionId: 'one', sequence: message.length, id: 'broker', message }], nextBefore);
+  search.mockResolvedValueOnce(found('first', 40)).mockResolvedValueOnce(found('second', 20));
+  await input('needle');
+  await click('Search history');
+  const newer = () =>
+    [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Newer matches',
+    )!;
+  expect(newer().disabled).toBe(true);
+  await click('Continue search');
+  expect(container.querySelector('[data-testid=matches]')!.textContent).toBe('second');
+  // The first page is rescanned from its start, within the snapshot it was found in.
+  search.mockResolvedValueOnce(found('first', 40));
+  await click('Newer matches');
+  expect(search.mock.calls[2][0]).toMatchObject({ snapshot: 99, generation: 0 });
+  expect(search.mock.calls[2][0].before).toBeUndefined();
+  expect(container.querySelector('[data-testid=matches]')!.textContent).toBe('first');
+  expect(newer().disabled).toBe(true);
+  search.mockResolvedValueOnce(found('second', 20));
+  await click('Continue search');
+  expect(search.mock.calls[3][0]).toMatchObject({ before: 40, snapshot: 99 });
+  expect(newer().disabled).toBe(false);
+  // Changed criteria cannot page back into the old search.
+  await input('other');
+  expect(newer().disabled).toBe(true);
+});
+
 it('discards a pending result after cancellation or edits and resumes from the last completed chunk', async () => {
   let resolve!: (value: any) => void;
   search.mockResolvedValueOnce(page([], 50)).mockImplementationOnce(
