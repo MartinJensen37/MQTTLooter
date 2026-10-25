@@ -40,7 +40,8 @@ function RecordingItem({
       {/* Header */}
       <div className="recording-item-header" onClick={() => onSelect(recording)}>
         <div className="recording-item-title">
-          <i className={`fas fa-${isExpanded ? 'chevron-down' : 'chevron-right'}`}></i>
+          {/* Rotated down by CSS when expanded. */}
+          <i className="fas fa-chevron-right"></i>
           <i className={`fas ${active ? 'fa-circle recording-item-live' : 'fa-video'}`}></i>
           {editingRecording === recording.id ? (
             <input
