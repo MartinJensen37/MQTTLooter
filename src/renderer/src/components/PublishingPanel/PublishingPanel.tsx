@@ -473,11 +473,11 @@ function PublishingPanel({
             </span>
           ) : !isConnected ? (
             <span className="connection-indicator disconnected">
-              <i className="fas fa-exclamation-triangle"></i> {connectionId} (Disconnected)
+              <i className="fas fa-exclamation-triangle"></i> Disconnected
             </span>
           ) : (
             <span className="connection-indicator connected">
-              <i className="fas fa-check-circle"></i> {connectionId} (Connected)
+              <i className="fas fa-check-circle"></i> Connected
             </span>
           )}
         </div>

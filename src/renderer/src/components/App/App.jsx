@@ -436,14 +436,11 @@ function App() {
           <div className="main-header">
             <div className="header-left">
               <h2>{selectedConnection ? getConnectionName() : 'MQTTLooter'}</h2>
-              {selectedConnection && (
+              {selectedConnection && activeConnections.length > 1 && (
                 <div className="connection-info">
-                  <span className="connection-id">{selectedConnection}</span>
-                  {activeConnections.length > 1 && (
-                    <span className="multi-connection-indicator">
-                      {activeConnections.length} active connections
-                    </span>
-                  )}
+                  <span className="multi-connection-indicator">
+                    {activeConnections.length} active connections
+                  </span>
                 </div>
               )}
             </div>

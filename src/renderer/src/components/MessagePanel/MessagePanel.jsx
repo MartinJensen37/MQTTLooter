@@ -410,9 +410,6 @@ function MessagePanel({
                               <i className="fas fa-save"></i> RETAIN
                             </span>
                           )}
-                          <span className="connection-id" title={`Connection: ${msg.connectionId}`}>
-                            <i className="fas fa-plug"></i> {msg.connectionId}
-                          </span>
                         </div>
                         <div className="message-actions">
                           <button

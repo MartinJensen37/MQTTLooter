@@ -76,19 +76,6 @@
   min-width: 0;
 }
 
-.connection-id {
-  font-size: 12px;
-  color: var(--gray-600);
-  font-family: var(--font-mono);
-  background: var(--gray-100);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
-}
-
 .multi-connection-indicator {
   font-size: 11px;
   color: var(--success);
