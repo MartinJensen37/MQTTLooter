@@ -8,25 +8,26 @@ module.exports = async ({ evaluate, waitFor, published, capture }) => {
     element.dispatchEvent(new Event('input', {bubbles:true}));
   })()`);
   await evaluate("document.querySelector('.publish-form-clear-btn').click()");
-  await evaluate("document.querySelector('.template-checkbox-label input').click()");
+  await evaluate("document.querySelector('.message-schemas input').click()");
   await evaluate("document.querySelector('.template-select-wrapper > button').click()");
   await evaluate("document.querySelector('.template-dropdown-item .dropdown-option').click()");
   await waitFor(
-    () => evaluate("document.querySelector('.schema-validation')?.textContent === 'Schema Valid'"),
+    () =>
+      evaluate("document.querySelector('.schema-validation')?.textContent === 'Matches schema'"),
     'typed default template',
   );
   assert.equal(
     await evaluate("document.querySelector('#topic').value"),
-    'sensors/temperature/temp-001',
+    'sensors/sensor-01/reading',
   );
-  await field('[aria-label="Template variable sensorId"]', 'sensor"01');
+  await field('[aria-label="Schema variable sensorId"]', 'sensor"01');
   await evaluate("document.querySelector('.publish-template-variables button').click()");
   const payload = await evaluate("document.querySelector('#payload').value");
   const topic = await evaluate("document.querySelector('#topic').value");
-  assert.equal(topic, 'sensors/temperature/sensor"01');
+  assert.equal(topic, 'sensors/sensor"01/reading');
   assert.equal(JSON.parse(payload).sensorId, 'sensor"01');
   assert.equal(typeof JSON.parse(payload).temperature, 'number');
-  assert.equal(typeof JSON.parse(payload).timestamp, 'number');
+  assert.ok(!Number.isNaN(Date.parse(JSON.parse(payload).time)));
   await capture();
   const start = published.length;
   await evaluate("document.querySelector('.publish-form-publish-btn').click()");
@@ -48,5 +49,5 @@ module.exports = async ({ evaluate, waitFor, published, capture }) => {
       ),
     'template acknowledgement',
   );
-  await evaluate("document.querySelector('.template-checkbox-label input').click()");
+  await evaluate("document.querySelector('.message-schemas input').click()");
 };

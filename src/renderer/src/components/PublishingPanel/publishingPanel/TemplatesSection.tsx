@@ -1,5 +1,6 @@
 import React from 'react';
 import type { MessageTemplate, SchemaValidationResult } from './types';
+import CheckToggle from '../../Controls/CheckToggle';
 
 interface Props {
   showTemplates: boolean;
@@ -36,19 +37,19 @@ function TemplatesSection({
 }: Props) {
   return (
     <div className="form-group">
-      <div className="template-header">
-        <label className="template-checkbox-label">
-          <input
-            type="checkbox"
-            checked={showTemplates}
-            onChange={(e) => setShowTemplates(e.target.checked)}
-          />
-          <span className="template-checkbox-custom"></span>
-          <span className="template-checkbox-text">Message Templates</span>
-        </label>
-        {showTemplates && (
+      <CheckToggle
+        className="message-schemas"
+        label="Message schemas"
+        hint={showTemplates ? undefined : 'Fill the payload from a JSON Schema and check it.'}
+        checked={showTemplates}
+        onChange={setShowTemplates}
+      >
+        <div className="template-header">
           <div className="template-actions">
-            <label className="template-action-btn import-btn" title="Import Templates">
+            <label
+              className="template-action-btn import-btn"
+              title="Import a JSON Schema or exported message schemas"
+            >
               <input
                 type="file"
                 accept=".json"
@@ -62,15 +63,12 @@ function TemplatesSection({
               className="template-action-btn export-btn"
               onClick={handleTemplateExport}
               disabled={messageTemplates.length === 0}
-              title="Export Templates"
+              title="Export message schemas"
             >
               <i className="fas fa-download"></i>
             </button>
           </div>
-        )}
-      </div>
-
-      {showTemplates && (
+        </div>
         <div className="template-select-wrapper custom-select-wrapper">
           <button
             type="button"
@@ -93,7 +91,7 @@ function TemplatesSection({
                   setShowTemplateDropdown(false);
                 }}
               >
-                Select a template...
+                Choose a message schema
               </button>
               {messageTemplates.map((template) => (
                 <div key={template.id} className="template-dropdown-item">
@@ -104,11 +102,8 @@ function TemplatesSection({
                   >
                     <div className="template-info">
                       <span className="template-name">{template.name}</span>
-                      <span className="template-category">({template.category})</span>
-                      {template.schema && (
-                        <span className="schema-indicator" title="Has schema validation">
-                          <i className="fas fa-shield-alt"></i>
-                        </span>
+                      {template.category && (
+                        <span className="template-category">{template.category}</span>
                       )}
                     </div>
                   </button>
@@ -119,7 +114,7 @@ function TemplatesSection({
                       e.stopPropagation();
                       handleTemplateDelete(template.id);
                     }}
-                    title="Delete template"
+                    title="Delete this message schema"
                   >
                     <i className="fas fa-trash"></i>
                   </button>
@@ -128,7 +123,7 @@ function TemplatesSection({
             </div>
           )}
         </div>
-      )}
+      </CheckToggle>
     </div>
   );
 }

@@ -25,11 +25,11 @@ export default function TemplateVariables({
           const type = definitions[name]?.type;
           return (
             <label key={name}>
-              {name}
+              {definitions[name]?.description ?? name}
               {type === 'boolean' ? (
                 <select
                   className="custom-select-button form-select"
-                  aria-label={`Template variable ${name}`}
+                  aria-label={`Schema variable ${name}`}
                   value={values[name]}
                   disabled={disabled}
                   onChange={(event) => onChange(name, event.target.value)}
@@ -41,7 +41,7 @@ export default function TemplateVariables({
               ) : (
                 <input
                   className="form-input"
-                  aria-label={`Template variable ${name}`}
+                  aria-label={`Schema variable ${name}`}
                   value={values[name]}
                   disabled={disabled}
                   onChange={(event) => onChange(name, event.target.value)}
@@ -58,7 +58,7 @@ export default function TemplateVariables({
         disabled={disabled}
         onClick={onApply}
       >
-        Apply template
+        Fill payload
       </button>
       {error && (
         <p className="publish-template-error" role="alert">

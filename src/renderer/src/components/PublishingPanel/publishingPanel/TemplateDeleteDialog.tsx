@@ -17,12 +17,12 @@ function TemplateDeleteDialog({
     <div className="modal-overlay template-delete-dialog">
       <div className="confirmation-modal">
         <div className="modal-header">
-          <h3>Delete Template</h3>
+          <h3>Delete message schema</h3>
         </div>
         <div className="modal-content">
           <p>
-            Are you sure you want to delete the template{' '}
-            <strong>"{templateService.getTemplate(templateToDelete)?.name}"</strong>?
+            Delete <strong>"{templateService.getTemplate(templateToDelete)?.name}"</strong> from
+            your message schemas?
           </p>
           <p className="warning-text">This action cannot be undone.</p>
         </div>

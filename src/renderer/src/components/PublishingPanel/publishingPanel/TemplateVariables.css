@@ -13,6 +13,8 @@
   gap: var(--spacing-xs);
   min-width: 0;
   overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 500;
 }
 .publish-template-variables > button {
   justify-self: start;

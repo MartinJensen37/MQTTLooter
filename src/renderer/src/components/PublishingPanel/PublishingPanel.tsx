@@ -185,7 +185,7 @@ function PublishingPanel({
       setMessageTemplates(templateService.getAllTemplates());
 
       if (result.imported > 0) {
-        let message = `Successfully imported ${result.imported} template(s)`;
+        let message = `Imported ${result.imported} message schema${result.imported === 1 ? '' : 's'}`;
         if (result.errors.length > 0) message += ` with ${result.errors.length} error(s)`;
         showFeedback?.(message, 'success');
       }
@@ -206,12 +206,12 @@ function PublishingPanel({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `mqtt-templates-${new Date().toISOString().slice(0, 19)}.json`;
+      a.download = `mqtt-message-schemas-${new Date().toISOString().slice(0, 19)}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showFeedback?.('Templates exported successfully!', 'success');
+      showFeedback?.('Message schemas exported', 'success');
     } catch (error: any) {
       showFeedback?.(`Export failed: ${error.message}`, 'error');
     }
@@ -232,9 +232,9 @@ function PublishingPanel({
           setSelectedTemplate(null);
           setSchemaValidation(null);
         }
-        showFeedback?.(`Template "${template?.name}" deleted successfully!`, 'success');
+        showFeedback?.(`Deleted "${template?.name}"`, 'success');
       } else {
-        showFeedback?.('Failed to delete template', 'error');
+        showFeedback?.('The message schema could not be deleted', 'error');
       }
     }
     setTemplateToDelete(null);
@@ -459,9 +459,9 @@ function PublishingPanel({
   };
 
   const getSelectedTemplateName = () => {
-    if (!selectedTemplate) return 'Select a template...';
+    if (!selectedTemplate) return 'Choose a message schema';
     const template = messageTemplates.find((t) => t.id === selectedTemplate);
-    return template ? `${template.name} (${template.category})` : 'Select a template...';
+    return template ? template.name : 'Choose a message schema';
   };
 
   return (

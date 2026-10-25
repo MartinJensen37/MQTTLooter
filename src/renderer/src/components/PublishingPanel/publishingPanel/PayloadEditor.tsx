@@ -69,8 +69,8 @@ function PayloadEditor({
                 className={`fas ${schemaValidation.valid ? 'fa-shield-alt' : 'fa-exclamation-triangle'}`}
               ></i>
               {schemaValidation.valid
-                ? 'Schema Valid'
-                : `Schema Invalid (${schemaValidation.errors.length} errors)`}
+                ? 'Matches schema'
+                : `Does not match schema (${schemaValidation.errors.length})`}
             </span>
           )}
         </div>
@@ -81,7 +81,7 @@ function PayloadEditor({
         <div className="schema-errors">
           <div className="schema-errors-header">
             <i className="fas fa-exclamation-triangle"></i>
-            Schema Validation Errors:
+            Differences from the schema:
           </div>
           <ul className="schema-error-list">
             {schemaValidation.errors.map((error, index) => (

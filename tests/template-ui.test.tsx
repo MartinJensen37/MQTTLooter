@@ -50,8 +50,7 @@ async function field(selector: string, value: string) {
   });
 }
 async function select(index = 1) {
-  if (!container.querySelector('.template-select-wrapper'))
-    await click('.template-checkbox-label input');
+  if (!container.querySelector('.template-select-wrapper')) await click('.message-schemas input');
   await click('.template-select-wrapper > button');
   await click(`.template-dropdown-item:nth-of-type(${index}) .dropdown-option`);
 }
@@ -61,21 +60,21 @@ const topic = () => container.querySelector<HTMLInputElement>('#topic')!.value;
 it('applies defaults, edits variables explicitly and publishes exactly the visible typed draft', async () => {
   await render();
   await select();
-  expect(topic()).toBe('sensors/temperature/temp-001');
-  expect(JSON.parse(payload()).sensorId).toBe('temp-001');
-  expect(container.querySelector('.schema-validation')!.textContent).toBe('Schema Valid');
+  expect(topic()).toBe('sensors/sensor-01/reading');
+  expect(JSON.parse(payload()).sensorId).toBe('sensor-01');
+  expect(container.querySelector('.schema-validation')!.textContent).toBe('Matches schema');
   const before = payload();
-  await field('[aria-label="Template variable sensorId"]', 'room"1');
+  await field('[aria-label="Schema variable sensorId"]', 'room"1');
   expect(payload()).toBe(before);
   await click('.publish-template-variables button');
-  expect(topic()).toBe('sensors/temperature/room"1');
+  expect(topic()).toBe('sensors/room"1/reading');
   expect(JSON.parse(payload()).sensorId).toBe('room"1');
   expect(typeof JSON.parse(payload()).temperature).toBe('number');
   const draft = payload();
   await click('.publish-form-publish-btn');
   expect(publish.mock.calls[0][0]).toMatchObject({ topic: topic(), payload: draft });
   await field('#topic', 'manual/topic');
-  await field('[aria-label="Template variable sensorId"]', 'two');
+  await field('[aria-label="Schema variable sensorId"]', 'two');
   await click('.publish-template-variables button');
   expect(topic()).toBe('manual/topic');
   expect(JSON.parse(payload()).sensorId).toBe('two');
@@ -102,16 +101,16 @@ it('keeps the draft unchanged on failure and allows correcting typed variables',
   await render();
   await select();
   const before = payload();
-  await field('[aria-label="Template variable n"]', 'bad');
+  await field('[aria-label="Schema variable n"]', 'bad');
   await click('.publish-template-variables button');
   expect(payload()).toBe(before);
   expect(container.querySelector('[role="alert"]')!.textContent).toContain('safe integer');
   expect(container.querySelector<HTMLButtonElement>('.publish-form-publish-btn')!.disabled).toBe(
     true,
   );
-  await field('[aria-label="Template variable n"]', '-2');
-  await field('[aria-label="Template variable flag"]', 'true');
-  await field('[aria-label="Template variable meta"]', '[1,null]');
+  await field('[aria-label="Schema variable n"]', '-2');
+  await field('[aria-label="Schema variable flag"]', 'true');
+  await field('[aria-label="Schema variable meta"]', '[1,null]');
   await click('.publish-template-variables button');
   expect(JSON.parse(payload())).toEqual({ n: -2, flag: true, meta: [1, null] });
   await click('.publish-form-publish-btn');
@@ -142,7 +141,7 @@ it('reports malformed saved templates without losing the existing draft', async 
   );
   expect(topic()).toBe('existing');
   expect(payload()).toBe('unchanged');
-  await click('.template-checkbox-label input');
+  await click('.message-schemas input');
   expect(container.querySelector<HTMLButtonElement>('.publish-form-publish-btn')!.disabled).toBe(
     false,
   );
