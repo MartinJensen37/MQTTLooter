@@ -38,7 +38,8 @@ Audited through `b705d91`. Baseline: 164 tests, typecheck, lint and the built El
 - The library lists metadata only. Playback and topic filters read pages; export streams chunks to a file chosen in main.
 - The legacy `recordings.json` library and any localStorage copy are imported idempotently. The JSON file is kept as `recordings.json.migrated` once its counts are verified.
 - Playback schedules each message against a fixed start anchor, so slow publish acknowledgements no longer accumulate drift; a stalled publish is followed by catch-up sends.
-- Remaining: streaming import of files above 10 MiB and cross-recording search.
+- Imports stream files of any size through an incremental scanner in bounded worker steps into a hidden recording, which appears only when complete.
+- Remaining: cross-recording search.
 
 ### Load baseline (2026-10-25)
 
@@ -75,7 +76,7 @@ Broker passwords, TLS private keys and passphrases are encrypted with `safeStora
 | Plain simulator payloads | Raw UTF-8 scalar output, device defaults/per-signal overrides, exact text/hex previews and versioned legacy migration. Combined payload templates place several typed signals, timestamps, ISO times, UUIDs and random helpers in nested JSON or raw text. | Done: schema-built templates bind properties named like signals. |
 | MQTT 5 properties | Live/disk inspection and exports preserve metadata. Publisher supports response topic, correlation bytes, content type, expiry, payload format and repeated user properties with main-process validation. | Broader real-broker interoperability tests. Opt-in outgoing topic aliases follow the broker's CONNACK limit and reset on reconnect (via MQTT.js), verified against the loopback broker. |
 | Memory and throttling | Acknowledged transport batches, per-connection/shared budgets, protected topic metadata, worker-owned disk history and recordings with durable gap records. A load harness measures working sets, V8 heaps, input latency, queues and accounting. | Replaceable-update coalescing for retained floods; optional per-message allocation reduction. |
-| Recordings in a database | Main-owned capture into `recordings.sqlite` with per-batch commits, crash recovery, durable queue/outage/storage gaps, paged playback, streamed export and one-time JSON/localStorage migration. Kept up with 5,000 msg/s for 60 s under load. | Streaming import above 10 MiB. |
+| Recordings in a database | Main-owned capture into `recordings.sqlite` with per-batch commits, crash recovery, durable queue/outage/storage gaps, paged playback, streamed export and one-time JSON/localStorage migration. Kept up with 5,000 msg/s for 60 s under load. | Cross-recording search. |
 | Responsive disconnect control | MQTT clients run in main; storage runs in workers. Measured disconnect is 1-2 ms during 50k-topic floods and 5,000 msg/s streams. | Repeat with decoding and plots active once those land. |
 | Multiple tiled panels | Not implemented; current tabs preserve mounted workspaces. | Dockable layout with explicit panel lifecycle and persistence. |
 | Protobuf / Sparkplug B | User-provided `.proto` decoders mapped to MQTT topic filters, compiled and applied in a main-process worker (the renderer CSP forbids generated code), with a Decoded payload view, 1 MiB input/output limits and exact 64-bit integers. | Plotting and searching decoded fields; `.proto` imports; Sparkplug B stays optional. |
@@ -250,13 +251,12 @@ Every phase includes targeted regression tests, typecheck/lint/build where relev
 
 ## Delivery order
 
-Done on 2026-10-25, in order: durable recordings, the load harness, credential storage, renderer heap profiling, chunked history clears, JSON Schema validation, simulator payload templates, plot time sources and scales, cross-topic search, drift-free playback, negotiated topic aliases, whole-topic export, the transport test matrix, Mosquitto interoperability tests, schema-built publishing and simulator templates, and protobuf decoding.
+Done on 2026-10-25, in order: durable recordings, the load harness, credential storage, renderer heap profiling, chunked history clears, JSON Schema validation, simulator payload templates, plot time sources and scales, cross-topic search, drift-free playback, negotiated topic aliases, whole-topic export, the transport test matrix, Mosquitto interoperability tests, schema-built publishing and simulator templates, protobuf decoding, full search-result export and streamed recording import.
 
 Next, in order:
 
 1. Installer/upgrade checks and other brokers (Mosquitto checks are in place).
-2. Streaming recording import above 10 MiB.
-3. Tiled workspaces. Then plotting decoded protobuf fields through the numeric series adapter.
+2. Tiled workspaces. Then plotting decoded protobuf fields through the numeric series adapter.
 
 Original order: start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
 
