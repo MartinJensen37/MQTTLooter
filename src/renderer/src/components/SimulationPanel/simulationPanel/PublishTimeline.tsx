@@ -8,6 +8,7 @@ import {
   type TimelineRow,
 } from './publishTimelineModel';
 import CheckToggle from '../../Controls/CheckToggle';
+import InfoTip from '../../Controls/InfoTip';
 import './PublishTimeline.css';
 
 const seconds = (ms: number) => `${Number((ms / 1000).toFixed(3))} s`;
@@ -174,9 +175,7 @@ function Timeline({ device }: { device: SimulatedDevice }) {
             ))}
           </select>
         </label>
-        <span>
-          From a fresh loop start, assuming an available connection and no stalled publishes.
-        </span>
+        <InfoTip text="When each signal may publish after starting the loop, assuming the connection is up and no publish stalls." />
       </div>
       {busy && <p role="status">Calculating publish probabilities…</p>}
       {error && <p role="alert">{error}</p>}

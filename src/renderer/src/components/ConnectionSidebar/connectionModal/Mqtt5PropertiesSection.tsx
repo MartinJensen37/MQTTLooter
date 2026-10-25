@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ConnectionFormData, FieldChange } from './types';
+import InfoTip from '../../Controls/InfoTip';
 
 interface Props {
   formData: ConnectionFormData;
@@ -13,7 +14,10 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
 
       <div className="mqtt-form-row">
         <div className="mqtt-form-group">
-          <label htmlFor="sessionExpiryInterval">Session Expiry Interval (seconds)</label>
+          <label htmlFor="sessionExpiryInterval">
+            Session Expiry Interval (seconds){' '}
+            <InfoTip text="0: the session ends when the connection closes." />
+          </label>
           <input
             id="sessionExpiryInterval"
             type="number"
@@ -24,11 +28,12 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             min="0"
             placeholder="0"
           />
-          <div className="mqtt-field-hint">0: the session ends when the connection closes.</div>
         </div>
 
         <div className="mqtt-form-group">
-          <label htmlFor="receiveMaximum">Receive Maximum</label>
+          <label htmlFor="receiveMaximum">
+            Receive Maximum <InfoTip text="QoS 1 and 2 messages the broker may send at once." />
+          </label>
           <input
             id="receiveMaximum"
             type="number"
@@ -38,13 +43,15 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             max="65535"
             placeholder="65535"
           />
-          <div className="mqtt-field-hint">QoS 1 and 2 messages the broker may send at once.</div>
         </div>
       </div>
 
       <div className="mqtt-form-row">
         <div className="mqtt-form-group">
-          <label htmlFor="maximumPacketSize">Maximum Packet Size (bytes)</label>
+          <label htmlFor="maximumPacketSize">
+            Maximum Packet Size (bytes){' '}
+            <InfoTip text="Largest packet this client accepts, in bytes." />
+          </label>
           <input
             id="maximumPacketSize"
             type="number"
@@ -55,11 +62,13 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             min="1"
             placeholder="268435455"
           />
-          <div className="mqtt-field-hint">Largest packet this client accepts, in bytes.</div>
         </div>
 
         <div className="mqtt-form-group">
-          <label htmlFor="topicAliasMaximum">Topic Alias Maximum</label>
+          <label htmlFor="topicAliasMaximum">
+            Topic Alias Maximum{' '}
+            <InfoTip text="Aliases the broker may use for messages to this client. 0: none." />
+          </label>
           <input
             id="topicAliasMaximum"
             type="number"
@@ -69,9 +78,6 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             max="65535"
             placeholder="0"
           />
-          <div className="mqtt-field-hint">
-            Aliases the broker may use for messages to this client. 0: none.
-          </div>
         </div>
       </div>
 
@@ -86,9 +92,9 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             <div className="mqtt-connection-modal-checkbox-custom"></div>
             <span className="mqtt-connection-modal-checkbox-text">
               Request Response Information
+              <InfoTip text="Ask the broker for response information." />
             </span>
           </label>
-          <div className="mqtt-field-hint">Ask the broker for response information.</div>
         </div>
 
         <div className="mqtt-form-group">
@@ -99,11 +105,11 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
               onChange={(e) => handleInputChange('requestProblemInformation', e.target.checked)}
             />
             <div className="mqtt-connection-modal-checkbox-custom"></div>
-            <span className="mqtt-connection-modal-checkbox-text">Request Problem Information</span>
+            <span className="mqtt-connection-modal-checkbox-text">
+              Request Problem Information{' '}
+              <InfoTip text="Ask the broker to explain errors with reason strings." />
+            </span>
           </label>
-          <div className="mqtt-field-hint">
-            Ask the broker to explain errors with reason strings.
-          </div>
         </div>
       </div>
 
@@ -118,11 +124,9 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
             <div className="mqtt-connection-modal-checkbox-custom"></div>
             <span className="mqtt-connection-modal-checkbox-text">
               Use topic aliases when publishing
+              <InfoTip text="Shortens repeated topics within the broker's limit. Reset on every reconnect." />
             </span>
           </label>
-          <div className="mqtt-field-hint">
-            Shortens repeated topics within the broker's limit. Reset on every reconnect.
-          </div>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ConnectionFormData, FormErrors, FieldChange } from './types';
+import InfoTip from '../../Controls/InfoTip';
 
 interface Props {
   formData: ConnectionFormData;
@@ -80,7 +81,9 @@ function ConnectionDetailsSection({
       {/* WebSocket path — only for ws/wss. */}
       {(formData.protocol === 'ws' || formData.protocol === 'wss') && (
         <div className="mqtt-form-group">
-          <label htmlFor="wsPath">WebSocket Path</label>
+          <label htmlFor="wsPath">
+            WebSocket Path <InfoTip text="WebSocket path on the broker, usually /mqtt." />
+          </label>
           <input
             id="wsPath"
             type="text"
@@ -90,7 +93,6 @@ function ConnectionDetailsSection({
             className={errors.wsPath ? 'error' : ''}
             autoComplete="off"
           />
-          <div className="mqtt-field-hint">WebSocket path on the broker, usually /mqtt.</div>
           {errors.wsPath && <span className="mqtt-error-text">{errors.wsPath}</span>}
         </div>
       )}
@@ -123,7 +125,16 @@ function ConnectionDetailsSection({
       </div>
 
       <div className="mqtt-form-group">
-        <label htmlFor="protocolVersion">MQTT Protocol Version</label>
+        <label htmlFor="protocolVersion">
+          MQTT Protocol Version{' '}
+          <InfoTip
+            text={
+              formData.protocolVersion === 5
+                ? 'Adds message properties, expiry and topic aliases.'
+                : 'Supported by almost every broker.'
+            }
+          />
+        </label>
         <div className="custom-select-wrapper">
           <button
             type="button"
@@ -161,11 +172,6 @@ function ConnectionDetailsSection({
               </button>
             </div>
           )}
-        </div>
-        <div className="mqtt-field-hint">
-          {formData.protocolVersion === 5
-            ? 'Adds message properties, expiry and topic aliases.'
-            : 'Supported by almost every broker.'}
         </div>
       </div>
     </div>

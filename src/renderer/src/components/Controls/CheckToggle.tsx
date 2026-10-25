@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
+import InfoTip from './InfoTip';
 
 /**
  * A checkbox styled like the connection editor's options. With children it reveals them while
- * checked, so optional settings and hidden sections share one look. `compact` drops the box for
- * use inside message cards; `keepMounted` keeps hidden children in the document.
+ * checked, so optional settings and hidden sections share one look. `hint` becomes an info tip
+ * beside the label. `compact` drops the box for use inside message cards; `keepMounted` keeps
+ * hidden children in the document.
  */
 export default function CheckToggle({
   checked,
@@ -40,9 +42,11 @@ export default function CheckToggle({
           onChange={(event) => onChange(event.target.checked)}
         />
         <span className="check-toggle-box" aria-hidden="true" />
-        <span className="check-toggle-text">{label}</span>
+        <span className="check-toggle-text">
+          {label}
+          {hint && <InfoTip text={hint} />}
+        </span>
       </label>
-      {hint && <p className="check-toggle-hint">{hint}</p>}
       {children !== undefined && (checked || keepMounted) && (
         <div className="check-toggle-body" hidden={!checked}>
           {children}

@@ -37,6 +37,9 @@
   min-width: 100px;
   width: 0;
 }
+.publish-properties p.publish-properties-warning {
+  color: var(--warning-text);
+}
 .publish-properties p.publish-properties-error {
   color: var(--danger);
   overflow-wrap: anywhere;

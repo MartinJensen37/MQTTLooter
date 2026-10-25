@@ -6,6 +6,7 @@ import SignalSparkline from './SignalSparkline';
 import PublishTimeline from './PublishTimeline';
 import { defaultPayloadTemplate, MAX_PAYLOAD_TEMPLATE, validateDevice } from './model';
 import { formatInterval } from './formatters';
+import InfoTip from '../../Controls/InfoTip';
 interface Props {
   device: SimulatedDevice;
   onUpdateDevice: (id: number, updates: Partial<SimulatedDevice>) => void;
@@ -163,7 +164,10 @@ export default function DeviceConfigPanel({
         {template && (
           <div className="payload-template-field">
             <label>
-              Payload template
+              <span>
+                Payload template
+                <InfoTip text="Placeholders: {{signal name}}, {{timestamp}}, {{isoTimestamp}}, {{uuid}}, {{randomInt(min, max)}}" />
+              </span>
               <textarea
                 className="form-input payload-template-input"
                 aria-label="Payload template"
@@ -175,10 +179,6 @@ export default function DeviceConfigPanel({
               />
             </label>
             <div className="payload-template-actions">
-              <span className="field-hint">
-                {'Placeholders: {{signal name}}, {{timestamp}}, {{isoTimestamp}}, {{uuid}}, '}
-                {'{{randomInt(min, max)}}'}
-              </span>
               {!raw && (
                 <label className="btn btn-sm btn-secondary">
                   Build from JSON Schema

@@ -21,16 +21,20 @@ export default function PublishPropertiesEditor({
       <CheckToggle
         label="Include MQTT 5 properties"
         hint={
-          protocolVersion !== 5
-            ? draft.enabled
-              ? 'This connection uses MQTT 3. Turn this off to publish; the fields are kept.'
-              : 'Needs an MQTT 5 connection.'
-            : undefined
+          protocolVersion === 5
+            ? 'Response topic, content type, expiry, correlation data and user properties.'
+            : 'Needs an MQTT 5 connection.'
         }
         checked={draft.enabled}
         disabled={disabled || (protocolVersion !== 5 && !draft.enabled)}
         onChange={(enabled) => change({ enabled })}
       >
+        {protocolVersion !== 5 && (
+          <p className="publish-properties-warning" role="alert">
+            MQTT 5 properties need an MQTT 5 connection. Turn this off to publish here; the fields
+            are kept.
+          </p>
+        )}
         <fieldset disabled={disabled || protocolVersion !== 5}>
           <div className="publish-properties-grid">
             <label>

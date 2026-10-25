@@ -1,6 +1,7 @@
 import React from 'react';
 import SecretInput from './SecretInput';
 import type { ConnectionFormData, FieldChange, CertFileType } from './types';
+import InfoTip from '../../Controls/InfoTip';
 
 interface Props {
   formData: ConnectionFormData;
@@ -29,11 +30,11 @@ function TlsSection({
             }
           />
           <div className="mqtt-connection-modal-checkbox-custom"></div>
-          <span className="mqtt-connection-modal-checkbox-text">Enable TLS/SSL</span>
+          <span className="mqtt-connection-modal-checkbox-text">
+            Enable TLS/SSL{' '}
+            <InfoTip text="Encrypts the connection. Required for mqtts:// and wss://." />
+          </span>
         </label>
-        <div className="mqtt-field-hint">
-          Encrypts the connection. Required for mqtts:// and wss://.
-        </div>
       </div>
 
       {(formData.tls.enabled || formData.protocol === 'mqtts' || formData.protocol === 'wss') && (
@@ -51,15 +52,17 @@ function TlsSection({
                 }
               />
               <div className="mqtt-connection-modal-checkbox-custom"></div>
-              <span className="mqtt-connection-modal-checkbox-text">Verify Server Certificate</span>
+              <span className="mqtt-connection-modal-checkbox-text">
+                Verify Server Certificate{' '}
+                <InfoTip text="Turn off only to test with self-signed certificates." />
+              </span>
             </label>
-            <div className="mqtt-field-hint">
-              Turn off only to test with self-signed certificates.
-            </div>
           </div>
 
           <div className="mqtt-form-group">
-            <label htmlFor="servername">Server Name (SNI)</label>
+            <label htmlFor="servername">
+              Server Name (SNI) <InfoTip text="Name checked against the broker's certificate." />
+            </label>
             <input
               id="servername"
               type="text"
@@ -70,12 +73,14 @@ function TlsSection({
               placeholder="Defaults to the host"
               autoComplete="off"
             />
-            <div className="mqtt-field-hint">Name checked against the broker's certificate.</div>
           </div>
 
           {/* CA Certificate */}
           <div className="mqtt-form-group">
-            <label>CA Certificate (Optional)</label>
+            <label>
+              CA Certificate (Optional){' '}
+              <InfoTip text="Certificate of the authority that signed the broker's certificate." />
+            </label>
             <div className="mqtt-certificate-upload">
               <input
                 type="file"
@@ -107,14 +112,14 @@ function TlsSection({
                 </div>
               )}
             </div>
-            <div className="mqtt-field-hint">
-              Certificate of the authority that signed the broker's certificate.
-            </div>
           </div>
 
           {/* Client Certificate */}
           <div className="mqtt-form-group">
-            <label>Client Certificate (Optional)</label>
+            <label>
+              Client Certificate (Optional){' '}
+              <InfoTip text="For brokers that require a client certificate." />
+            </label>
             <div className="mqtt-certificate-upload">
               <input
                 type="file"
@@ -146,12 +151,13 @@ function TlsSection({
                 </div>
               )}
             </div>
-            <div className="mqtt-field-hint">For brokers that require a client certificate.</div>
           </div>
 
           {/* Private Key */}
           <div className="mqtt-form-group">
-            <label>Private Key (Optional)</label>
+            <label>
+              Private Key (Optional) <InfoTip text="Private key of the client certificate." />
+            </label>
             <div className="mqtt-certificate-upload">
               <input
                 type="file"
@@ -183,13 +189,14 @@ function TlsSection({
                 </div>
               )}
             </div>
-            <div className="mqtt-field-hint">Private key of the client certificate.</div>
           </div>
 
           {/* Passphrase for private key */}
           {formData.tls.key && (
             <div className="mqtt-form-group">
-              <label htmlFor="key-passphrase">Private Key Passphrase</label>
+              <label htmlFor="key-passphrase">
+                Private Key Passphrase <InfoTip text="Unlocks an encrypted private key." />
+              </label>
               <SecretInput
                 label="key passphrase"
                 id="key-passphrase"
@@ -200,7 +207,6 @@ function TlsSection({
                 placeholder="Only for an encrypted key"
                 autoComplete="new-password"
               />
-              <div className="mqtt-field-hint">Unlocks an encrypted private key.</div>
             </div>
           )}
         </>

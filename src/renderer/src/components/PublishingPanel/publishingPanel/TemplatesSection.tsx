@@ -40,7 +40,7 @@ function TemplatesSection({
       <CheckToggle
         className="message-schemas"
         label="Message schemas"
-        hint={showTemplates ? undefined : 'Fill the payload from a JSON Schema and check it.'}
+        hint="Fill the payload from a JSON Schema, and check it against the schema."
         checked={showTemplates}
         onChange={setShowTemplates}
       >

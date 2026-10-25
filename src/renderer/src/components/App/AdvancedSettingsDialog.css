@@ -65,6 +65,15 @@
   white-space: nowrap;
 }
 
+.advanced-settings-note {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.advanced-settings-field > span {
+  white-space: nowrap;
+}
+
 .advanced-settings-body [role='alert'] {
   margin: 0;
   color: var(--danger);

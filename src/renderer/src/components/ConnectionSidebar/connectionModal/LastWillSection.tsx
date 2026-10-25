@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ConnectionFormData, FormErrors, FieldChange } from './types';
+import InfoTip from '../../Controls/InfoTip';
 
 interface Props {
   formData: ConnectionFormData;
@@ -28,11 +29,11 @@ function LastWillSection({
             onChange={(e) => handleInputChange('willEnabled', e.target.checked)}
           />
           <div className="mqtt-connection-modal-checkbox-custom"></div>
-          <span className="mqtt-connection-modal-checkbox-text">Enable Last Will Message</span>
+          <span className="mqtt-connection-modal-checkbox-text">
+            Enable Last Will Message{' '}
+            <InfoTip text="The broker publishes this message if the connection drops unexpectedly." />
+          </span>
         </label>
-        <div className="mqtt-field-hint">
-          The broker publishes this message if the connection drops unexpectedly.
-        </div>
       </div>
 
       {formData.willEnabled && (
@@ -136,7 +137,10 @@ function LastWillSection({
 
           <div className="mqtt-form-row">
             <div className="mqtt-form-group">
-              <label htmlFor="willDelayInterval">Will Delay Interval (s)</label>
+              <label htmlFor="willDelayInterval">
+                Will Delay Interval (s){' '}
+                <InfoTip text="Seconds the broker waits before publishing it." />
+              </label>
               <input
                 id="willDelayInterval"
                 type="number"
@@ -147,12 +151,13 @@ function LastWillSection({
                 min="0"
                 placeholder="0"
               />
-              <div className="mqtt-field-hint">Seconds the broker waits before publishing it.</div>
             </div>
 
             {formData.protocolVersion === 5 && (
               <div className="mqtt-form-group">
-                <label htmlFor="willMessageExpiryInterval">Will Message Expiry (s)</label>
+                <label htmlFor="willMessageExpiryInterval">
+                  Will Message Expiry (s) <InfoTip text="0: never expires. MQTT 5 only." />
+                </label>
                 <input
                   id="willMessageExpiryInterval"
                   type="number"
@@ -163,7 +168,6 @@ function LastWillSection({
                   min="0"
                   placeholder="0"
                 />
-                <div className="mqtt-field-hint">0: never expires. MQTT 5 only.</div>
               </div>
             )}
           </div>

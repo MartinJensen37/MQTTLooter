@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import CheckToggle from '../Controls/CheckToggle';
+import InfoTip from '../Controls/InfoTip';
 import TopicTreeService from '../../services/TopicTreeService';
 import MQTTService from '../../services/MQTTService';
 import { advancedSettings, useAdvancedSettings } from '../../services/AdvancedSettings';
@@ -78,7 +79,10 @@ export default function AdvancedSettingsDialog({
           <section>
             <h3>Topic tree</h3>
             <label className="advanced-settings-field">
-              Cache size
+              <span>
+                Cache size
+                <InfoTip text="Messages kept in memory for browsing. Older messages are still on disk." />
+              </span>
               <select
                 className="form-select"
                 aria-label="Cache size"
@@ -95,9 +99,6 @@ export default function AdvancedSettingsDialog({
                 <option value="compact">{profileLabel('compact')}</option>
               </select>
             </label>
-            <p className="check-toggle-hint">
-              Messages kept in memory for browsing. Older messages are still on disk.
-            </p>
           </section>
           <section>
             <h3>Disk history</h3>
@@ -155,7 +156,7 @@ export default function AdvancedSettingsDialog({
                 })}
               </dl>
             ) : (
-              <p className="check-toggle-hint">No messages received since the app started.</p>
+              <p className="advanced-settings-note">No messages received since the app started.</p>
             )}
           </section>
           {error && <p role="alert">{error}</p>}

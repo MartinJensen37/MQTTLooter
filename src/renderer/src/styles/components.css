@@ -370,6 +370,38 @@ select option::checkmark { color: var(--primary); }
 .check-toggle-compact .check-toggle-box { width: 13px; height: 13px; border-width: 1.5px; }
 .check-toggle-compact .check-toggle-label input:checked + .check-toggle-box::after { font-size: 9px; }
 
+/* ── Info tips: a small "i" whose explanation appears on hover or focus ── */
+.info-tip {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 5px;
+  color: var(--gray-500);
+  font-size: 12px;
+  font-weight: 400;
+  vertical-align: middle;
+  cursor: help;
+  border-radius: 50%;
+  outline: none;
+}
+.info-tip:hover,
+.info-tip:focus-visible { color: var(--primary); }
+.info-tip:focus-visible { box-shadow: 0 0 0 3px var(--primary-light); }
+.info-tip-bubble {
+  position: fixed;
+  /* Above every overlay, including the connection editor's. */
+  z-index: 100000;
+  max-width: 260px;
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  background: var(--gray-800);
+  color: white;
+  font: 400 12px/1.4 var(--font-family);
+  font-style: normal;
+  white-space: normal;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+}
+
 /* ── Badges ── */
 .badge {
   display: inline-flex;

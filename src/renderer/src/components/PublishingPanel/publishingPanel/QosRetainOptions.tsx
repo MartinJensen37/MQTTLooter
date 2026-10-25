@@ -1,4 +1,5 @@
 import React from 'react';
+import InfoTip from '../../Controls/InfoTip';
 
 interface Props {
   qos: number;
@@ -86,12 +87,7 @@ function QosRetainOptions({
           <span className="retain-checkbox-custom"></span>
           <span className="retain-checkbox-text">
             Retain message
-            <span
-              className="retain-info"
-              title="Retained messages are stored by the broker and sent to new subscribers"
-            >
-              <i className="fas fa-info-circle"></i>
-            </span>
+            <InfoTip text="The broker keeps the last retained message on a topic and sends it to new subscribers." />
           </span>
         </label>
       </div>
