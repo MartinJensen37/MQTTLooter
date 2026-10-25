@@ -34,6 +34,8 @@ export interface SimulatedDevice {
   outputs: DeviceOutput[];
   qos?: 0 | 1 | 2;
   retain?: boolean;
-  payloadFormat?: 'auto' | 'named';
+  payloadFormat?: 'auto' | 'named' | 'template';
+  /** Combined payload with {{signal name}}, {{timestamp}}, {{uuid}} and other placeholders. */
+  payloadTemplate?: string;
   publishMode?: 'combined' | 'signals';
 }

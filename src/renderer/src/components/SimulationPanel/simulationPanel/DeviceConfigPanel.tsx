@@ -2,7 +2,7 @@ import type { SimulatedDevice, DeviceOutput } from './types';
 import IntervalField from './IntervalField';
 import SignalSparkline from './SignalSparkline';
 import PublishTimeline from './PublishTimeline';
-import { validateDevice } from './model';
+import { defaultPayloadTemplate, MAX_PAYLOAD_TEMPLATE, validateDevice } from './model';
 import { formatInterval } from './formatters';
 interface Props {
   device: SimulatedDevice;
@@ -27,6 +27,8 @@ export default function DeviceConfigPanel({
   onDuplicate,
 }: Props) {
   const separate = device.publishMode === 'signals';
+  const raw = device.payloadMode === 'raw';
+  const template = !separate && device.payloadFormat === 'template';
   const errors = validateDevice(device);
   return (
     <div className="device-config panel">
@@ -104,20 +106,27 @@ export default function DeviceConfigPanel({
               <option value="raw">Raw scalar (UTF-8)</option>
             </select>
           </label>
-          {!separate && device.payloadMode !== 'raw' && (
+          {!separate && (
             <label>
               Payload structure
               <select
                 className="custom-select-button form-select"
-                value={device.payloadFormat ?? 'auto'}
-                onChange={(event) =>
+                aria-label="Payload structure"
+                value={raw && !template ? 'named' : (device.payloadFormat ?? 'auto')}
+                onChange={(event) => {
+                  const payloadFormat = event.target.value as 'auto' | 'named' | 'template';
                   onUpdateDevice(device.id, {
-                    payloadFormat: event.target.value as 'auto' | 'named',
-                  })
-                }
+                    payloadFormat,
+                    ...(payloadFormat === 'template' &&
+                      !device.payloadTemplate?.trim() && {
+                        payloadTemplate: defaultPayloadTemplate(device),
+                      }),
+                  });
+                }}
               >
-                <option value="named">Named signals</option>
-                <option value="auto">Flatten single signal (legacy)</option>
+                <option value="named">{raw ? 'Single signal value' : 'Named signals'}</option>
+                {!raw && <option value="auto">Flatten single signal (legacy)</option>}
+                <option value="template">Template</option>
               </select>
             </label>
           )}
@@ -130,6 +139,24 @@ export default function DeviceConfigPanel({
             Retain message
           </label>
         </div>
+        {template && (
+          <label className="payload-template-field">
+            Payload template
+            <textarea
+              className="form-input payload-template-input"
+              aria-label="Payload template"
+              rows={8}
+              spellCheck={false}
+              maxLength={MAX_PAYLOAD_TEMPLATE}
+              value={device.payloadTemplate ?? ''}
+              onChange={(e) => onUpdateDevice(device.id, { payloadTemplate: e.target.value })}
+            />
+            <span className="field-hint">
+              {'Placeholders: {{signal name}}, {{timestamp}}, {{isoTimestamp}}, {{uuid}}, '}
+              {'{{randomInt(min, max)}}'}
+            </span>
+          </label>
+        )}
         <IntervalField
           value={device.publishInterval}
           onChange={(publishInterval) => onUpdateDevice(device.id, { publishInterval })}

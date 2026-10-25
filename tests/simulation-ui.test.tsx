@@ -406,3 +406,43 @@ it('does not persist live samples, stops on disconnect, and isolates connection 
   expect(container.textContent).toContain('Device b');
   expect(JSON.parse(localStorage.getItem('mqtt-simulation-devices-a')!)[0].name).toBe('Device a');
 });
+
+it('builds combined payloads from a template and blocks publishing an invalid one', async () => {
+  seed('a');
+  const publish = vi.fn().mockResolvedValue(undefined);
+  await act(async () =>
+    root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={publish} />),
+  );
+  await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
+  await input('Payload structure', 'template');
+  const area = () =>
+    container.querySelector('[aria-label="Payload template"]') as HTMLTextAreaElement;
+  // The starting template names every signal.
+  expect(JSON.parse(area().value)).toEqual({
+    device: 'Device a',
+    timestamp: '{{isoTimestamp}}',
+    values: { value: '{{value}}' },
+  });
+  await click('Publish Once');
+  const sent = JSON.parse(publish.mock.calls[0][0].payload);
+  expect(sent).toMatchObject({ device: 'Device a', values: { value: 0 } });
+  expect(new Date(sent.timestamp).toISOString()).toBe(sent.timestamp);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
+      area(),
+      '{"v": "{{nope}}"}',
+    );
+    area().dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(container.querySelector('.device-config [role="alert"]')!.textContent).toContain(
+    'Unknown template expression: nope',
+  );
+  const once = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Publish Once',
+  )!;
+  expect(once.disabled).toBe(true);
+  expect(JSON.parse(localStorage.getItem('mqtt-simulation-devices-a')!)[0]).toMatchObject({
+    payloadFormat: 'template',
+    payloadTemplate: '{"v": "{{nope}}"}',
+  });
+});

@@ -1,3 +1,4 @@
+import { expandTemplate } from '../../../../../shared/template-expansion';
 import { DATA_TYPE_CONFIGS } from './constants';
 import type { DeviceOutput, SimulatedDevice } from './types';
 import { validatePublishTopic } from '../../../../../shared/publish-properties';
@@ -204,9 +205,11 @@ export function validateDevice(device: SimulatedDevice): string[] {
   const errors: string[] = [];
   if (!['json', 'raw'].includes(device.payloadMode ?? 'json'))
     errors.push('Invalid device payload mode.');
+  const template = device.publishMode !== 'signals' && device.payloadFormat === 'template';
   if (
     device.publishMode !== 'signals' &&
     device.payloadMode === 'raw' &&
+    !template &&
     device.outputs.length !== 1
   )
     errors.push(
@@ -224,8 +227,9 @@ export function validateDevice(device: SimulatedDevice): string[] {
   if (![0, 1, 2].includes(device.qos ?? 0)) errors.push('QoS must be 0, 1 or 2.');
   if (device.retain !== undefined && typeof device.retain !== 'boolean')
     errors.push('Retain must be true or false.');
-  if (!['auto', 'named'].includes(device.payloadFormat ?? 'auto'))
+  if (!['auto', 'named', 'template'].includes(device.payloadFormat ?? 'auto'))
     errors.push('Invalid payload format.');
+  if (template) errors.push(...validatePayloadTemplate(device));
   if (!['combined', 'signals'].includes(device.publishMode ?? 'combined'))
     errors.push('Invalid publishing mode.');
   if (device.publishMode === 'signals')
@@ -238,6 +242,51 @@ export function validateDevice(device: SimulatedDevice): string[] {
       ...validateOutput(output, device.outputs).map((error) => `${output.name}: ${error}`),
     );
   return errors;
+}
+
+export const MAX_PAYLOAD_TEMPLATE = 64 * 1024;
+
+/** Check syntax and placeholder names with stand-in values, without publishing anything. */
+export function validatePayloadTemplate(device: SimulatedDevice): string[] {
+  const template = device.payloadTemplate ?? '';
+  if (!template.trim()) return ['Enter a payload template.'];
+  if (template.length > MAX_PAYLOAD_TEMPLATE) return ['Payload template exceeds 64 KiB.'];
+  if ((device.payloadMode ?? 'json') === 'json') {
+    try {
+      JSON.parse(template);
+    } catch {
+      return ['JSON templates must be valid JSON. Put placeholders inside strings: "{{name}}".'];
+    }
+  }
+  try {
+    expandTemplate(
+      { topic: '', payload: template },
+      Object.fromEntries(device.outputs.map((output) => [output.name.trim(), 0])),
+      { uuid: () => '00000000-0000-4000-8000-000000000000' },
+    );
+  } catch (error) {
+    return [(error as Error).message];
+  }
+  return [];
+}
+
+/** A starting template naming every signal, in the device's payload mode. */
+export function defaultPayloadTemplate(device: SimulatedDevice): string {
+  if (device.payloadMode === 'raw')
+    return device.outputs
+      .map((output) => `${output.name.trim()}={{${output.name.trim()}}}`)
+      .join(';');
+  return JSON.stringify(
+    {
+      device: device.name,
+      timestamp: '{{isoTimestamp}}',
+      values: Object.fromEntries(
+        device.outputs.map((output) => [output.name.trim(), `{{${output.name.trim()}}}`]),
+      ),
+    },
+    null,
+    2,
+  );
 }
 
 export function nextId(items: { id: number }[]): number {

@@ -159,6 +159,7 @@
 }
 .signal-parameters label,
 .signal-topic-field,
+.device-settings .payload-template-field,
 .device-dialog form > label {
   display: flex;
   flex-direction: column;
@@ -462,4 +463,16 @@
   .signal-list-row {
     flex-wrap: wrap;
   }
+}
+
+.device-settings .payload-template-field {
+  margin-top: var(--spacing-md);
+}
+
+.payload-template-input {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 12px;
 }

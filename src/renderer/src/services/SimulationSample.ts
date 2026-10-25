@@ -1,4 +1,5 @@
 import { generateSignalSample } from '../utils/valueGenerators';
+import { expandTemplate } from '../../../shared/template-expansion';
 import { defaultConfig, validateDevice } from '../components/SimulationPanel/simulationPanel/model';
 import type {
   SimulatedDevice,
@@ -63,7 +64,16 @@ export function sampleDevice(
     ] as const;
   });
   let payload: string;
-  if (device.payloadMode === 'raw') {
+  if (device.payloadFormat === 'template') {
+    // Signal values are typed variables; the expander adds timestamp, uuid and random helpers.
+    const variables = Object.fromEntries(
+      device.outputs.map((output) => [output.name.trim(), values[output.id]]),
+    );
+    payload = expandTemplate({ topic: '', payload: device.payloadTemplate ?? '' }, variables, {
+      now: () => Date.parse(timestamp),
+      random,
+    }).payload;
+  } else if (device.payloadMode === 'raw') {
     if (entries.length !== 1)
       throw new Error('Raw output requires exactly one signal per message.');
     const value = entries[0][1].value;

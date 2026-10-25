@@ -737,6 +737,33 @@ async function run() {
       window.setSize(1400, 900);
     },
   });
+  await require('./electron-payload-templates.cjs')({
+    evaluate,
+    waitFor,
+    clickButton,
+    published,
+    capture: async () => {
+      window.setSize(800, 600);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await evaluate(
+        `document.querySelector('[aria-label="Payload template"]').scrollIntoView({block:'center'})`,
+      );
+      const layout = await evaluate(`(() => {
+        const editor = document.querySelector('[aria-label="Payload template"]').getBoundingClientRect();
+        const panel = document.querySelector('.device-config');
+        return { right: editor.right, width: editor.width, scroll: panel.scrollWidth, client: panel.clientWidth };
+      })()`);
+      assert.ok(
+        layout.right <= 801 && layout.width >= 250 && layout.scroll <= layout.client + 1,
+        JSON.stringify(layout),
+      );
+      fs.writeFileSync(
+        path.join(workspace, '.tmp', 'electron-payload-template.png'),
+        (await window.webContents.capturePage()).toPNG(),
+      );
+      window.setSize(1400, 900);
+    },
+  });
   await require('./electron-navigation.cjs')({
     evaluate,
     waitFor,

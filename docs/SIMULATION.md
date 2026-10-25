@@ -41,13 +41,29 @@ Editor charts show the delay and transition with numeric axes: ramp includes a s
 
 ## Raw scalar output
 
-Set **Payload format** to **Raw scalar (UTF-8)** in device settings. In individual-topic mode, each signal can inherit that default or explicitly select JSON or raw output. Combined raw output requires exactly one signal; multiple signals remain supported in combined JSON mode.
+Set **Payload format** to **Raw scalar (UTF-8)** in device settings. In individual-topic mode, each signal can inherit that default or explicitly select JSON or raw output. Combined raw output requires exactly one signal unless the device uses a payload template (below).
 
 Raw strings are sent exactly as configured, including empty strings, spaces, newlines and Unicode. Static string fields support multiple lines. Booleans send `true` or `false`; numbers use the existing precision rounding without fixed-width trailing zeroes. No quotes, JSON wrapper, units, timestamps or newline are appended. Unit/timestamp settings remain saved but are disabled while raw output is selected. An empty retained raw payload clears the broker's retained message for that topic.
 
 The signal editor offers exact text, hex and Pretty JSON views, a UTF-8 byte count and full payload copy. Text/hex previews are bounded to 4 KiB; JSON formatting has its own bounded preview. Truncation is labeled and never changes the copied or published payload. Raw JSON-looking strings open as exact text. Last-published previews remember the format that was actually used, even after editing the current format.
 
-Saved devices now carry `schemaVersion: 1`. Unversioned devices migrate to JSON without changing their existing payload structure, topic or schedule. Unknown versions and output formats are reported while preserving the original saved library. This adds scalar serialization; nested typed fields and schema-driven payload construction remain pending.
+Saved devices now carry `schemaVersion: 1`. Unversioned devices migrate to JSON without changing their existing payload structure, topic or schedule. Unknown versions and output formats are reported while preserving the original saved library. This adds scalar serialization.
+
+## Payload templates
+
+For **Combined device payload**, set **Payload structure** to **Template** to compose one message from several signals. The editor starts with a template naming every signal, for example:
+
+```json
+{
+  "device": "Boiler",
+  "timestamp": "{{isoTimestamp}}",
+  "values": { "Temperature": "{{Temperature}}", "Running": "{{Running}}" }
+}
+```
+
+Each signal is available by its name. In JSON mode a placeholder that fills a whole string becomes the signal's typed value, so the message above contains `"Temperature": 21.5` and `"Running": true`; placeholders inside longer strings insert text. Templates use the publishing template syntax, so `{{timestamp}}` (milliseconds), `{{isoTimestamp}}`, `{{uuid}}` (one per message) and the random helpers also work. With **Raw scalar (UTF-8)** the template is plain text, such as `temp={{Temperature}};on={{Running}}`, and may combine several signals.
+
+JSON templates must be valid JSON before expansion; put placeholders inside strings. Templates are checked while editing and a device with an unknown placeholder or invalid JSON cannot start. Templates are limited to 64 KiB and apply only to combined publishing; per-signal topics keep their own payloads. A signal named like a built-in placeholder (for example `uuid`) takes precedence over it. Schema-driven payload construction remains pending.
 
 ## Per-signal schedules
 
