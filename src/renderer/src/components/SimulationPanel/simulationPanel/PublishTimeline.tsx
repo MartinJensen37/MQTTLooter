@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import type { SimulatedDevice } from './types';
 import { validateTiming } from './model';
 import {
@@ -35,7 +35,12 @@ function Timeline({ device }: { device: SimulatedDevice }) {
   const [result, setResult] = useState<TimelineResult>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(true);
-  const [bin, setBin] = useState(0);
+  // Hovering (or arrow keys) inspects a time bin; its card appears after a short rest.
+  const [hover, setHover] = useState<{ bin: number; left: number; top: number } | null>(null);
+  const [cardShown, setCardShown] = useState(false);
+  const dwell = useRef<ReturnType<typeof setTimeout>>();
+  const chart = useRef<HTMLDivElement>(null);
+  useEffect(() => () => clearTimeout(dwell.current), []);
   const [scroll, setScroll] = useState(0);
   const invalidTiming =
     !Number.isFinite(device.publishInterval) ||
@@ -99,6 +104,58 @@ function Timeline({ device }: { device: SimulatedDevice }) {
   const start = Math.max(0, Math.min(Math.floor(scroll / 62) - 2, (result?.rows.length ?? 1) - 1));
   const shown = result?.rows.slice(start, start + 10) ?? [];
   const peak = Math.max(0, ...(result?.aggregate ?? []));
+  const bin = hover?.bin ?? null;
+  const leave = () => {
+    clearTimeout(dwell.current);
+    dwell.current = undefined;
+    setHover(null);
+    setCardShown(false);
+  };
+  // Lanes and the expected-messages chart share one x axis; measure against the latter.
+  const axis = () =>
+    chart.current?.querySelector('.publish-timeline-total svg')?.getBoundingClientRect();
+  const inspect = (event: PointerEvent<HTMLDivElement>) => {
+    const box = chart.current?.getBoundingClientRect();
+    const lane = axis();
+    if (!box || !lane || event.clientX < lane.left || event.clientX > lane.right) return leave();
+    const index = Math.min(
+      TIMELINE_LIMITS.bins - 1,
+      Math.floor(((event.clientX - lane.left) / lane.width) * TIMELINE_LIMITS.bins),
+    );
+    setHover({ bin: index, left: event.clientX - box.left, top: event.clientY - box.top });
+    if (!cardShown && !dwell.current)
+      dwell.current = setTimeout(() => {
+        dwell.current = undefined;
+        setCardShown(true);
+      }, 800);
+  };
+  const inspectByKey = (index: number) => {
+    const box = chart.current?.getBoundingClientRect();
+    const lane = axis();
+    if (!box || !lane) return;
+    const next = Math.max(0, Math.min(TIMELINE_LIMITS.bins - 1, index));
+    setHover({
+      bin: next,
+      left: lane.left - box.left + ((next + 0.5) / TIMELINE_LIMITS.bins) * lane.width,
+      top: lane.top - box.top,
+    });
+    setCardShown(true);
+  };
+  const likely = result
+    ? result.rows
+        .filter((row) => !row.error && bin !== null && row.likelihood[bin] > 0)
+        .sort((a, b) => b.likelihood[bin!] - a.likelihood[bin!])
+    : [];
+  const cursor = (height: number) =>
+    bin === null ? null : (
+      <line
+        className="publish-timeline-cursor"
+        x1={((bin + 0.5) * 640) / TIMELINE_LIMITS.bins}
+        x2={((bin + 0.5) * 640) / TIMELINE_LIMITS.bins}
+        y1="0"
+        y2={height}
+      />
+    );
   return (
     <>
       <div className="publish-timeline-controls">
@@ -124,7 +181,31 @@ function Timeline({ device }: { device: SimulatedDevice }) {
       {busy && <p role="status">Calculating publish probabilities…</p>}
       {error && <p role="alert">{error}</p>}
       {result && (
-        <>
+        <div
+          ref={chart}
+          className="publish-timeline-chart"
+          onPointerMove={inspect}
+          onPointerLeave={leave}
+          onBlur={leave}
+          onKeyDown={(event) => {
+            const step = event.shiftKey ? 10 : 1;
+            const current = bin ?? 0;
+            const next =
+              event.key === 'ArrowLeft'
+                ? current - step
+                : event.key === 'ArrowRight'
+                  ? current + step
+                  : event.key === 'Home'
+                    ? 0
+                    : event.key === 'End'
+                      ? TIMELINE_LIMITS.bins - 1
+                      : null;
+            if (event.key === 'Escape') leave();
+            if (next === null) return;
+            event.preventDefault();
+            inspectByKey(next);
+          }}
+        >
           <div className="publish-timeline-axis">
             <span>Signal / send chance</span>
             <span>0 s</span>
@@ -135,7 +216,7 @@ function Timeline({ device }: { device: SimulatedDevice }) {
             className="publish-timeline-rows"
             onScroll={(event) => setScroll(event.currentTarget.scrollTop)}
             tabIndex={0}
-            aria-label="Signal schedules"
+            aria-label="Signal schedules. Hover, or use the left and right arrow keys, to inspect a moment."
           >
             <div style={{ height: result.rows.length * 62, position: 'relative' }}>
               {shown.map((row, index) => (
@@ -172,14 +253,7 @@ function Timeline({ device }: { device: SimulatedDevice }) {
                                       width={640 / TIMELINE_LIMITS.bins}
                                       height="20"
                                       opacity={0.15 + 0.85 * probability}
-                                    >
-                                      <title>
-                                        {seconds(index * binWidth)}–
-                                        {seconds((index + 1) * binWidth)}: {percent(probability)}{' '}
-                                        chance of at least one send;{' '}
-                                        {row.expected[index].toFixed(3)} expected messages
-                                      </title>
-                                    </rect>
+                                    />
                                   ),
                               )
                             : row.ticks.map((tick, index) => (
@@ -191,19 +265,9 @@ function Timeline({ device }: { device: SimulatedDevice }) {
                                   y2="22"
                                   opacity={row.chance ? 0.15 + 0.85 * row.chance : 0.25}
                                   strokeDasharray={row.chance ? undefined : '2 2'}
-                                >
-                                  <title>
-                                    {seconds(tick)}: {percent(row.chance)} send chance
-                                  </title>
-                                </line>
+                                />
                               ))}
-                          <line
-                            className="publish-timeline-cursor"
-                            x1={((bin + 0.5) * 640) / TIMELINE_LIMITS.bins}
-                            x2={((bin + 0.5) * 640) / TIMELINE_LIMITS.bins}
-                            y1="0"
-                            y2="24"
-                          />
+                          {cursor(24)}
                         </svg>
                         <small title={rowNotes(row, horizon)}>{rowNotes(row, horizon)}</small>
                       </>
@@ -211,9 +275,9 @@ function Timeline({ device }: { device: SimulatedDevice }) {
                   </div>
                   <span
                     className="publish-timeline-likelihood"
-                    title="Chance of at least one send in the inspected time bin"
+                    title="Chance of at least one send at the inspected moment"
                   >
-                    {row.error ? '—' : percent(row.likelihood[bin])}
+                    {bin === null ? '' : row.error ? '—' : percent(row.likelihood[bin])}
                   </span>
                 </div>
               ))}
@@ -222,8 +286,12 @@ function Timeline({ device }: { device: SimulatedDevice }) {
           <div className="publish-timeline-total">
             <span>
               Expected messages
-              <br />
-              <strong>{count(result.aggregate[bin])} in bin</strong>
+              {bin !== null && (
+                <>
+                  <br />
+                  <strong>{count(result.aggregate[bin])} here</strong>
+                </>
+              )}
             </span>
             <svg
               viewBox="0 0 640 40"
@@ -238,13 +306,9 @@ function Timeline({ device }: { device: SimulatedDevice }) {
                   width={640 / TIMELINE_LIMITS.bins - 0.5}
                   y={40 - (value / (peak || 1)) * 38}
                   height={(value / (peak || 1)) * 38}
-                >
-                  <title>
-                    {seconds(index * binWidth)}–{seconds((index + 1) * binWidth)}:{' '}
-                    {value.toFixed(3)} expected messages
-                  </title>
-                </rect>
+                />
               ))}
+              {cursor(40)}
             </svg>
             <span>
               Peak
@@ -252,27 +316,39 @@ function Timeline({ device }: { device: SimulatedDevice }) {
               {count(peak)}
             </span>
           </div>
-          <label className="publish-timeline-inspect">
-            Inspect bin{' '}
-            <input
-              type="range"
-              aria-label="Timeline time bin"
-              min="0"
-              max={TIMELINE_LIMITS.bins - 1}
-              value={bin}
-              onChange={(event) => setBin(Number(event.target.value))}
-            />
-            <span>
-              {seconds(bin * binWidth)}–{seconds((bin + 1) * binWidth)}
-            </span>
-          </label>
+          {hover && cardShown && bin !== null && (
+            <div
+              className="publish-timeline-card"
+              role="status"
+              style={{
+                left: hover.left,
+                top: hover.top,
+                // Stay inside the timeline: flip left near the right edge and above in the lower half.
+                transform: `translate(${hover.left > (chart.current?.clientWidth ?? 0) / 2 ? 'calc(-100% - 12px)' : '12px'}, ${hover.top > (chart.current?.clientHeight ?? 0) / 2 ? 'calc(-100% - 12px)' : '12px'})`,
+              }}
+            >
+              <time>
+                {seconds(bin * binWidth)}–{seconds((bin + 1) * binWidth)}
+              </time>
+              <div>
+                Expected messages <strong>{count(result.aggregate[bin])}</strong>
+              </div>
+              {likely.slice(0, 5).map((row) => (
+                <div key={row.id}>
+                  {row.name} <strong>{percent(row.likelihood[bin])}</strong>
+                </div>
+              ))}
+              {likely.length > 5 && <small>{likely.length - 5} more signals may send</small>}
+              {!likely.length && <small>No signal sends here</small>}
+            </div>
+          )}
           {result.omitted > 0 && (
             <p role="status">
               Showing the first {TIMELINE_LIMITS.signals} signals; {result.omitted} more are
               excluded from this preview and its aggregate.
             </p>
           )}
-        </>
+        </div>
       )}
     </>
   );

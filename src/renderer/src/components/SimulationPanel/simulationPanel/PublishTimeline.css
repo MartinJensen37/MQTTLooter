@@ -99,16 +99,38 @@
 .publish-timeline-total > span:last-child {
   text-align: right;
 }
-.publish-timeline-inspect {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
+/* Hovering shows a cursor across the lanes, then a card for that moment after a short rest. */
+.publish-timeline-chart {
+  position: relative;
 }
-.publish-timeline-inspect input {
-  flex: 1;
-  min-width: 80px;
-  accent-color: var(--primary);
+.publish-timeline-card {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 160px;
+  max-width: 280px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+}
+.publish-timeline-card time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.publish-timeline-card div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  white-space: nowrap;
+}
+.publish-timeline-card small {
+  color: var(--text-muted);
 }
 .publish-timeline details summary {
   cursor: pointer;
