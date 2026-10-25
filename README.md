@@ -84,7 +84,7 @@ A worker owns `history/history.sqlite` in Electron's user-data directory. It sto
 
 History is session-only by default: it is removed on normal exit, or on the next startup after a crash. Enable **Disk history settings > Keep history across app restarts** to retain it. Messages older than 24 hours are excluded from pages and removed incrementally. Retention trims oldest records at a 256 MiB payload/metadata estimate; SQLite has a separate 512 MiB database ceiling, plus a write-ahead log truncated to 64 MiB after checkpoints. Database free pages are reused, so deleting messages need not shrink the file. The worker uses an 8 MiB SQLite page cache.
 
-**Clear Messages** in Disk history removes that topic's stored and cached messages. Live-cache clearing remains a cache-only action. Exports currently cover the displayed page; streaming whole-history export is still planned.
+**Clear Messages** in Disk history removes that topic's stored and cached messages. Live-cache clearing remains a cache-only action. **Export** offers the displayed page, or **Export all stored as JSON/CSV**, which streams every retained message of the topic from main into a file you choose, oldest first. It includes messages committed before the export started; later arrivals are left out.
 
 ### Inspecting MQTT 5 properties
 
