@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import StableScrollViewport from '../StableScrollViewport';
 import TopicTreeNode from './TopicTreeNode';
-import HistoryControls from './HistoryControls';
 import TrafficStatus from './TrafficStatus';
 import './TopicTree.css';
 
@@ -12,9 +11,6 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
   const searchRef = useRef('');
   searchRef.current = search;
   const [statistics, setStatistics] = useState(null);
-  const [historySettings, setHistorySettings] = useState(() =>
-    topicTreeService.getHistorySettings(),
-  );
   const [isLoading, setIsLoading] = useState(true);
 
   const scrollRef = useRef(null);
@@ -24,7 +20,6 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
     try {
       setNodes(topicTreeService.getTopicTreeNodes(connectionId, false, searchRef.current));
       setStatistics(topicTreeService.getTopicTreeStatistics(connectionId));
-      setHistorySettings(topicTreeService.getHistorySettings());
       setIsLoading(false);
     } catch (err) {
       console.error('Error loading topic tree nodes:', err);
@@ -217,15 +212,6 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
             {nodes.filter((node) => node.searchMatch).length} matches
           </div>
         )}
-        <HistoryControls
-          connectionId={connectionId}
-          selectedPath={selectedPath}
-          statistics={statistics}
-          settings={historySettings}
-          service={topicTreeService}
-          onSelect={onTopicSelect}
-          onChange={loadNodes}
-        />
         <TrafficStatus connectionId={connectionId} />
         {historyNotice}
       </div>

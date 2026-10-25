@@ -822,6 +822,8 @@ async function run() {
     evaluate,
     waitFor,
     field,
+    // Clicks a real application menu item, as the user would.
+    menu: (id) => electron.Menu.getApplicationMenu().getMenuItemById(id).click(),
     send: (topic, payload) => {
       for (const socket of sockets)
         socket.write(
@@ -875,6 +877,7 @@ async function run() {
     evaluate,
     waitFor,
     field,
+    menu: (id) => electron.Menu.getApplicationMenu().getMenuItemById(id).click(),
     userData: temporary,
     capture: async () => {
       window.setSize(800, 600);

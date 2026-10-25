@@ -4,7 +4,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import MessageWorkspace from '../src/renderer/src/components/MessagePanel/MessageWorkspace';
 
-vi.mock('../src/renderer/src/services/TopicTreeService', () => ({ default: {} }));
+vi.mock('../src/renderer/src/services/TopicTreeService', () => ({
+  default: { getTopicTree: () => undefined, toggleTopicPin: () => true },
+}));
 vi.mock('../src/renderer/src/components/MessagePanel/IncomingPlot', () => ({
   default: ({ topic, active }) => (
     <section className="incoming-plot" data-active={active}>

@@ -3,6 +3,7 @@ import './MessagePanel.css';
 import StableScrollViewport from '../StableScrollViewport';
 import PayloadView from './PayloadView';
 import MessageProperties from './MessageProperties';
+import TopicTreeService from '../../services/TopicTreeService';
 import { exportMessage, exportMessageCSV } from '../../utils/messageExport';
 import { plainLog } from '../../utils/payloadPresentation';
 
@@ -40,6 +41,17 @@ function MessagePanel({
   const panelRef = useRef(null);
   const [previewBytes, setPreviewBytes] = useState(100);
   const [displayMode, setDisplayMode] = useState('cards');
+  // Pinned live topics keep their cached messages under memory pressure.
+  const [, setPinVersion] = useState(0);
+  const pinnable = !storedPage && Boolean(connectionId && selectedTopic);
+  const pinned =
+    pinnable &&
+    (TopicTreeService.getTopicTree(connectionId)?.pins.includes(selectedTopic.topicPath) ?? false);
+  const togglePin = () => {
+    if (TopicTreeService.toggleTopicPin(connectionId, selectedTopic.topicPath))
+      setPinVersion((version) => version + 1);
+    else showFeedback?.('Up to 8 topics per connection can be pinned.', 'error');
+  };
   useEffect(() => {
     if (typeof ResizeObserver === 'undefined' || !panelRef.current) return;
     const observer = new ResizeObserver(([entry]) => {
@@ -241,6 +253,21 @@ function MessagePanel({
                   <button className="copy-btn" onClick={copyTopicPath} title="Copy topic path">
                     <i className="fas fa-copy"></i>
                   </button>
+                  {pinnable && (
+                    <button
+                      className={`copy-btn pin-btn${pinned ? ' pinned' : ''}`}
+                      onClick={togglePin}
+                      aria-pressed={pinned}
+                      aria-label={pinned ? 'Unpin topic' : 'Pin topic'}
+                      title={
+                        pinned
+                          ? 'Unpin: older messages can be removed from memory again'
+                          : 'Pin: keep this topic’s messages in memory'
+                      }
+                    >
+                      <i className="fas fa-thumbtack"></i>
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="topic-info-item">

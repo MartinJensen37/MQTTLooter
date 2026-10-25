@@ -25,8 +25,7 @@
   gap: 6px;
 }
 .message-history-toolbar,
-.message-history-catalog,
-.message-storage-settings {
+.message-history-catalog {
   font-size: 12px;
 }
 .message-history-toolbar .form-select {
@@ -37,15 +36,6 @@
   flex: 1;
   min-width: 160px;
   max-width: 100%;
-}
-.message-storage-settings summary {
-  cursor: pointer;
-  color: var(--text-muted);
-}
-.message-storage-settings[open] {
-  flex-basis: 100%;
-  max-height: 160px;
-  overflow-y: auto;
 }
 .message-storage-notice {
   margin: 0;

@@ -3,6 +3,7 @@ import MessageTemplateService from '../../services/MessageTemplateService';
 import './PublishingPanel.css';
 import { payloadBytes, type PayloadEncoding } from '../../../../shared/payload';
 import TopicTreeService from '../../services/TopicTreeService';
+import { useAdvancedSettings } from '../../services/AdvancedSettings';
 import type { PublishHistoryItem, SchemaValidationResult } from './publishingPanel/types';
 import PayloadEditor from './publishingPanel/PayloadEditor';
 import PublishPropertiesEditor from './publishingPanel/PublishPropertiesEditor';
@@ -36,6 +37,7 @@ function PublishingPanel({
   selectedTopic = null,
   showFeedback,
 }: PublishingPanelProps) {
+  const settings = useAdvancedSettings();
   const formKey = `publish-form-state-${connectionId}`;
   const [initialForm] = useState(() => {
     try {
@@ -527,19 +529,21 @@ function PublishingPanel({
               </div>
             </div>
 
-            <div className="form-group">
-              <label htmlFor="publish-encoding">Payload encoding</label>
-              <select
-                className="custom-select-button form-select"
-                id="publish-encoding"
-                value={encoding}
-                disabled={isPublishing}
-                onChange={(e) => setEncoding(e.target.value as PayloadEncoding)}
-              >
-                <option value="utf8">UTF-8 text</option>
-                <option value="base64">Base64 bytes</option>
-              </select>
-            </div>
+            {(settings.payloadEncoding || encoding !== 'utf8') && (
+              <div className="form-group">
+                <label htmlFor="publish-encoding">Payload encoding</label>
+                <select
+                  className="custom-select-button form-select"
+                  id="publish-encoding"
+                  value={encoding}
+                  disabled={isPublishing}
+                  onChange={(e) => setEncoding(e.target.value as PayloadEncoding)}
+                >
+                  <option value="utf8">UTF-8 text</option>
+                  <option value="base64">Base64 bytes</option>
+                </select>
+              </div>
+            )}
             <PayloadEditor
               payload={payload}
               setPayload={setPayload}

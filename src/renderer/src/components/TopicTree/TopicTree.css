@@ -278,17 +278,3 @@
 .topic-search-status { font-size: 11px; color: var(--text-muted); margin-top: var(--spacing-xs); min-height: 16px; }
 .tree-control-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
 
-.topic-history-controls {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: var(--spacing-sm);
-}
-.topic-history-controls summary { cursor: pointer; padding: var(--spacing-xs) 0; }
-.topic-history-controls label { display: grid; gap: var(--spacing-xs); margin: var(--spacing-sm) 0; }
-.topic-history-controls .form-select { width: 100%; min-width: 0; font-size: 11px; }
-.topic-history-controls p { margin: var(--spacing-sm) 0; line-height: 1.4; }
-.topic-history-controls [role='alert'] { color: var(--danger); }
-.topic-pin-count { margin-left: var(--spacing-sm); }
-.topic-pin-list { list-style: none; padding: 0; margin: var(--spacing-sm) 0; max-height: 140px; overflow-y: auto; }
-.topic-pin-list li { display: flex; align-items: center; }
-.topic-pin-list .topic-pin-link { flex: 1; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; text-align: left; }

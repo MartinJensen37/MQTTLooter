@@ -11,7 +11,7 @@ package smoke;
 import "units.proto";
 message Reading { string id = 1; double value = 2; int64 count = 3; units.Unit unit = 4; }`;
 
-module.exports = async ({ evaluate, waitFor, field, send, userData, capture }) => {
+module.exports = async ({ evaluate, waitFor, field, send, userData, capture, menu }) => {
   const root = new protobuf.Root();
   protobuf.parse(units, root);
   protobuf.parse(proto, root);
@@ -25,6 +25,17 @@ module.exports = async ({ evaluate, waitFor, field, send, userData, capture }) =
     `[...document.querySelectorAll('button')].find(button => button.textContent.trim().startsWith(${JSON.stringify(text)}))`;
 
   // Add the decoder through the real dialog and a real file input, with an imported file.
+  // Decoders are an advanced option: turn them on in Tools > Advanced settings first.
+  menu('advanced-settings');
+  await waitFor(
+    () => evaluate("!!document.querySelector('.advanced-settings')"),
+    'advanced settings',
+  );
+  await evaluate(
+    "[...document.querySelectorAll('.advanced-settings label')].find(label => label.textContent.trim() === 'Protobuf decoders').querySelector('input').click()",
+  );
+  await evaluate('document.querySelector(\'[aria-label="Close advanced settings"]\').click()');
+  await waitFor(() => evaluate(`!!${button('Decoders')}`), 'decoders button');
   await evaluate(`${button('Decoders')}.click()`);
   await waitFor(() => evaluate("!!document.querySelector('.decoder-dialog')"), 'decoder dialog');
   await evaluate(`(() => {

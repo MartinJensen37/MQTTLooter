@@ -4,6 +4,7 @@ import IncomingPlot from './IncomingPlot';
 import HistorySearch from './HistorySearch';
 import DecoderSettings from './DecoderSettings';
 import { useDecoders } from '../../services/DecoderRegistry';
+import { useAdvancedSettings } from '../../services/AdvancedSettings';
 import type { HistoryPage, HistoryQuery, HistoryStatus } from '../../../../shared/history';
 import TopicTreeService from '../../services/TopicTreeService';
 import './MessageWorkspace.css';
@@ -27,6 +28,7 @@ function Workspace(props: any) {
   const [topics, setTopics] = useState<{ path: string }[]>([]);
   const [decodersOpen, setDecodersOpen] = useState(false);
   const { decoders } = useDecoders();
+  const settings = useAdvancedSettings();
   const selectedPath = props.selectedTopic?.topicPath;
   const topic = topicOverride ?? selectedPath;
   const connectionId = props.connectionId;
@@ -185,25 +187,11 @@ function Workspace(props: any) {
             <option value="stored">Disk history</option>
           </select>
         </label>
-        <button className="btn btn-sm btn-secondary" onClick={() => setDecodersOpen(true)}>
-          Decoders{decoders.length ? ` (${decoders.length})` : ''}
-        </button>
-        <details className="message-storage-settings">
-          <summary>Disk history settings</summary>
-          <label>
-            <input
-              type="checkbox"
-              checked={status?.store?.persistent ?? false}
-              disabled={!status?.store}
-              onChange={async (event) => {
-                const result = await window.electronAPI.history.persist(event.target.checked);
-                if (!result.success) setError(result.error ?? 'Could not save setting');
-                setRefresh((value) => value + 1);
-              }}
-            />{' '}
-            Keep history across app restarts
-          </label>
-        </details>
+        {(settings.protobufDecoders || decoders.length > 0) && (
+          <button className="btn btn-sm btn-secondary" onClick={() => setDecodersOpen(true)}>
+            Decoders{decoders.length ? ` (${decoders.length})` : ''}
+          </button>
+        )}
         {stored && !searchOpen && !plotOpen && (
           <>
             <button className="btn btn-sm btn-secondary" onClick={latest} disabled={busy}>

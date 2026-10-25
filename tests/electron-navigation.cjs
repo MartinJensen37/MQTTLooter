@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 
-module.exports = async function checkNavigation({ evaluate, waitFor, field, send }) {
+module.exports = async function checkNavigation({ evaluate, waitFor, field, send, menu }) {
   const settle = () => new Promise((resolve) => setTimeout(resolve, 250));
   const topicCount = () =>
     evaluate("parseInt(document.querySelector('.topic-tree-stats .stat-item').textContent, 10)");
@@ -141,13 +141,19 @@ module.exports = async function checkNavigation({ evaluate, waitFor, field, send
   );
   assert.equal(await evaluate("document.querySelector('.message-list').scrollTop"), 0);
   // Cache settings and pins use the real controls; pressure must not remove the inspected path.
-  await evaluate("document.querySelector('.topic-history-controls').open = true");
-  await field('[aria-label="History cache"]', 'compact');
-  await evaluate(
-    "[...document.querySelectorAll('.topic-history-controls button')].find(button => button.textContent === 'Pin selected topic').click()",
-  );
+  const cacheSize = async (profile) => {
+    menu('advanced-settings');
+    await waitFor(
+      () => evaluate('!!document.querySelector(\'[aria-label="Cache size"]\')'),
+      'advanced settings',
+    );
+    await field('[aria-label="Cache size"]', profile);
+    await evaluate('document.querySelector(\'[aria-label="Close advanced settings"]\').click()');
+  };
+  await cacheSize('compact');
+  await evaluate('document.querySelector(\'[aria-label="Pin topic"]\').click()');
   await waitFor(
-    () => evaluate("document.querySelector('.topic-pin-list')?.textContent.length > 0"),
+    () => evaluate('!!document.querySelector(\'[aria-label="Unpin topic"][aria-pressed=true]\')'),
     'pin selected topic',
   );
   const protectedPath = anchor.key;
@@ -179,8 +185,7 @@ module.exports = async function checkNavigation({ evaluate, waitFor, field, send
   );
   assert.ok(await evaluate("document.querySelectorAll('.message-item').length > 0"));
   assert.equal(await evaluate("localStorage.getItem('mqtt-history-profile')"), 'compact');
-  await field('[aria-label="History cache"]', 'larger');
-  await evaluate("document.querySelector('.topic-history-controls').open = false");
+  await cacheSize('larger');
   await evaluate(
     "document.querySelector('[aria-label=\"Search topics\"]').dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',bubbles:true}))",
   );

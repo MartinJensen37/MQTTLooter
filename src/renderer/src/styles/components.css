@@ -529,6 +529,7 @@ select option::checkmark { color: var(--primary); }
   flex-shrink: 0;
 }
 .copy-btn:hover { background: var(--gray-600); color: white; transform: scale(1.1); }
+.copy-btn.pin-btn.pinned { background: var(--primary); color: white; }
 
 /* ── Connection status pill ── */
 .connection-indicator {

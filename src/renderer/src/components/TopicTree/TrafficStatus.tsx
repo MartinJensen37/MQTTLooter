@@ -25,20 +25,10 @@ export default function TrafficStatus({ connectionId }: { connectionId: string }
   }, [connectionId]);
   const counts = status?.connections[connectionId];
   if (!status || !counts) return null;
+  if (!counts.dropped) return null;
   return (
-    <>
-      {counts.dropped > 0 && (
-        <p className="history-limit-notice" role="status">
-          Delivery gap: {counts.dropped.toLocaleString()} messages dropped or unconfirmed.
-        </p>
-      )}
-      <details className="topic-history-controls topic-traffic-status">
-        <summary>Message delivery</summary>
-        <p>
-          {counts.received.toLocaleString()} received · {counts.processed.toLocaleString()}{' '}
-          processed · {counts.dropped.toLocaleString()} dropped/unconfirmed
-        </p>
-      </details>
-    </>
+    <p className="history-limit-notice" role="status">
+      Delivery gap: {counts.dropped.toLocaleString()} messages dropped or unconfirmed.
+    </p>
   );
 }
