@@ -2,6 +2,7 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { RecordingDatabase } from './recording-database';
+import { RecordingImport } from './recording-import';
 import type { RecordingRequest } from '../shared/recording';
 
 const directory: string = workerData.directory;
@@ -46,6 +47,22 @@ const purge = () => {
 };
 purge();
 
+// File imports run one bounded step per request, so captures interleave with them.
+const imports = new Map<number, RecordingImport>();
+const importStep = (importId: number) => {
+  const session = imports.get(importId);
+  if (!session) throw new Error('This import is no longer running');
+  try {
+    const result = session.step();
+    if (result.done) imports.delete(importId);
+    return result;
+  } catch (error) {
+    imports.delete(importId);
+    purge();
+    throw error;
+  }
+};
+
 const status = () => ({
   databaseBytes: database.usedBytes(),
   recovered: database.recovered,
@@ -62,7 +79,18 @@ parentPort!.on(
         parentPort!.close();
         return;
       }
-      const data = request.action === 'status' ? status() : database.handle(request);
+      let data: unknown;
+      if (request.action === 'status') data = status();
+      else if (request.action === 'import-begin') {
+        const session = new RecordingImport(database, request.path);
+        imports.set(session.recordingId, session);
+        data = session.recordingId;
+      } else if (request.action === 'import-step') data = importStep(request.importId);
+      else if (request.action === 'import-abort') {
+        imports.get(request.importId)?.abort();
+        imports.delete(request.importId);
+        purge();
+      } else data = database.handle(request);
       if (request.action === 'delete') purge();
       parentPort!.postMessage({ requestId, data: data ?? null });
     } catch (error) {

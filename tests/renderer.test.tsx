@@ -367,3 +367,26 @@ describe('renderer state', () => {
     expect(vi.getTimerCount()).toBe(1); // Only the recording status poll remains.
   });
 });
+
+describe('recording import', () => {
+  it('imports through main and reports the result or a cancelled dialog', async () => {
+    await act(async () =>
+      root.render(<RecordingPanel activeConnectionId="a" isConnected showFeedback={feedback} />),
+    );
+    await settle();
+    await click('Load Recording');
+    await settle();
+    expect(feedback).not.toHaveBeenCalled();
+    recordings.chooseImport({
+      recordingInfo: { name: 'From file', startTime: 0, endTime: 1 },
+      messages: [
+        { topic: 'a', payload: '1', timestamp: 0 },
+        { topic: 'a', payload: '2', timestamp: 1 },
+      ],
+    });
+    await click('Load Recording');
+    await settle();
+    expect(feedback).toHaveBeenCalledWith('Recording imported: 2 messages.', 'success');
+    expect(container.textContent).toContain('From file');
+  });
+});

@@ -491,8 +491,14 @@ for (const [channel, handler] of Object.entries({
   },
   'recordings-delete': (id: unknown) =>
     recordingService!.request({ action: 'delete', recordingId: recording(id) }),
-  'recordings-import': (data: unknown) =>
-    recordingService!.request({ action: 'import', recording: data as never }),
+  'recordings-import': async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openFile'],
+      filters: [{ name: 'Recordings', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return recordingService!.importFile(result.filePaths[0]);
+  },
   'recordings-migrate': (recordings: unknown) => {
     if (!Array.isArray(recordings)) throw new Error('Invalid legacy recording library');
     return recordingService!.request({ action: 'import-legacy', recordings });

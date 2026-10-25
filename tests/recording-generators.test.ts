@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateValue } from '../src/renderer/src/utils/valueGenerators';
-import { parseRecording } from '../src/renderer/src/components/RecordingPanel/recordingPanel/parseRecording';
+import { parseRecording } from '../src/shared/recording';
 import MessageTemplateService from '../src/renderer/src/services/MessageTemplateService';
 
 afterEach(() => vi.restoreAllMocks());

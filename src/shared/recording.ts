@@ -130,7 +130,9 @@ export type RecordingRequest =
   | { action: 'count'; recordingId: number; topics?: string[] }
   | { action: 'rename'; recordingId: number; name: string }
   | { action: 'delete'; recordingId: number }
-  | { action: 'import'; recording: Recording }
+  | { action: 'import-begin'; path: string }
+  | { action: 'import-step'; importId: number }
+  | { action: 'import-abort'; importId: number }
   | { action: 'import-legacy'; recordings: unknown[] }
   | { action: 'export-chunk'; recordingId: number; after: number }
   | { action: 'close' };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { encodePayload, payloadBytes, formatPayloadBytes } from '../src/shared/payload';
-import { parseRecording } from '../src/renderer/src/components/RecordingPanel/recordingPanel/parseRecording';
+import { parseRecording } from '../src/shared/recording';
 
 describe('payload fidelity', () => {
   it('round-trips all byte values, empty payloads, UTF-8 and a BOM', () => {

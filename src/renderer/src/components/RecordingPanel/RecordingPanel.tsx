@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './RecordingPanel.css';
 import { useRecordingLibrary, unwrap } from '../../hooks/useRecordingLibrary';
 import { RecordingCursor } from '../../services/RecordingCursor';
-import { parseRecording } from './recordingPanel/parseRecording';
 import type {
   PlaybackState,
   RecordingSummary,
@@ -348,37 +347,23 @@ function RecordingPanel({
     }
   };
 
-  const loadRecordingFromFile = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (event) => {
-      const file = (event.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      if (file.size > 10 * 1024 * 1024) {
-        alert('Recording files must be at most 10 MB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const data = JSON.parse(e.target?.result as string);
-          if (!data.recordingInfo || !data.messages) {
-            alert('Invalid recording file format.');
-            return;
-          }
-          const recording = parseRecording(data);
-          recording.name += ' (Imported)';
-          unwrap(await api().import(recording));
-          await refresh();
-          showFeedback?.('Recording imported.', 'success');
-        } catch (error: any) {
-          alert('Error reading recording file: ' + error.message);
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
+  // Main opens the file dialog and streams the file into storage in bounded steps.
+  const [importing, setImporting] = useState(false);
+  const loadRecordingFromFile = async () => {
+    setImporting(true);
+    try {
+      const imported = unwrap(await api().import());
+      if (!imported) return;
+      await refresh();
+      showFeedback?.(
+        `Recording imported: ${imported.messageCount.toLocaleString()} messages.`,
+        'success',
+      );
+    } catch (error) {
+      showFeedback?.(`Recording could not be imported: ${(error as Error).message}`, 'error');
+    } finally {
+      setImporting(false);
+    }
   };
 
   const deleteRecording = async (recordingId: number) => {
@@ -468,12 +453,12 @@ function RecordingPanel({
           <div className="recording-saved-list-header">
             <h3>Saved Recordings ({recordings.length})</h3>
             <button
-              onClick={loadRecordingFromFile}
-              disabled={!ready}
+              onClick={() => void loadRecordingFromFile()}
+              disabled={!ready || importing}
               className="btn btn-md btn-primary"
               title="Load recording from file"
             >
-              <i className="fas fa-upload"></i> Load Recording
+              <i className="fas fa-upload"></i> {importing ? 'Importing…' : 'Load Recording'}
             </button>
           </div>
 

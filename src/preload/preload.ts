@@ -82,7 +82,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     page: (query: unknown) => ipcRenderer.invoke('recordings-page', query),
     rename: (id: number, name: string) => ipcRenderer.invoke('recordings-rename', id, name),
     delete: (id: number) => ipcRenderer.invoke('recordings-delete', id),
-    import: (recording: unknown) => ipcRenderer.invoke('recordings-import', recording),
+    import: () => ipcRenderer.invoke('recordings-import'),
     migrate: (recordings: unknown[]) => ipcRenderer.invoke('recordings-migrate', recordings),
     export: (id: number) => ipcRenderer.invoke('recordings-export', id),
   },

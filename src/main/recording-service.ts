@@ -278,6 +278,15 @@ export class RecordingService {
     return this.worker.request(request);
   }
 
+  /** Import a recording file of any size in bounded worker steps. */
+  async importFile(path: string): Promise<RecordingSummary> {
+    const importId: number = await this.worker.request({ action: 'import-begin', path });
+    for (;;) {
+      const step = await this.worker.request({ action: 'import-step', importId });
+      if (step.done) return step.summary;
+    }
+  }
+
   /** Stream a recording to a file in chunks; the target is replaced only when complete. */
   async exportTo(recordingId: number, path: string): Promise<void> {
     const summary: RecordingSummary | null = await this.request({ action: 'summary', recordingId });

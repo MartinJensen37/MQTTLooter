@@ -19,6 +19,7 @@ export function fakeRecordingApi() {
   const active = new Map<string, number>();
   const notices: RecordingNotice[] = [];
   const migrated = new Set<string>();
+  let pendingImport: unknown = null;
   let nextId = 0;
   const result = async <T>(action: () => T) => {
     try {
@@ -161,7 +162,8 @@ export function fakeRecordingApi() {
       }),
     ),
     delete: vi.fn((id: number) => result(() => void stored.delete(id))),
-    import: vi.fn((recording: unknown) => result(() => store(recording))),
+    // Main opens a file dialog; tests choose what the dialog yields.
+    import: vi.fn(() => result(() => (pendingImport ? store(pendingImport) : null))),
     migrate: vi.fn((recordings: unknown[]) =>
       result(() => {
         const key = JSON.stringify(recordings);
@@ -176,6 +178,10 @@ export function fakeRecordingApi() {
   return {
     api,
     list: () => [...stored.values()].map(summary),
+    /** The recording the next import dialog returns, or null for a cancelled dialog. */
+    chooseImport(recording: unknown) {
+      pendingImport = recording;
+    },
     import: store,
     /** Simulate main capturing messages for a connection's active recording. */
     capture(connectionId: string, messages: { topic: string; message: string }[]) {

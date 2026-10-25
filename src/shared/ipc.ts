@@ -127,7 +127,8 @@ export interface ElectronAPI {
     ): Promise<IpcResult<import('./recording').RecordingPage>>;
     rename(id: number, name: string): Promise<IpcResult<import('./recording').RecordingSummary>>;
     delete(id: number): Promise<IpcResult>;
-    import(recording: unknown): Promise<IpcResult<import('./recording').RecordingSummary>>;
+    /** Opens a file dialog in main; null when cancelled. */
+    import(): Promise<IpcResult<import('./recording').RecordingSummary | null>>;
     migrate(recordings: unknown[]): Promise<IpcResult<{ imported: number; skipped: boolean }>>;
     export(id: number): Promise<IpcResult<{ saved: boolean; path?: string }>>;
   };

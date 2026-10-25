@@ -695,7 +695,12 @@ export class RecordingDatabase {
   }
 
   /** Dispatch a worker request. Status and close are handled by the worker itself. */
-  handle(request: Exclude<RecordingRequest, { action: 'status' | 'close' }>): unknown {
+  handle(
+    request: Exclude<
+      RecordingRequest,
+      { action: 'status' | 'close' | 'import-begin' | 'import-step' | 'import-abort' }
+    >,
+  ): unknown {
     switch (request.action) {
       case 'create':
         return this.create(request.connectionId, request.connectionName, request.name, request.at);
@@ -723,8 +728,6 @@ export class RecordingDatabase {
         return this.rename(request.recordingId, request.name);
       case 'delete':
         return this.delete(request.recordingId);
-      case 'import':
-        return this.import(request.recording);
       case 'import-legacy':
         return this.importLibrary(request.recordings, 'local');
       case 'export-chunk':
