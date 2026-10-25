@@ -3,6 +3,7 @@
 
 /* Main Recording Panel */
 .recording-main-panel {
+  container: recording / inline-size;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -936,4 +937,50 @@
 
 .recording-item-live {
   color: var(--danger-red);
+}
+
+/* The pane can be about 330 px wide beside the topic tree at the minimum window size. */
+@container recording (max-width: 600px) {
+  .recording-main-header,
+  .recording-fixed-controls,
+  .recording-controls-section,
+  .recording-connection-warning {
+    padding: var(--spacing-md);
+  }
+  .recording-main-header,
+  .recording-saved-list-header,
+  .recording-item-header,
+  .recording-playback-settings {
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+  }
+  .recording-controls-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .recording-warning-content i {
+    font-size: 24px;
+    margin: 0;
+  }
+  .recording-scrollable-content {
+    padding: 0 var(--spacing-sm) var(--spacing-md);
+  }
+  .recording-saved-list-header,
+  .recording-saved-items {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .recording-item-header {
+    padding: var(--spacing-md);
+  }
+  .recording-item-title {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .recording-name-text {
+    overflow-wrap: anywhere;
+  }
+  .recording-expanded-area {
+    padding: var(--spacing-md);
+  }
 }

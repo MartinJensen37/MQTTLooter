@@ -17,7 +17,7 @@ Audited through `b705d91`. Baseline: 164 tests, typecheck, lint and the built El
 | Finding | Impact | Action |
 | --- | --- | --- |
 | Recording capture ran in the renderer behind the lossy delivery queue. | Any delivery gap, automatic reconnect or switching the selected connection stopped the capture. Captures were capped at 10,000 messages / 2 MB, dropped MQTT 5 properties and protocol version, and every save rewrote the whole JSON library. | Fixed: main-owned capture into a disk SQLite recording store (below). |
-| The Recording panel is very narrow at the 800 px minimum window with the topic tree open. | Recording names truncate and controls wrap. Pre-existing layout. | Pane-based responsive rules, as in Publishing. |
+| The Recording panel was cramped at the 800 px minimum window with the topic tree open. | Recording names truncated and nested padding squeezed the list. Pre-existing layout. | Fixed: pane-based container rules tighten padding and wrap headers below 600 px. |
 | `mqtt-get-connections` returned each connection's full config. | Passwords, private keys and passphrases crossed IPC on every status refresh. | Fixed: status omits the config. Required before secrets move to main. |
 | `ConnectionProfileService` was unused. | Dead code with public-broker defaults. | Removed. |
 | History `clear()` deleted a whole connection in one transaction under the 10 s worker watchdog. | A very large clear could time out and disable history until restart. | Fixed: cleared topics become unreachable tombstones at once and their messages are purged in 5,000-row steps. |
@@ -249,7 +249,7 @@ Every phase includes targeted regression tests, typecheck/lint/build where relev
 
 ## Delivery order
 
-Current order (2026-10-25): durable recordings, the load harness and credential storage are done. Renderer heap profiling and chunked history clears followed. JSON Schema validation and simulator payload templates followed. Next: cross-topic search, payload-timestamp plots and independent axes, the narrow Recording layout, then schema-driven construction, workspaces and decoding.
+Current order (2026-10-25): durable recordings, the load harness and credential storage are done. Renderer heap profiling and chunked history clears followed. JSON Schema validation and simulator payload templates followed. Next: cross-topic search, payload-timestamp plots and independent axes, then schema-driven construction, workspaces and decoding.
 
 Original order: start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
 
