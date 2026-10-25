@@ -28,7 +28,9 @@ const historyService = primaryInstance
   : null;
 const recordingService = primaryInstance ? new RecordingService(app.getPath('userData')) : null;
 const decoderService = primaryInstance
-  ? new DecoderService(join(app.getPath('userData'), 'decoders.json'))
+  ? new DecoderService(join(app.getPath('userData'), 'decoders.json'), undefined, (decoders) => {
+      void historyService?.request({ action: 'decoders', decoders }).catch(() => {});
+    })
   : null;
 // Linux without a keyring falls back to a fixed key; treat that as unavailable.
 const credentialStore = new CredentialStore(join(app.getPath('userData'), 'credentials.json'), {
@@ -238,7 +240,9 @@ for (const [channel, handler] of Object.entries({
           path.length > 16 ||
           path.some((segment) => typeof segment !== 'string' || segment.length > 1024),
       ) ||
-      (query.timeUnit !== undefined && !['ms', 's', 'iso'].includes(query.timeUnit))
+      (query.timeUnit !== undefined && !['ms', 's', 'iso'].includes(query.timeUnit)) ||
+      (query.decoderId !== undefined &&
+        (typeof query.decoderId !== 'string' || query.decoderId.length > 128))
     )
       throw new Error('Invalid numeric history query');
     return historyService!.request({ action: 'series', query });

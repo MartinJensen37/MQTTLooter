@@ -2,6 +2,7 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { readFileSync, writeFileSync, renameSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { HistoryDatabase } from './history-database';
+import { ProtobufDecoders } from './protobuf-decoders';
 import type { HistoryRequest } from '../shared/history';
 
 const directory: string = workerData.directory;
@@ -21,6 +22,8 @@ const cleanSession = () => {
 };
 if (!persistent) cleanSession();
 const database = new HistoryDatabase(databasePath);
+// Plots of protobuf topics decode stored payloads here, next to the data.
+const decoders = new ProtobufDecoders();
 const maintenance = setInterval(() => {
   try {
     database.append([]);
@@ -58,8 +61,18 @@ parentPort!.on(
           database.append(request.messages, Date.now(), request.drops);
           data = status();
           break;
-        case 'series':
-          data = database.series(request.query);
+        case 'series': {
+          const { decoderId } = request.query;
+          data = database.series(
+            request.query,
+            decoderId === undefined
+              ? undefined
+              : (payload) => (payload ? decoders.decodeValues(decoderId, payload) : undefined),
+          );
+          break;
+        }
+        case 'decoders':
+          data = decoders.configure(request.decoders);
           break;
         case 'page':
           data = database.page(request.query);

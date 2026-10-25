@@ -38,6 +38,26 @@ export class ProtobufDecoders {
     return errors;
   }
 
+  /**
+   * A decoded object for plotting: 64-bit integers become numbers and zero-valued fields are
+   * included, because proto3 omits them from the wire and a missing value would plot as a gap.
+   * Returns undefined for payloads that do not decode.
+   */
+  decodeValues(decoderId: string, payload: Uint8Array): unknown {
+    const type = this.types.get(decoderId);
+    if (!type || payload.byteLength > DECODER_LIMITS.maxPayloadBytes) return undefined;
+    try {
+      return type.toObject(type.decode(payload), {
+        longs: Number,
+        enums: String,
+        bytes: String,
+        defaults: true,
+      });
+    } catch {
+      return undefined;
+    }
+  }
+
   /** Decoded JSON text, with 64-bit integers as strings, bytes as base64 and enum names. */
   decode(decoderId: string, payload: Uint8Array): string {
     const type = this.types.get(decoderId);

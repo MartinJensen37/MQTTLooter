@@ -18,9 +18,11 @@ export class DecoderService {
   private ready: Promise<void>;
   private queue: Promise<unknown> = Promise.resolve();
 
+  /** `onChange` receives the definitions after loading and after every save. */
   constructor(
     private readonly file: string,
     workerPath = join(__dirname, 'decoder-worker.js'),
+    private readonly onChange: (decoders: DecoderDefinition[]) => void = () => {},
   ) {
     this.worker = new WorkerClient(
       workerPath,
@@ -47,6 +49,7 @@ export class DecoderService {
       throw error;
     }
     this.errors = await this.worker.request({ action: 'configure', decoders: this.decoders });
+    this.onChange(this.decoders);
   }
 
   async list(): Promise<{ decoders: DecoderDefinition[]; errors: Record<string, string> }> {
@@ -83,6 +86,7 @@ export class DecoderService {
       }
       this.decoders = decoders;
       this.errors = {};
+      this.onChange(decoders);
       return decoders;
     });
     this.queue = task.catch(() => {});

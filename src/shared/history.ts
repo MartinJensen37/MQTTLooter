@@ -88,6 +88,7 @@ export type HistoryRequest =
   | { action: 'clear'; connectionId: string; topic?: string }
   | { action: 'status' }
   | { action: 'persist'; enabled: boolean }
+  | { action: 'decoders'; decoders: import('./decoders').DecoderDefinition[] }
   | { action: 'close' };
 
 /** Binary properties are explicitly tagged instead of silently converted to number maps. */

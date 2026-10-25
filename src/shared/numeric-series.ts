@@ -14,6 +14,8 @@ export interface NumericQuery {
   /** Plot by this payload field instead of receive time. Messages are still selected by receive time. */
   timePath?: string[];
   timeUnit?: TimeUnit;
+  /** Decode payloads with this saved protobuf decoder before reading fields. */
+  decoderId?: string;
 }
 export interface NumericResult {
   from: number;
@@ -117,7 +119,11 @@ export class NumericSampler {
   private timeRejected = 0;
   private outsideWindow = 0;
 
-  constructor(private query: NumericQuery) {
+  /** `parse` turns stored payload bytes into a value; text and JSON by default. */
+  constructor(
+    private query: NumericQuery,
+    private parse: (payload: Uint8Array | null) => unknown = numericPayload,
+  ) {
     this.binsCount = Math.max(1, Math.floor(query.maxPoints / 4));
     this.bins = query.paths.map(() => new Map());
     this.gaps = query.paths.map(() => new Set());
@@ -127,7 +133,7 @@ export class NumericSampler {
 
   add(timestamp: number, order: number, session: string, payload: Uint8Array | null): void {
     this.scanned++;
-    const value = numericPayload(payload);
+    const value = this.parse(payload);
     if (this.scanned <= 20) this.discover(value);
     if (this.query.timePath) {
       const time = payloadTime(fieldValue(value, this.query.timePath), this.query.timeUnit ?? 'ms');

@@ -233,8 +233,8 @@ export class HistoryDatabase {
     };
   }
 
-  series(query: NumericQuery) {
-    const sampler = new NumericSampler(query);
+  series(query: NumericQuery, parse?: (payload: Uint8Array | null) => unknown) {
+    const sampler = new NumericSampler(query, parse);
     const rows = this.db
       .prepare(
         `SELECT m.id, m.timestamp, m.session_id,

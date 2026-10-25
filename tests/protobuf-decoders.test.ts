@@ -81,3 +81,59 @@ it('validates definitions and matches topics in list order', () => {
   expect(matchDecoder(list, 'plant/7/status')?.id).toBe('all');
   expect(matchDecoder(list, 'other')).toBeUndefined();
 });
+
+it('plots decoded fields from stored protobuf payloads, including zero values', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { HistoryDatabase } = await import('../src/main/history-database');
+  const decoders = new ProtobufDecoders();
+  decoders.configure([definition]);
+  expect(decoders.decodeValues('reading', encode({ id: 'z' }))).toMatchObject({
+    id: 'z',
+    value: 0,
+    count: 0,
+  });
+  expect(decoders.decodeValues('reading', Uint8Array.of(0x0a, 0xff))).toBeUndefined();
+  expect(decoders.decodeValues('missing', new Uint8Array())).toBeUndefined();
+
+  const directory = mkdtempSync(join(tmpdir(), 'mqtt-decoded-plot-'));
+  const database = new HistoryDatabase(join(directory, 'history.sqlite'));
+  try {
+    const now = Date.now();
+    database.append(
+      [0, 5, 0, 7].map((value, index) => ({
+        id: 'broker',
+        sessionId: 's',
+        sequence: index + 1,
+        topic: 'plant/1/reading',
+        message: Buffer.from(encode({ id: 'p', value, count: index })).toString('base64'),
+        encoding: 'base64' as const,
+        byteLength: 0,
+        timestamp: now - 4000 + index * 1000,
+        qos: 0,
+        retain: false,
+        protocolVersion: 5,
+      })),
+      now,
+    );
+    const query = {
+      connectionId: 'broker',
+      topic: 'plant/1/reading',
+      paths: [['value']],
+      from: now - 10_000,
+      to: now,
+      maxPoints: 64,
+    };
+    const series = database.series(query, (payload) =>
+      payload ? decoders.decodeValues('reading', payload) : undefined,
+    );
+    expect(series.series[0].points.map((point) => point.y)).toEqual([0, 5, 0, 7]);
+    expect(series.availablePaths).toContainEqual(['count']);
+    // Without the decoder the same bytes are not numeric.
+    expect(database.series(query).series[0].valid).toBe(0);
+  } finally {
+    database.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
