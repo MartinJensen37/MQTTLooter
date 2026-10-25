@@ -170,7 +170,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 38px;
+  height: 30px;
   color: var(--text-body);
   font-weight: 500;
   font-family: var(--font-family);
@@ -180,18 +180,57 @@
 .custom-select-button:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
 .custom-select-button:disabled { background: var(--bg-subtle); color: var(--text-muted); cursor: not-allowed; }
 
-/* Native selects reuse the same pill, spacing, focus and colors as custom menus. */
-select.form-select {
-  appearance: none;
-  display: block;
-  padding-right: 34px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%236c757d' stroke-width='1.5'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  text-overflow: ellipsis;
-  border-radius: var(--radius-pill);
+/* Native selects use Chromium's customizable select, so the open list matches the custom
+   menus: a rounded panel with hover and selected rows. The closed control is a slim pill. */
+select,
+::picker(select) {
+  appearance: base-select;
 }
-select.form-select-compact { display: inline-block; width: auto; height: 32px; padding-top: 5px; padding-bottom: 5px; }
+select.form-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--gray-400);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  color: var(--text-body);
+  font: 500 13px var(--font-family);
+  white-space: nowrap;
+  cursor: pointer;
+}
+select.form-select:hover:not(:disabled) { border-color: var(--primary); }
+select.form-select:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+select.form-select:disabled { background: var(--bg-subtle); color: var(--text-muted); cursor: not-allowed; }
+select.form-select-compact { display: inline-flex; width: auto; }
+select::picker-icon {
+  content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%236c757d' stroke-width='1.6'/%3E%3C/svg%3E");
+  display: flex;
+  transition: rotate var(--transition-fast);
+}
+select:open::picker-icon { rotate: 180deg; }
+::picker(select) {
+  margin-block: 4px;
+  padding: 4px 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+  max-height: 280px;
+  overflow-y: auto;
+}
+select option {
+  padding: 7px 14px;
+  font: 400 13px var(--font-family);
+  color: var(--text-body);
+  cursor: pointer;
+}
+select option:hover,
+select option:focus-visible { background: var(--primary-light); color: var(--primary); outline: none; }
+select option:checked { background: var(--primary-light); color: var(--primary); font-weight: 600; }
+select option:disabled { color: var(--text-muted); cursor: default; background: none; }
+select option::checkmark { color: var(--primary); }
 
 .form-range {
   appearance: none;
