@@ -1,5 +1,6 @@
 import {
   DELIVERY_LIMITS,
+  type DELIVERY_COALESCE,
   publishStorageBytes,
   type DeliveryCounts,
   type IncomingPublish,
@@ -7,9 +8,15 @@ import {
   type TrafficStatus,
 } from '../shared/traffic';
 
-/** One acknowledged batch at a time bounds Electron's otherwise unbounded IPC queue. */
+type Entry = { message: IncomingPublish; bytes: number; ordinal: number };
+
+/**
+ * One acknowledged batch at a time bounds Electron's otherwise unbounded IPC queue. With
+ * `coalesce`, overflow keeps each topic's newest message instead of dropping it; storage queues
+ * leave it unset so every overflow is a counted, recorded drop.
+ */
 export class MessageDelivery {
-  private queue: ({ message: IncomingPublish; bytes: number; ordinal: number } | undefined)[] = [];
+  private queue: (Entry | undefined)[] = [];
   private head = 0;
   private bytes = 0;
   private inFlight: { batch: MessageBatch; bytes: number; firstOrdinal: number } | null = null;
@@ -19,11 +26,23 @@ export class MessageDelivery {
   private ordinal = 0;
   private counts = new Map<string, DeliveryCounts>();
   private paused = false;
+  // Newest overflowing message per connection and topic, in first-overflow order.
+  private overflow = new Map<string, Entry>();
+  private overflowBytes = 0;
 
   constructor(
     private send: (batch: MessageBatch) => void,
     private limits = DELIVERY_LIMITS,
+    private coalesce?: typeof DELIVERY_COALESCE,
   ) {}
+
+  private fits(bytes: number): boolean {
+    return (
+      this.queue.length - this.head + (this.inFlight?.batch.messages.length ?? 0) <
+        this.limits.maxMessages &&
+      this.bytes + (this.inFlight?.bytes ?? 0) + bytes <= this.limits.maxBytes
+    );
+  }
 
   enqueue(message: IncomingPublish): boolean {
     let counts = this.counts.get(message.id);
@@ -33,18 +52,43 @@ export class MessageDelivery {
     }
     counts.received++;
     const bytes = publishStorageBytes(message);
+    // While anything is coalesced, arrivals join it so each topic's updates stay in order.
+    if (!this.overflow.size && this.fits(bytes)) {
+      this.queue.push({ message, bytes, ordinal: ++this.ordinal });
+      this.bytes += bytes;
+      this.schedule();
+      return true;
+    }
+    if (!this.coalesce) {
+      counts.dropped++;
+      return false;
+    }
+    const key = `${message.id}\u0000${message.topic}`;
+    const previous = this.overflow.get(key);
+    const added = bytes - (previous?.bytes ?? 0);
     if (
-      this.queue.length - this.head + (this.inFlight?.batch.messages.length ?? 0) >=
-        this.limits.maxMessages ||
-      this.bytes + (this.inFlight?.bytes ?? 0) + bytes > this.limits.maxBytes
+      (!previous && this.overflow.size >= this.coalesce.maxTopics) ||
+      this.overflowBytes + added > this.coalesce.maxBytes
     ) {
       counts.dropped++;
       return false;
     }
-    this.queue.push({ message, bytes, ordinal: ++this.ordinal });
-    this.bytes += bytes;
-    this.schedule();
+    if (previous) counts.dropped++;
+    // Replacing a key keeps its position, so a busy topic cannot starve the others.
+    this.overflow.set(key, { message, bytes, ordinal: ++this.ordinal });
+    this.overflowBytes += added;
     return true;
+  }
+
+  /** Move coalesced messages into the queue as acknowledgements free space. */
+  private refill(): void {
+    for (const [key, entry] of this.overflow) {
+      if (!this.fits(entry.bytes)) return;
+      this.overflow.delete(key);
+      this.overflowBytes -= entry.bytes;
+      this.queue.push(entry);
+      this.bytes += entry.bytes;
+    }
   }
 
   discard(connectionId: string): void {
@@ -64,7 +108,8 @@ export class MessageDelivery {
   hasPendingThrough(checkpoint: number): boolean {
     return Boolean(
       (this.inFlight && this.inFlight.firstOrdinal <= checkpoint) ||
-      (this.queue[this.head] && this.queue[this.head]!.ordinal <= checkpoint),
+      (this.queue[this.head] && this.queue[this.head]!.ordinal <= checkpoint) ||
+      [...this.overflow.values()].some((entry) => entry.ordinal <= checkpoint),
     );
   }
 
@@ -117,6 +162,7 @@ export class MessageDelivery {
     if (batchId !== this.inFlight?.batch.batchId) return;
     for (const message of this.inFlight.batch.messages) this.counts.get(message.id)!.processed++;
     this.inFlight = null;
+    this.refill();
     this.schedule();
   }
 
@@ -140,10 +186,13 @@ export class MessageDelivery {
     }
     for (const message of this.inFlight?.batch.messages ?? [])
       this.counts.get(message.id)!.dropped++;
+    for (const entry of this.overflow.values()) this.counts.get(entry.message.id)!.dropped++;
     this.queue = [];
     this.head = 0;
     this.bytes = 0;
     this.inFlight = null;
+    this.overflow.clear();
+    this.overflowBytes = 0;
   }
 
   status(): TrafficStatus {
@@ -153,6 +202,7 @@ export class MessageDelivery {
       pendingBytes: this.bytes,
       inFlightMessages: this.inFlight?.batch.messages.length ?? 0,
       inFlightBytes: this.inFlight?.bytes ?? 0,
+      coalescedTopics: this.overflow.size,
       maxMessages: this.limits.maxMessages,
       maxBytes: this.limits.maxBytes,
     };

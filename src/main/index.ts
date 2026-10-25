@@ -9,17 +9,21 @@ import { mergeSecrets, validateSecrets } from '../shared/credentials';
 import { HistoryService } from './history-service';
 import { validateSearch, type HistorySearchQuery } from '../shared/history-search';
 import { MessageDelivery } from './message-delivery';
-import type { IncomingPublish } from '../shared/traffic';
+import { DELIVERY_COALESCE, DELIVERY_LIMITS, type IncomingPublish } from '../shared/traffic';
 import { RECORDING_LIMITS, type RecordingPageQuery } from '../shared/recording';
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
 const mqttManager = new MQTTConnectionManager();
-const messageDelivery = new MessageDelivery((batch) => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('mqtt-message-batch', batch);
-  } else messageDelivery.reset();
-});
+const messageDelivery = new MessageDelivery(
+  (batch) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('mqtt-message-batch', batch);
+    } else messageDelivery.reset();
+  },
+  DELIVERY_LIMITS,
+  DELIVERY_COALESCE,
+);
 messageDelivery.pause();
 // One main process owns each user-data directory and its storage workers.
 const primaryInstance = app.requestSingleInstanceLock();

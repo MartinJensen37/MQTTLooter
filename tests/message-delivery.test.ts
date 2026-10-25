@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MessageDelivery } from '../src/main/message-delivery';
 import { BatchProcessor } from '../src/renderer/src/services/BatchProcessor';
 import {
+  DELIVERY_COALESCE,
   DELIVERY_LIMITS,
   publishStorageBytes,
   type IncomingPublish,
@@ -101,6 +102,49 @@ it('includes in-flight bytes in the budget, handles empty/large payloads and rec
     pendingBytes: 0,
     inFlightBytes: 0,
     pendingMessages: 0,
+  });
+});
+
+it("keeps each topic's newest overflowing message, in order, when coalescing", async () => {
+  const send = vi.fn();
+  const delivery = new MessageDelivery(
+    send,
+    { ...DELIVERY_LIMITS, maxMessages: 2, batchMessages: 2 },
+    { ...DELIVERY_COALESCE, maxTopics: 2 },
+  );
+  const on = (sequence: number, topic: string) => ({ ...message(sequence), topic });
+  expect([on(1, 'a'), on(2, 'b')].map((m) => delivery.enqueue(m))).toEqual([true, true]);
+  // The queue is full: a and c wait as their newest message, 5 replacing 3; d finds no room.
+  expect([on(3, 'a'), on(4, 'c'), on(5, 'a'), on(6, 'd')].map((m) => delivery.enqueue(m))).toEqual([
+    true,
+    true,
+    true,
+    false,
+  ]);
+  expect(delivery.status()).toMatchObject({
+    coalescedTopics: 2,
+    connections: { a: { received: 6, dropped: 2 } },
+  });
+  await vi.runAllTimersAsync();
+  expect(send.mock.calls[0][0].messages.map((m: IncomingPublish) => m.sequence)).toEqual([1, 2]);
+  delivery.acknowledge(send.mock.calls[0][0].batchId);
+  await vi.runAllTimersAsync();
+  expect(send.mock.calls[1][0].messages.map((m: IncomingPublish) => m.sequence)).toEqual([5, 4]);
+  delivery.acknowledge(send.mock.calls[1][0].batchId);
+  expect(delivery.enqueue(on(7, 'a'))).toBe(true);
+  await vi.runAllTimersAsync();
+  delivery.acknowledge(send.mock.calls[2][0].batchId);
+  expect(delivery.status()).toMatchObject({
+    coalescedTopics: 0,
+    connections: { a: { received: 7, processed: 5, dropped: 2 } },
+  });
+  // Navigation drops coalesced messages with everything else.
+  delivery.pause();
+  [8, 9, 10].forEach((sequence) => delivery.enqueue(on(sequence, `t${sequence}`)));
+  delivery.reset();
+  expect(delivery.status()).toMatchObject({
+    coalescedTopics: 0,
+    connections: { a: { received: 10, dropped: 5 } },
   });
 });
 
