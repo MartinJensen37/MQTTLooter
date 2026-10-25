@@ -208,3 +208,26 @@ it('bounds dense plot queries and upgrades the version-one index without losing 
   expect(result.series[0].points.map((point) => point.y)).toContain(20004);
   expect(result.series[0].points.length).toBeLessThanOrEqual(16);
 });
+
+it('stores overflow gaps durably, expires them with history and clears them per connection', () => {
+  database.append([message(1)], now, [{ connectionId: 'broker', at: now - 5, dropped: 40 }]);
+  database.append([], now, [
+    { connectionId: 'broker', at: now - 2, dropped: 2 },
+    { connectionId: 'other', at: now - DISK_HISTORY.maxAgeMs - 1, dropped: 9 },
+  ]);
+  expect(database.status(now).gaps).toEqual({ broker: { dropped: 42, last: now - 2 } });
+  database.clear('broker', 'a//b');
+  expect(database.status(now).gaps.broker.dropped).toBe(42);
+  database.clear('broker');
+  expect(database.status(now).gaps).toEqual({});
+  // A version-two database gains the gap table without losing messages.
+  database.append([message(2)], now);
+  database.close();
+  const old = new DatabaseSync(join(directory, 'test.sqlite'));
+  old.exec('DROP TABLE gaps; PRAGMA user_version=2;');
+  old.close();
+  database = new HistoryDatabase(join(directory, 'test.sqlite'));
+  expect(database.status(now)).toMatchObject({ retainedMessages: 1, gaps: {} });
+  database.append([], now, [{ connectionId: 'broker', at: now, dropped: 1 }]);
+  expect(database.status(now).gaps.broker.dropped).toBe(1);
+});

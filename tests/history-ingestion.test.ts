@@ -47,32 +47,38 @@ it('flushes a checkpoint without waiting indefinitely for subsequent live traffi
   const service = new HistoryService('unused');
   const worker = workers[0];
   worker.reply(worker.requests[0]);
-  for (let i = 0; i < 128; i++) service.append(message(i));
+  for (let i = 0; i < 1024; i++) service.append(message(i));
   const flushed = vi.fn();
   const result = service.flush().then(flushed);
-  for (let i = 128; i < 256; i++) service.append(message(i));
+  for (let i = 1024; i < 2048; i++) service.append(message(i));
   await vi.advanceTimersByTimeAsync(0);
   const first = worker.requests.find((item: any) => item.request.action === 'append');
-  expect(first.request.messages).toHaveLength(128);
+  expect(first.request.messages).toHaveLength(1024);
   expect(flushed).not.toHaveBeenCalled();
   worker.reply(first);
   await result;
   expect(flushed).toHaveBeenCalledOnce();
-  expect(service.status().delivery.pendingMessages).toBe(128);
+  expect(service.status().delivery.pendingMessages).toBe(1024);
 });
 
-it('stops disk capture visibly on overflow and counts subsequent omissions', async () => {
+it('keeps capturing after an overflow and writes the omission as a gap record', async () => {
   const service = new HistoryService('unused');
-  workers[0].reply(workers[0].requests[0]);
-  for (let i = 0; i < 8194; i++) service.append(message(i));
-  expect(service.status().error).toContain('queue is full');
-  expect(service.status().delivery.connections.a).toEqual({
-    received: 8194,
-    processed: 0,
-    dropped: 8194,
-  });
-  expect(service.status().delivery.pendingBytes).toBe(0);
-  await service.flush();
+  const worker = workers[0];
+  worker.reply(worker.requests[0]);
+  for (let i = 0; i < 16_386; i++) service.append(message(i));
+  expect(service.status().error).toBeUndefined();
+  expect(service.status().delivery.connections.a).toMatchObject({ received: 16_386, dropped: 2 });
+  await vi.advanceTimersByTimeAsync(0);
+  const appends = () => worker.requests.filter((item: any) => item.request.action === 'append');
+  expect(appends()[0].request.drops).toEqual([
+    { connectionId: 'a', at: expect.any(Number), dropped: 2 },
+  ]);
+  worker.reply(appends()[0]);
+  await vi.advanceTimersByTimeAsync(0);
+  // Later traffic is accepted again once the queue drains.
+  service.append(message(20_000));
+  expect(service.status().delivery.connections.a.dropped).toBe(2);
+  expect(appends()[1].request.drops).toEqual([]);
 });
 
 it('rejects outstanding queries and releases the write queue after a worker crash', async () => {
@@ -80,7 +86,7 @@ it('rejects outstanding queries and releases the write queue after a worker cras
   const worker = workers[0];
   worker.reply(worker.requests[0]);
   service.append(message(1));
-  await vi.advanceTimersByTimeAsync(40);
+  await vi.advanceTimersByTimeAsync(100);
   const query = service.request({ action: 'page', query: { connectionId: 'a', topic: 'a' } });
   const rejected = expect(query).rejects.toThrow('disk failed');
   worker.emit('error', new Error('disk failed'));

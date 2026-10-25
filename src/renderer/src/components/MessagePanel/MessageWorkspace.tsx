@@ -114,7 +114,13 @@ function Workspace(props: any) {
     latest();
     props.showFeedback?.('Stored and cached messages cleared for this topic.', 'success');
   };
-  const counts = status?.delivery.connections[connectionId];
+  // Durable gap records cover earlier runs; this run's drops may not be written yet.
+  const gap = status?.store?.gaps?.[connectionId];
+  const missing = Math.max(
+    gap?.dropped ?? 0,
+    status?.delivery.connections[connectionId]?.dropped ?? 0,
+  );
+  const lastGap = gap?.last;
   const archiveMessages =
     page?.messages.map((message) => ({
       ...message,
@@ -218,10 +224,10 @@ function Workspace(props: any) {
           </button>
         </p>
       )}
-      {counts && counts.dropped > 0 && (
+      {missing > 0 && (
         <p className="message-storage-notice">
-          Disk history has gaps: {counts.dropped.toLocaleString()} dropped or unconfirmed messages
-          this run.
+          Disk history has gaps: {missing.toLocaleString()} messages were not stored
+          {lastGap ? ` (latest ${new Date(lastGap).toLocaleTimeString()})` : ''}.
         </p>
       )}
       {stored && !searchOpen && (

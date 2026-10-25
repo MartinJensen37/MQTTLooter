@@ -2,7 +2,13 @@ import { join } from 'node:path';
 import { MessageDelivery } from './message-delivery';
 import { WorkerClient } from './worker-client';
 import type { IncomingPublish } from '../shared/traffic';
-import type { HistoryRequest, HistoryStatus, HistoryStoreStatus } from '../shared/history';
+import {
+  HISTORY_QUEUE,
+  type HistoryDrop,
+  type HistoryRequest,
+  type HistoryStatus,
+  type HistoryStoreStatus,
+} from '../shared/history';
 
 /** Bounded writes and requests keep database work away from main's connection controls. */
 export class HistoryService {
@@ -11,15 +17,19 @@ export class HistoryService {
   private closing = false;
   private store?: HistoryStoreStatus;
   private flushWaiters: { checkpoint: number; resolve: () => void }[] = [];
+  /** Overflow drops not yet written as gap records. */
+  private drops = new Map<string, HistoryDrop>();
   private delivery = new MessageDelivery((batch) => {
-    void this.request({ action: 'append', messages: batch.messages })
+    const drops = [...this.drops.values()];
+    this.drops.clear();
+    void this.request({ action: 'append', messages: batch.messages, drops })
       .then((status) => {
         this.store = status;
         this.delivery.acknowledge(batch.batchId);
         this.finishFlush();
       })
       .catch((error: Error) => this.failCapture(error.message));
-  });
+  }, HISTORY_QUEUE);
 
   constructor(directory: string, workerPath = join(__dirname, 'history-worker.js')) {
     this.worker = new WorkerClient(
@@ -46,8 +56,13 @@ export class HistoryService {
       this.delivery.discard(message.id);
       return;
     }
-    if (!this.delivery.enqueue(message))
-      this.failCapture('Disk history queue is full. Capture stopped; history has a gap.');
+    // A burst beyond the queue becomes a durable gap; capture continues with later messages.
+    if (!this.delivery.enqueue(message)) {
+      const drop = this.drops.get(message.id);
+      if (drop) drop.dropped++;
+      else
+        this.drops.set(message.id, { connectionId: message.id, at: message.timestamp, dropped: 1 });
+    }
   }
 
   private failCapture(message: string): void {

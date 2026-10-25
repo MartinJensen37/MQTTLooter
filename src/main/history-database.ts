@@ -9,6 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import {
   DISK_HISTORY,
   serializeProperties,
+  type HistoryDrop,
   type HistoryPage,
   type HistoryMessage,
   type HistoryQuery,
@@ -33,7 +34,7 @@ export class HistoryDatabase {
     this.db.exec(`PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA cache_size=-8192;
       PRAGMA temp_store=FILE; PRAGMA foreign_keys=ON; PRAGMA secure_delete=ON;`);
     const version = Number(this.db.prepare('PRAGMA user_version').get()!.user_version);
-    if (version > 2) {
+    if (version > 3) {
       this.db.close();
       throw new Error('History database uses a newer schema');
     }
@@ -55,7 +56,12 @@ export class HistoryDatabase {
       CREATE INDEX IF NOT EXISTS topic_messages ON messages(topic_id, id);
       CREATE INDEX IF NOT EXISTS message_time ON messages(timestamp);
       CREATE INDEX IF NOT EXISTS topic_message_time ON messages(topic_id, timestamp, id);
-      PRAGMA user_version=2;
+      CREATE TABLE IF NOT EXISTS gaps (
+        id INTEGER PRIMARY KEY, connection_id TEXT NOT NULL, at INTEGER NOT NULL,
+        dropped INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS connection_gaps ON gaps(connection_id, at);
+      PRAGMA user_version=3;
     `);
     this.recount();
   }
@@ -68,7 +74,7 @@ export class HistoryDatabase {
     this.retainedBytes = Number(counts.bytes);
   }
 
-  append(messages: IncomingPublish[], now = Date.now()): void {
+  append(messages: IncomingPublish[], now = Date.now(), drops: HistoryDrop[] = []): void {
     const topic = this.db.prepare(`INSERT INTO topics(connection_id, path, last_seen) VALUES(?,?,?)
       ON CONFLICT(connection_id,path) DO UPDATE SET last_seen=excluded.last_seen RETURNING id`);
     const insert = this.db.prepare(`INSERT OR IGNORE INTO messages
@@ -81,6 +87,9 @@ export class HistoryDatabase {
     let bytesRemoved = 0;
     this.db.exec('BEGIN IMMEDIATE');
     try {
+      const gap = this.db.prepare('INSERT INTO gaps(connection_id, at, dropped) VALUES(?,?,?)');
+      for (const drop of drops) gap.run(drop.connectionId, drop.at, drop.dropped);
+      this.db.prepare('DELETE FROM gaps WHERE at < ?').run(now - this.limits.maxAgeMs);
       for (const message of messages) {
         const payload = payloadBytes(message.message, message.encoding);
         const properties = serializeProperties(message.properties);
@@ -362,6 +371,8 @@ export class HistoryDatabase {
         )
         .run(...parameters);
       this.db.prepare(`DELETE FROM topics WHERE ${condition}`).run(...parameters);
+      if (topic === undefined)
+        this.db.prepare('DELETE FROM gaps WHERE connection_id=?').run(connectionId);
       this.db.exec('COMMIT');
       this.generation++;
       this.recount();
@@ -375,10 +386,19 @@ export class HistoryDatabase {
     }
   }
 
-  status() {
+  status(now = Date.now()) {
     const pageSize = Number(this.db.prepare('PRAGMA page_size').get()!.page_size);
     const pageCount = Number(this.db.prepare('PRAGMA page_count').get()!.page_count);
+    const gaps: Record<string, { dropped: number; last: number }> = {};
+    for (const row of this.db
+      .prepare(
+        `SELECT connection_id, sum(dropped) dropped, max(at) last FROM gaps WHERE at >= ?
+      GROUP BY connection_id LIMIT 1000`,
+      )
+      .all(now - this.limits.maxAgeMs))
+      gaps[String(row.connection_id)] = { dropped: Number(row.dropped), last: Number(row.last) };
     return {
+      gaps,
       retainedMessages: this.retainedMessages,
       retainedBytes: this.retainedBytes,
       databaseBytes: pageSize * pageCount,

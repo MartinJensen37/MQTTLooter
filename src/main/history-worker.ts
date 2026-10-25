@@ -36,7 +36,7 @@ parentPort!.on(
       let data: unknown;
       switch (request.action) {
         case 'append':
-          database.append(request.messages);
+          database.append(request.messages, Date.now(), request.drops);
           data = status();
           break;
         case 'series':

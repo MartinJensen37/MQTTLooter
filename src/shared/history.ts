@@ -8,6 +8,22 @@ export const DISK_HISTORY = {
   pageBytes: 2 * 1024 * 1024,
 };
 
+/** Disk writes batch more than renderer delivery; nothing waits on display. */
+export const HISTORY_QUEUE = {
+  maxMessages: 16_384,
+  maxBytes: 16 * 1024 * 1024,
+  batchMessages: 1024,
+  batchBytes: 1024 * 1024,
+  flushMs: 100,
+};
+
+/** Messages that never reached disk history, kept as durable gap records. */
+export interface HistoryDrop {
+  connectionId: string;
+  at: number;
+  dropped: number;
+}
+
 export interface HistoryQuery {
   connectionId: string;
   topic: string;
@@ -36,6 +52,8 @@ export interface HistoryStoreStatus {
   generation: number;
   persistent: boolean;
   limits: typeof DISK_HISTORY;
+  /** Retained gap records per connection. */
+  gaps: Record<string, { dropped: number; last: number }>;
 }
 
 export interface HistoryStatus {
@@ -45,7 +63,7 @@ export interface HistoryStatus {
 }
 
 export type HistoryRequest =
-  | { action: 'append'; messages: IncomingPublish[] }
+  | { action: 'append'; messages: IncomingPublish[]; drops?: HistoryDrop[] }
   | { action: 'page'; query: HistoryQuery }
   | { action: 'search'; query: import('./history-search').HistorySearchQuery }
   | { action: 'series'; query: import('./numeric-series').NumericQuery }
