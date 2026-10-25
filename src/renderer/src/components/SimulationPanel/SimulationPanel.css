@@ -159,7 +159,7 @@
 }
 .signal-parameters label,
 .signal-topic-field,
-.device-settings .payload-template-field,
+.device-settings .payload-template-field > label,
 .device-dialog form > label {
   display: flex;
   flex-direction: column;
@@ -467,6 +467,21 @@
 
 .device-settings .payload-template-field {
   margin-top: var(--spacing-md);
+}
+
+.payload-template-field > label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.payload-template-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
 }
 
 .payload-template-input {

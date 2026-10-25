@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { SimulatedDevice, DeviceOutput } from './types';
+import { templateFromSchema } from '../../../../../shared/schema-template';
 import IntervalField from './IntervalField';
 import SignalSparkline from './SignalSparkline';
 import PublishTimeline from './PublishTimeline';
@@ -30,6 +32,25 @@ export default function DeviceConfigPanel({
   const raw = device.payloadMode === 'raw';
   const template = !separate && device.payloadFormat === 'template';
   const errors = validateDevice(device);
+  const [schemaError, setSchemaError] = useState('');
+  // Signals fill properties with their names; the schema shapes and fills everything else.
+  const buildFromSchema = async (input: HTMLInputElement) => {
+    const file = input.files?.[0];
+    input.value = '';
+    setSchemaError('');
+    if (!file) return;
+    try {
+      if (file.size > 1024 * 1024) throw new Error('schema files must be at most 1 MiB');
+      const schema = JSON.parse(await file.text());
+      onUpdateDevice(device.id, {
+        payloadTemplate: templateFromSchema(schema, {
+          variables: device.outputs.map((output) => output.name.trim()),
+        }),
+      });
+    } catch (error) {
+      setSchemaError(`Schema could not be used: ${(error as Error).message}`);
+    }
+  };
   return (
     <div className="device-config panel">
       <div className="device-config-header">
@@ -140,22 +161,39 @@ export default function DeviceConfigPanel({
           </label>
         </div>
         {template && (
-          <label className="payload-template-field">
-            Payload template
-            <textarea
-              className="form-input payload-template-input"
-              aria-label="Payload template"
-              rows={8}
-              spellCheck={false}
-              maxLength={MAX_PAYLOAD_TEMPLATE}
-              value={device.payloadTemplate ?? ''}
-              onChange={(e) => onUpdateDevice(device.id, { payloadTemplate: e.target.value })}
-            />
-            <span className="field-hint">
-              {'Placeholders: {{signal name}}, {{timestamp}}, {{isoTimestamp}}, {{uuid}}, '}
-              {'{{randomInt(min, max)}}'}
-            </span>
-          </label>
+          <div className="payload-template-field">
+            <label>
+              Payload template
+              <textarea
+                className="form-input payload-template-input"
+                aria-label="Payload template"
+                rows={8}
+                spellCheck={false}
+                maxLength={MAX_PAYLOAD_TEMPLATE}
+                value={device.payloadTemplate ?? ''}
+                onChange={(e) => onUpdateDevice(device.id, { payloadTemplate: e.target.value })}
+              />
+            </label>
+            <div className="payload-template-actions">
+              <span className="field-hint">
+                {'Placeholders: {{signal name}}, {{timestamp}}, {{isoTimestamp}}, {{uuid}}, '}
+                {'{{randomInt(min, max)}}'}
+              </span>
+              {!raw && (
+                <label className="btn btn-sm btn-secondary">
+                  Build from JSON Schema
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    aria-label="Build payload template from JSON Schema"
+                    hidden
+                    onChange={(event) => void buildFromSchema(event.target)}
+                  />
+                </label>
+              )}
+            </div>
+            {schemaError && <p role="alert">{schemaError}</p>}
+          </div>
         )}
         <IntervalField
           value={device.publishInterval}

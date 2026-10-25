@@ -446,3 +446,48 @@ it('builds combined payloads from a template and blocks publishing an invalid on
     payloadTemplate: '{"v": "{{nope}}"}',
   });
 });
+
+it('builds a device template from a JSON Schema, using signals for matching properties', async () => {
+  seed('a');
+  const publish = vi.fn().mockResolvedValue(undefined);
+  await act(async () =>
+    root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={publish} />),
+  );
+  await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
+  await input('Payload structure', 'template');
+  const choose = (text: string) =>
+    act(async () => {
+      const element = container.querySelector(
+        '[aria-label="Build payload template from JSON Schema"]',
+      ) as HTMLInputElement;
+      // jsdom's File has no text(); the editor only needs these members.
+      Object.defineProperty(element, 'files', {
+        value: [{ size: text.length, text: async () => text }],
+        configurable: true,
+      });
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  await choose('{ not json');
+  expect(container.querySelector('.device-config [role="alert"]')!.textContent).toContain(
+    'Schema could not be used',
+  );
+  await choose(
+    JSON.stringify({
+      type: 'object',
+      required: ['site', 'value', 'id'],
+      properties: {
+        site: { const: 'plant-7' },
+        value: { type: 'number' },
+        id: { type: 'string', format: 'uuid' },
+      },
+    }),
+  );
+  const template = JSON.parse(
+    (container.querySelector('[aria-label="Payload template"]') as HTMLTextAreaElement).value,
+  );
+  expect(template).toEqual({ site: 'plant-7', value: '{{value}}', id: '{{uuid}}' });
+  await click('Publish Once');
+  const sent = JSON.parse(publish.mock.calls[0][0].payload);
+  expect(sent).toMatchObject({ site: 'plant-7', value: 0 });
+  expect(sent.id).toMatch(/^[0-9a-f-]{36}$/);
+});

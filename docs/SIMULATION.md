@@ -63,7 +63,9 @@ For **Combined device payload**, set **Payload structure** to **Template** to co
 
 Each signal is available by its name. In JSON mode a placeholder that fills a whole string becomes the signal's typed value, so the message above contains `"Temperature": 21.5` and `"Running": true`; placeholders inside longer strings insert text. Templates use the publishing template syntax, so `{{timestamp}}` (milliseconds), `{{isoTimestamp}}`, `{{uuid}}` (one per message) and the random helpers also work. With **Raw scalar (UTF-8)** the template is plain text, such as `temp={{Temperature}};on={{Running}}`, and may combine several signals.
 
-JSON templates must be valid JSON before expansion; put placeholders inside strings. Templates are checked while editing and a device with an unknown placeholder or invalid JSON cannot start. Templates are limited to 64 KiB and apply only to combined publishing; per-signal topics keep their own payloads. A signal named like a built-in placeholder (for example `uuid`) takes precedence over it. Schema-driven payload construction remains pending.
+JSON templates must be valid JSON before expansion; put placeholders inside strings. Templates are checked while editing and a device with an unknown placeholder or invalid JSON cannot start. Templates are limited to 64 KiB and apply only to combined publishing; per-signal topics keep their own payloads. A signal named like a built-in placeholder (for example `uuid`) takes precedence over it.
+
+In JSON mode, **Build from JSON Schema** replaces the template with one shaped by a schema file. Properties named like a signal use that signal; other values are generated as for imported publishing templates (bounded random numbers, enum choices, UUIDs, ISO times or fixed examples). Review the result: a schema property that should come from a signal with a different name still needs editing.
 
 ## Per-signal schedules
 
