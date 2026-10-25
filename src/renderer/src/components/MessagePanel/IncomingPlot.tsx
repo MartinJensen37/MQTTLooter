@@ -1,5 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import LinePlot from '../Charts/LinePlot';
+import { matchDecoder } from '../../../../shared/decoders';
+import { useDecoders } from '../../services/DecoderRegistry';
 import {
   fieldPointer,
   pointerPath,
@@ -24,6 +26,9 @@ export default function IncomingPlot({
   active?: boolean;
 }) {
   const fieldListId = useId();
+  // A matching protobuf decoder turns stored bytes into fields before plotting.
+  const decoder = matchDecoder(useDecoders().decoders, topic);
+  const decoderId = decoder?.id;
   const [duration, setDuration] = useState(60_000);
   const [end, setEnd] = useState<number | null>(null);
   const [fields, setFields] = useState(['']);
@@ -65,6 +70,7 @@ export default function IncomingPlot({
           to,
           maxPoints,
           ...(timeField && { timePath: pointerPath(timeField), timeUnit }),
+          ...(decoderId && { decoderId }),
         });
         if (disposed) return;
         if (!response.success || !response.data)
@@ -100,6 +106,7 @@ export default function IncomingPlot({
     maxPoints,
     timeField,
     timeUnit,
+    decoderId,
   ]);
 
   const plots = useMemo(
@@ -289,6 +296,7 @@ export default function IncomingPlot({
           Add field
         </button>
       </div>
+      {decoder && <p className="incoming-plot-decoder">Decoded with {decoder.name}</p>}
       {fieldError && <p role="alert">{fieldError}</p>}
       {error && <p role="alert">{error}</p>}
       <LinePlot

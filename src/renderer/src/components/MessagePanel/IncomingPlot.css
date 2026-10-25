@@ -54,3 +54,9 @@
 .incoming-plot .line-plot {
   max-height: none;
 }
+
+.incoming-plot-decoder {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}

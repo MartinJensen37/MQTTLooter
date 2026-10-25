@@ -72,5 +72,27 @@ module.exports = async ({ evaluate, waitFor, field, send, userData, capture }) =
     Buffer.from(message.message, message.encoding === 'base64' ? 'base64' : 'utf8'),
     payload,
   );
+  // The history worker decodes stored payloads for plots, so decoded fields plot like JSON.
+  for (const value of [1.5, 3.5])
+    send(
+      'proto/pump/reading',
+      Buffer.from(type.encode(type.fromObject({ id: 'pump', value, count: 1 })).finish()),
+    );
+  await field('[aria-label="Message display"]', 'plot');
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.incoming-plot-decoder')?.textContent === 'Decoded with Reading'",
+      ),
+    'decoded plot',
+  );
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.incoming-plot-readout')?.textContent.includes('/value: 3.5')",
+      ),
+    'decoded field plotted',
+  );
+  await field('[aria-label="Message display"]', 'cards');
   await field('[aria-label="Search topics"]', '');
 };
