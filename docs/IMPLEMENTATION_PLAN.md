@@ -67,7 +67,7 @@ Broker passwords, TLS private keys and passphrases are encrypted with `safeStora
 | Interval slider down to 0.1 s | Implemented, with an exact number field. | Reuse existing control. |
 | Extra waveforms | Sine, square, triangle, sawtooth, ramp, step, first-order step response, counter and random walk implemented alongside existing generators. Combined devices compose them through payload templates. | Keep generator coverage as templates evolve. |
 | Small waveform previews | Compact signal rows with tiny patterns; editor charts show three cycles for periodic waves or one transition, with labeled axes. | Keep responsive/keyboard coverage as editors evolve. |
-| Incoming topic plots | Four numeric fields, disk queries, shared chart styling, extrema aggregation, zoom, pause and cursor. | Payload timestamps, independent axes, adaptive point budgets and sustained-load measurements. |
+| Incoming topic plots | Four numeric fields, disk queries, shared chart styling, extrema aggregation, zoom, pause and cursor. Optional payload time (ms, s or zoned ISO 8601) with rejected/outside counts, per-field scales and a width-based point budget. | Plot load measurements alongside capture. |
 | Message-content search | Exact-topic disk search beyond loaded pages, text/hex, fixed time windows and stop/continue. | Cross-topic search, reverse paging, custom times, oversized-payload streaming and full-result export. |
 | Payload inspection | Text/hex, Pretty JSON, resizable inspector, plain log and adaptive previews; byte-preserving copy/export. | On-demand large-payload fetching and streaming exports. |
 | Templates and schemas | Typed JSON substitutions, editable variable defaults, safe text escaping and per-application timestamp/UUID values. Standards-based JSON Schema validation (draft-04 to 2020-12, local `$ref`, combinators, formats) without code generation, so it runs under the renderer CSP. | Schema-driven construction and shared simulation fields. |
@@ -249,7 +249,7 @@ Every phase includes targeted regression tests, typecheck/lint/build where relev
 
 ## Delivery order
 
-Current order (2026-10-25): durable recordings, the load harness and credential storage are done. Renderer heap profiling and chunked history clears followed. JSON Schema validation and simulator payload templates followed. Next: cross-topic search, payload-timestamp plots and independent axes, then schema-driven construction, workspaces and decoding.
+Current order (2026-10-25): durable recordings, the load harness and credential storage are done. Renderer heap profiling and chunked history clears followed. JSON Schema validation and simulator payload templates followed. Payload-time plots, per-field scales and width-based point budgets followed. Next: cross-topic search, then schema-driven construction, workspaces and decoding.
 
 Original order: start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
 
