@@ -88,6 +88,7 @@ export default function HistorySearch({
             : {
                 ...cursor,
                 before: data.nextBefore,
+                beforeTime: data.nextBeforeTime!,
                 snapshot: data.snapshot,
                 generation: data.generation,
               };

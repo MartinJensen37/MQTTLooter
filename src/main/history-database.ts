@@ -268,8 +268,9 @@ export class HistoryDatabase {
     return sampler.result(truncated);
   }
 
-  /** One resumable slice. Time filtering happens here so SQL cannot scan an unbounded time-filtered tail. */
   /**
+   * One resumable slice, newest first by receive time. The time range bounds an index scan, so
+   * rows outside it are never visited and a past range is reached directly.
    * `decode` returns a payload's decoded text for 'decoded' searches, or undefined when the
    * message's topic has no decoder or the payload does not decode.
    */
@@ -289,6 +290,7 @@ export class HistoryDatabase {
       snapshot,
       generation: this.generation,
       nextBefore: null,
+      nextBeforeTime: null,
       expired: this.expired,
       scanned: 0,
       skippedLarge: 0,
@@ -296,22 +298,27 @@ export class HistoryDatabase {
     };
     // A topic filter scans the connection's messages in the same bounded chunks; rows from
     // non-matching topics count toward the chunk, so sparse filters cannot scan unboundedly.
+    // It must walk the time index: planned through the topics, SQLite sorts the whole range.
     const filter = query.scope === 'filter' ? query.filter! : null;
     const rows = this.db
       .prepare(
         `SELECT m.id, m.timestamp, m.storage_bytes, t.path,
       CASE WHEN length(m.payload)<=? AND m.storage_bytes<=? THEN m.payload ELSE NULL END payload
-      FROM messages m JOIN topics t ON t.id=m.topic_id
+      FROM messages m ${filter === null ? '' : 'INDEXED BY message_time'}
+      JOIN topics t ON t.id=m.topic_id
       WHERE t.connection_id=? ${filter === null ? 'AND t.path=?' : ''}
-      AND m.id<=? AND m.id<? ORDER BY m.id DESC LIMIT ?`,
+      AND m.timestamp>=? AND (m.timestamp, m.id)<(?, ?) AND m.id<=?
+      ORDER BY m.timestamp DESC, m.id DESC LIMIT ?`,
       )
       .iterate(
         SEARCH_LIMITS.payloadBytes,
         SEARCH_LIMITS.resultBytes,
         query.connectionId,
         ...(filter === null ? [query.topic] : []),
-        snapshot,
+        Math.max(query.from, now - this.limits.maxAgeMs),
+        query.beforeTime ?? query.to,
         query.before ?? Number.MAX_SAFE_INTEGER,
+        snapshot,
         SEARCH_LIMITS.rows + 1,
       );
     const getMatch = this.db.prepare(
@@ -323,6 +330,11 @@ export class HistoryDatabase {
     let scannedBytes = 0;
     let resultBytes = 0;
     let lastRow = 0;
+    let lastTime = 0;
+    const resume = () => {
+      result.nextBefore = lastRow;
+      result.nextBeforeTime = lastTime;
+    };
     for (const row of rows) {
       const payload = row.payload as Uint8Array | null;
       if (
@@ -332,16 +344,13 @@ export class HistoryDatabase {
           performance.now() - started >= SEARCH_LIMITS.workMs ||
           result.messages.length >= SEARCH_LIMITS.matches)
       ) {
-        result.nextBefore = lastRow;
+        resume();
         break;
       }
-      const inRange =
-        Number(row.timestamp) >= Math.max(query.from, now - this.limits.maxAgeMs) &&
-        Number(row.timestamp) <= query.to &&
-        (filter === null || topicMatches(filter, String(row.path)));
+      const inScope = filter === null || topicMatches(filter, String(row.path));
       let matches = false;
       let binary = false;
-      if (inRange && payload) {
+      if (inScope && payload) {
         if (needle)
           matches = Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength).includes(
             needle,
@@ -359,13 +368,14 @@ export class HistoryDatabase {
         }
       }
       if (matches && resultBytes + Number(row.storage_bytes) > SEARCH_LIMITS.resultBytes) {
-        result.nextBefore = lastRow;
+        resume();
         break;
       }
       result.scanned++;
       scannedBytes += payload?.byteLength ?? 0;
       lastRow = Number(row.id);
-      if (inRange && payload === null) result.skippedLarge++;
+      lastTime = Number(row.timestamp);
+      if (inScope && payload === null) result.skippedLarge++;
       if (binary) result.skippedBinary++;
       if (!matches) continue;
       resultBytes += Number(row.storage_bytes);

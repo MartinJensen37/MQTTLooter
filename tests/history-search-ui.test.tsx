@@ -21,6 +21,7 @@ const page = (messages: any[] = [], nextBefore: number | null = null) => ({
   data: {
     messages,
     nextBefore,
+    nextBeforeTime: nextBefore === null ? null : 1000 + nextBefore,
     snapshot: 99,
     generation: 0,
     expired: 0,
@@ -71,6 +72,7 @@ it('scans past empty chunks, preserves snapshot cursors and stops at a result pa
   await act(async () => vi.advanceTimersByTimeAsync(20));
   expect(search.mock.calls[1][0]).toMatchObject({
     before: 50,
+    beforeTime: 1050,
     snapshot: 99,
     generation: 0,
     term: 'needle',

@@ -15,6 +15,11 @@ export interface HistorySearchQuery extends HistoryQuery {
   mode: 'text' | 'hex' | 'decoded';
   from: number;
   to: number;
+  /**
+   * Cursor: the last scanned row's receive time, paired with `before` (its id). Searches walk
+   * a time index newest first, so a past range is reached without scanning newer rows.
+   */
+  beforeTime?: number;
   /** 'filter' searches every stored topic of the connection matching an MQTT topic filter. */
   scope?: 'topic' | 'filter';
   filter?: string;
@@ -51,6 +56,8 @@ export function topicMatches(filter: string, topic: string): boolean {
   return filterLevels.length === topicLevels.length;
 }
 export interface HistorySearchPage extends HistoryPage {
+  /** With `nextBefore`, where the next slice resumes. */
+  nextBeforeTime: number | null;
   scanned: number;
   skippedLarge: number;
   skippedBinary: number;
@@ -70,7 +77,8 @@ export function validateSearch(query: HistorySearchQuery): void {
     query.from < 0 ||
     query.to < query.from ||
     query.to - query.from > 86400000 ||
-    ['before', 'snapshot', 'generation'].some((key) => {
+    (query.before === undefined) !== (query.beforeTime === undefined) ||
+    ['before', 'beforeTime', 'snapshot', 'generation'].some((key) => {
       const value = query[key as keyof HistorySearchQuery];
       return value !== undefined && (!Number.isSafeInteger(value) || (value as number) < 0);
     })

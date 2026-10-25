@@ -199,7 +199,12 @@ export class HistoryService {
         search: { topic: scope === 'filter' ? filter : topic, term, mode, from, to },
       },
       (async function* () {
-        let cursor: HistorySearchQuery = { ...query, before: undefined, snapshot: undefined };
+        let cursor: HistorySearchQuery = {
+          ...query,
+          before: undefined,
+          beforeTime: undefined,
+          snapshot: undefined,
+        };
         for (;;) {
           const page = await request(cursor);
           scanned += page.scanned;
@@ -216,6 +221,7 @@ export class HistoryService {
           cursor = {
             ...cursor,
             before: page.nextBefore,
+            beforeTime: page.nextBeforeTime!,
             snapshot: page.snapshot,
             generation: page.generation,
           };
