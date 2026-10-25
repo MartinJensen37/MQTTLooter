@@ -159,64 +159,79 @@ export const RECORDING_QUEUE = {
 
 import { payloadBytes, type PayloadEncoding } from './payload';
 
-/** Accept both saved recordings and the exported recordingInfo/payload format. */
-export function parseRecording(data: any): Recording {
-  const info = data?.recordingInfo ?? data;
+const recordingDate = (value: unknown) => {
+  if (typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date))
+    throw new Error('Invalid recording timestamp');
+  const result = new Date(value);
+  if (!Number.isFinite(result.getTime())) throw new Error('Invalid recording timestamp');
+  return result;
+};
+
+/** One recorded message. Exported files name the payload `payload`; saved libraries `message`. */
+export function parseRecordedMessage(
+  msg: any,
+  exported: boolean,
+): RecordedMessage & {
+  timestamp: Date;
+  encoding: PayloadEncoding;
+} {
+  const payload = exported ? msg?.payload : msg?.message;
+  const encoding: PayloadEncoding = msg?.encoding ?? 'utf8';
   if (
-    !info ||
-    typeof info.name !== 'string' ||
-    !Array.isArray(data.messages) ||
-    data.messages.length > 100_000
-  ) {
-    throw new Error('Invalid recording metadata or message list');
-  }
-  const date = (value: unknown) => {
-    if (typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date))
-      throw new Error('Invalid recording timestamp');
-    const result = new Date(value);
-    if (!Number.isFinite(result.getTime())) throw new Error('Invalid recording timestamp');
-    return result;
-  };
-  const messages = data.messages.map((msg: any) => {
-    const payload = data.recordingInfo ? msg?.payload : msg?.message;
-    const encoding: PayloadEncoding = msg?.encoding ?? 'utf8';
-    if (
-      typeof msg?.topic !== 'string' ||
-      !msg.topic.length ||
-      typeof payload !== 'string' ||
-      (msg.qos !== undefined && ![0, 1, 2].includes(msg.qos)) ||
-      (msg.retain !== undefined && typeof msg.retain !== 'boolean') ||
-      (msg.protocolVersion !== undefined && ![3, 4, 5].includes(msg.protocolVersion)) ||
-      (msg.properties !== undefined &&
-        (msg.properties === null ||
-          typeof msg.properties !== 'object' ||
-          Array.isArray(msg.properties)))
-    )
-      throw new Error('Invalid recorded message');
-    payloadBytes(payload, encoding);
-    return {
-      topic: msg.topic,
-      message: payload,
-      encoding,
-      timestamp: date(msg.timestamp),
-      qos: msg.qos ?? 0,
-      retain: msg.retain ?? false,
-      connectionId: typeof msg.connectionId === 'string' ? msg.connectionId : undefined,
-      ...(msg.protocolVersion !== undefined && { protocolVersion: msg.protocolVersion }),
-      ...(msg.properties !== undefined && { properties: msg.properties }),
-    };
-  });
-  const topics = new Set(messages.map((msg: { topic: string }) => msg.topic));
+    typeof msg?.topic !== 'string' ||
+    !msg.topic.length ||
+    typeof payload !== 'string' ||
+    (msg.qos !== undefined && ![0, 1, 2].includes(msg.qos)) ||
+    (msg.retain !== undefined && typeof msg.retain !== 'boolean') ||
+    (msg.protocolVersion !== undefined && ![3, 4, 5].includes(msg.protocolVersion)) ||
+    (msg.properties !== undefined &&
+      (msg.properties === null ||
+        typeof msg.properties !== 'object' ||
+        Array.isArray(msg.properties)))
+  )
+    throw new Error('Invalid recorded message');
+  payloadBytes(payload, encoding);
   return {
-    id: Number.isFinite(info.id) ? info.id : Date.now(),
+    topic: msg.topic,
+    message: payload,
+    encoding,
+    timestamp: recordingDate(msg.timestamp),
+    qos: msg.qos ?? 0,
+    retain: msg.retain ?? false,
+    connectionId: typeof msg.connectionId === 'string' ? msg.connectionId : undefined,
+    ...(msg.protocolVersion !== undefined && { protocolVersion: msg.protocolVersion }),
+    ...(msg.properties !== undefined && { properties: msg.properties }),
+  };
+}
+
+/** Recording metadata: name, times, connection and any incomplete-capture reason. */
+export function parseRecordingInfo(info: any) {
+  if (!info || typeof info.name !== 'string') throw new Error('Invalid recording metadata');
+  return {
     name: info.name,
     incompleteReason:
       typeof info.incompleteReason === 'string' ? info.incompleteReason.slice(0, 512) : undefined,
-    startTime: date(info.startTime),
-    endTime: date(info.endTime),
+    startTime: recordingDate(info.startTime),
+    endTime: recordingDate(info.endTime),
+    connectionName: typeof info.connectionName === 'string' ? info.connectionName : 'Unknown',
+  };
+}
+
+/** Accept both saved recordings and the exported recordingInfo/payload format. */
+export function parseRecording(data: any): Recording {
+  const info = data?.recordingInfo ?? data;
+  if (!info || !Array.isArray(data.messages) || data.messages.length > 100_000)
+    throw new Error('Invalid recording metadata or message list');
+  const metadata = parseRecordingInfo(info);
+  const messages = data.messages.map((msg: any) =>
+    parseRecordedMessage(msg, Boolean(data.recordingInfo)),
+  );
+  const topics = new Set(messages.map((msg: { topic: string }) => msg.topic));
+  return {
+    id: Number.isFinite(info.id) ? info.id : Date.now(),
+    ...metadata,
     messages,
     messageCount: messages.length,
     topic: topics.size === 1 ? messages[0].topic : `${topics.size} Topics`,
-    connectionName: typeof info.connectionName === 'string' ? info.connectionName : 'Unknown',
   };
 }
