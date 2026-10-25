@@ -415,6 +415,7 @@ function MessagePanel({
                           value={msg.message}
                           encoding={msg.encoding}
                           previewBytes={previewBytes}
+                          topic={msg.topic}
                         />
                         <MessageProperties
                           protocolVersion={msg.protocolVersion}
