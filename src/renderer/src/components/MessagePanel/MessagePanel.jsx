@@ -386,11 +386,6 @@ function MessagePanel({
         </div>
       )}
 
-      {!plotContent && selectedTopic?.node?.discardedHistory > 0 && (
-        <p className="message-history-notice" role="status">
-          {selectedTopic.node.discardedHistory} messages are no longer in the live cache.
-        </p>
-      )}
       {plotContent || (
         <StableScrollViewport
           className="message-list"
