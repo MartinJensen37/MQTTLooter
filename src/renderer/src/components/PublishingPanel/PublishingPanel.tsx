@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import MessageTemplateService from '../../services/MessageTemplateService';
 import './PublishingPanel.css';
 import { payloadBytes, type PayloadEncoding } from '../../../../shared/payload';
@@ -13,6 +13,8 @@ import {
   readPropertyDraft,
 } from './publishingPanel/propertyDraft';
 import TemplatesSection from './publishingPanel/TemplatesSection';
+import TemplateVariables from './publishingPanel/TemplateVariables';
+import { templateDefaults } from '../../../../shared/template-expansion';
 import QosRetainOptions from './publishingPanel/QosRetainOptions';
 import PublishHistory from './publishingPanel/PublishHistory';
 import TemplateDeleteDialog from './publishingPanel/TemplateDeleteDialog';
@@ -72,6 +74,9 @@ function PublishingPanel({
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
   const [messageTemplates, setMessageTemplates] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
+  const [templateError, setTemplateError] = useState('');
+  const generatedTopic = useRef<string | null>(null);
   const [templateService] = useState(() => new MessageTemplateService());
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
   const [schemaValidation, setSchemaValidation] = useState<SchemaValidationResult | null>(null);
@@ -120,6 +125,7 @@ function PublishingPanel({
   // Auto-load the selected topic into the form when enabled.
   useEffect(() => {
     if (autoLoadSelectedTopic && selectedPath !== null) {
+      generatedTopic.current = null;
       setTopic(selectedPath);
     }
     setRetainedMessageRemoved(false);
@@ -132,22 +138,40 @@ function PublishingPanel({
     }
   }, [selectedMessageId, selectedRetain, connectionId, isConnected]);
 
+  const applyTemplate = (templateId: string, variables: Record<string, string>) => {
+    const template = templateService.getTemplate(templateId);
+    if (!template) return;
+    try {
+      const processed = templateService.processTemplate(template, variables);
+      const properties = draftFromProperties(processed.properties);
+      if (!topic.trim() || topic === generatedTopic.current) {
+        setTopic(processed.topic);
+        generatedTopic.current = processed.topic;
+      }
+      setPayload(processed.payload);
+      setEncoding('utf8');
+      setQos(processed.qos ?? 0);
+      setRetain(processed.retain ?? false);
+      setPropertyDraft(properties);
+      setTemplateError('');
+    } catch (error) {
+      setTemplateError((error as Error).message);
+    }
+  };
+
   const handleTemplateSelect = (templateId: string) => {
     const template = templateService.getTemplate(templateId);
     if (!template) return;
-
-    // Only fill the topic if it's currently empty.
-    if (!topic.trim()) {
-      setTopic(template.topic);
-    }
-
-    const processed = templateService.processTemplate(template);
-    setPayload(processed.payload);
-    setEncoding('utf8');
-    setQos(template.qos);
-    setRetain(template.retain);
     setSelectedTemplate(templateId);
     setShowTemplateDropdown(false);
+    try {
+      const defaults = templateDefaults(template.variables);
+      setTemplateVariables(defaults);
+      applyTemplate(templateId, defaults);
+    } catch (error) {
+      setTemplateVariables({});
+      setTemplateError((error as Error).message);
+    }
   };
 
   const handleTemplateImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -239,6 +263,10 @@ function PublishingPanel({
   }, [publishHistory, connectionId, showFeedback]);
 
   const handlePublish = async () => {
+    if (selectedTemplate && templateError) {
+      showFeedback?.(templateError, 'error');
+      return;
+    }
     if (propertyValidation.error) {
       showFeedback?.(propertyValidation.error, 'error');
       return;
@@ -348,6 +376,8 @@ function PublishingPanel({
     }
 
     setPropertyDraft(emptyPropertyDraft());
+    generatedTopic.current = null;
+    setSelectedTemplate(null);
     setTopic(selectedTopic.topicPath || selectedTopic.topic || '');
     const messageData = connectionId
       ? TopicTreeService.getTopicMessages(connectionId, selectedTopic.topicPath)[0]
@@ -375,6 +405,8 @@ function PublishingPanel({
       showFeedback?.(`Cannot load saved properties: ${(error as Error).message}`, 'error');
       return;
     }
+    generatedTopic.current = null;
+    setSelectedTemplate(null);
     setTopic(historyItem.topic);
     setPayload(historyItem.payload);
     setEncoding(historyItem.encoding ?? 'utf8');
@@ -383,6 +415,7 @@ function PublishingPanel({
   };
 
   const clearForm = () => {
+    generatedTopic.current = null;
     setPropertyDraft(emptyPropertyDraft());
     setTopic('');
     setPayload('');
@@ -473,7 +506,10 @@ function PublishingPanel({
                   id="topic"
                   type="text"
                   value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
+                  onChange={(e) => {
+                    generatedTopic.current = null;
+                    setTopic(e.target.value);
+                  }}
                   placeholder="Enter MQTT topic (e.g., sensors/temperature)"
                   className="topic-input"
                   disabled={isPublishing}
@@ -531,6 +567,19 @@ function PublishingPanel({
               handleTemplateDelete={handleTemplateDelete}
             />
 
+            {showTemplates && selectedTemplate && (
+              <TemplateVariables
+                definitions={templateService.getTemplate(selectedTemplate)?.variables ?? {}}
+                values={templateVariables}
+                onChange={(name, value) =>
+                  setTemplateVariables((previous) => ({ ...previous, [name]: value }))
+                }
+                onApply={() => applyTemplate(selectedTemplate, templateVariables)}
+                error={templateError}
+                disabled={isPublishing}
+              />
+            )}
+
             <QosRetainOptions
               qos={qos}
               setQos={setQos}
@@ -554,6 +603,7 @@ function PublishingPanel({
                 onClick={handlePublish}
                 className="publish-form-publish-btn"
                 disabled={
+                  !!(selectedTemplate && templateError) ||
                   !topic.trim() ||
                   isPublishing ||
                   !connectionId ||

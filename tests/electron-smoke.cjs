@@ -372,6 +372,32 @@ async function run() {
     },
   });
 
+  await require('./electron-templates.cjs')({
+    evaluate,
+    waitFor,
+    published,
+    capture: async () => {
+      window.setSize(800, 600);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await evaluate(
+        "document.querySelector('.publish-template-variables').scrollIntoView({block:'center'})",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      const layout = await evaluate(`(() => {
+        const editor = document.querySelector('.publish-template-variables');
+        return {width:editor.clientWidth, scroll:editor.scrollWidth, right:editor.getBoundingClientRect().right};
+      })()`);
+      assert.ok(
+        layout.width >= 250 && layout.scroll <= layout.width + 1 && layout.right <= 801,
+        JSON.stringify(layout),
+      );
+      fs.writeFileSync(
+        path.join(workspace, '.tmp', 'electron-template-variables.png'),
+        (await window.webContents.capturePage()).toPNG(),
+      );
+      window.setSize(1400, 900);
+    },
+  });
   await evaluate(
     "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4', bubbles: true }))",
   );

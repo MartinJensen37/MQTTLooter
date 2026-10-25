@@ -1,3 +1,5 @@
+import { expandTemplate } from '../../../shared/template-expansion';
+
 class MessageTemplateService {
   constructor() {
     this.templates = this.loadTemplates();
@@ -6,7 +8,20 @@ class MessageTemplateService {
   loadTemplates() {
     try {
       const saved = localStorage.getItem('mqtt-message-templates');
-      return saved ? JSON.parse(saved) : this.getDefaultTemplates();
+      const defaults = this.getDefaultTemplates();
+      if (!saved) return defaults;
+      const templates = JSON.parse(saved);
+      for (const [id, stock] of Object.entries(defaults)) {
+        const template = templates[id];
+        if (
+          template &&
+          !template.variables &&
+          template.topic === stock.topic &&
+          template.payload === stock.payload
+        )
+          template.variables = stock.variables;
+      }
+      return templates;
     } catch (error) {
       console.error('Failed to load message templates:', error);
       return this.getDefaultTemplates();
@@ -67,6 +82,9 @@ class MessageTemplateService {
         qos: 1,
         retain: true,
         category: 'Device Management',
+        variables: {
+          deviceId: { type: 'text', default: 'device-001' },
+        },
         schema: {
           type: 'object',
           properties: {
@@ -96,6 +114,9 @@ class MessageTemplateService {
         qos: 0,
         retain: false,
         category: 'Location Services',
+        variables: {
+          vehicleId: { type: 'text', default: 'vehicle-001' },
+        },
         schema: {
           type: 'object',
           properties: {
@@ -138,65 +159,13 @@ class MessageTemplateService {
     return false;
   }
 
-  // Template variable replacement
   processTemplate(template, variables = {}) {
-    let processedTopic = template.topic;
-    let processedPayload = template.payload;
-
-    // Replace variables in topic and payload
-    Object.entries(variables).forEach(([key, value]) => {
-      const regex = new RegExp(`{{${key}}}`, 'g');
-      processedTopic = processedTopic.replace(regex, value);
-      processedPayload = processedPayload.replace(regex, value);
-    });
-
-    // Process built-in functions
-    processedTopic = this.processFunctions(processedTopic);
-    processedPayload = this.processFunctions(processedPayload);
-
     return {
-      topic: processedTopic,
-      payload: processedPayload,
+      ...expandTemplate(template, variables),
       qos: template.qos,
       retain: template.retain,
       properties: template.properties,
     };
-  }
-
-  processFunctions(text) {
-    // {{timestamp}} - Current timestamp
-    text = text.replace(/{{timestamp}}/g, () => Date.now());
-
-    // {{randomInt(min, max)}} - Random integer
-    text = text.replace(/{{randomInt\((\d+),\s*(\d+)\)}}/g, (match, min, max) => {
-      return Math.floor(Math.random() * (parseInt(max) - parseInt(min) + 1)) + parseInt(min);
-    });
-
-    // {{randomFloat(min, max, decimals)}} - Random float
-    text = text.replace(
-      /{{randomFloat\(([\d.-]+),\s*([\d.-]+),\s*(\d+)\)}}/g,
-      (match, min, max, decimals) => {
-        const value = Math.random() * (parseFloat(max) - parseFloat(min)) + parseFloat(min);
-        return value.toFixed(parseInt(decimals));
-      },
-    );
-
-    // {{randomChoice("option1", "option2", ...)}} - Random choice
-    text = text.replace(/{{randomChoice\((.*?)\)}}/g, (match, options) => {
-      const choices = options.split(',').map((s) => s.trim().replace(/['"]/g, ''));
-      return choices[Math.floor(Math.random() * choices.length)];
-    });
-
-    // {{uuid}} - Generate UUID
-    text = text.replace(/{{uuid}}/g, () => {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        const r = (Math.random() * 16) | 0;
-        const v = c == 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-      });
-    });
-
-    return text;
   }
 
   getCategories() {

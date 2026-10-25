@@ -1,0 +1,24 @@
+.publish-template-variables {
+  display: grid;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+.publish-template-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  gap: var(--spacing-sm);
+}
+.publish-template-fields label {
+  display: grid;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.publish-template-variables > button {
+  justify-self: start;
+}
+.publish-template-error {
+  color: var(--danger);
+  overflow-wrap: anywhere;
+  margin: 0;
+}
