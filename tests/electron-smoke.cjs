@@ -937,6 +937,13 @@ async function run() {
     evaluate,
     waitFor,
     field,
+    screenshot: async (name) => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      fs.writeFileSync(
+        path.join(workspace, '.tmp', name),
+        (await window.webContents.capturePage()).toPNG(),
+      );
+    },
     capture: async () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
       fs.writeFileSync(
