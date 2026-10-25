@@ -22,6 +22,12 @@ const profileName = process.env.LOAD_PROFILE || 'quick';
 const profile = PROFILES[profileName];
 if (!profile) throw new Error(`Unknown LOAD_PROFILE ${profileName}`);
 const TARGETS = { inputP95Ms: 100, disconnectMs: 500 };
+// Part of the stream is protobuf, decoded in main and plotted from disk history.
+const PROTO = {
+  source:
+    'syntax = "proto3"; package load; message Reading { double value = 1; int64 count = 2; string id = 3; }',
+  topics: 50,
+};
 
 const workspace = path.resolve(__dirname, '../..');
 const temporary = process.env.LOAD_USER_DATA ?? path.join(workspace, '.tmp', `load-${process.pid}`);
@@ -218,6 +224,18 @@ async function run() {
   await evaluate(
     `localStorage.setItem('mqtt-connections', ${JSON.stringify(JSON.stringify(connections))})`,
   );
+  const saved = await evaluate(
+    `window.electronAPI.decoders.save(${JSON.stringify([
+      {
+        id: 'load',
+        name: 'Load',
+        topicFilter: 'load/proto/#',
+        messageType: 'load.Reading',
+        proto: PROTO.source,
+      },
+    ])})`,
+  );
+  assert.equal(saved.success, true, saved.error);
   window.webContents.reload();
   await waitFor(() => !window.webContents.isLoading(), 'reload');
   await waitFor(
@@ -247,6 +265,19 @@ async function run() {
       `connect ${id}`,
       30_000,
     );
+  };
+  const field = (selector, value) =>
+    evaluate(`(() => {
+      const element = document.querySelector(${JSON.stringify(selector)});
+      const prototype = element.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(prototype, 'value').set.call(element, ${JSON.stringify(value)});
+      element.dispatchEvent(new Event(element.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
+    })()`);
+  const selectTopic = async (topic) => {
+    await field('[aria-label="Search topics"]', topic);
+    const node = `document.querySelector('.topic-tree-node[title="${topic}"]')`;
+    await waitFor(() => evaluate(`!!${node}`), `topic ${topic}`, 20_000);
+    await evaluate(`${node}.click()`);
   };
   const disconnect = async (id) => {
     const started = performance.now();
@@ -312,10 +343,40 @@ async function run() {
     "window.electronAPI.recordings.start('stream', 'Load stream', 'Load recording')",
   );
   assert.equal(recording.success, true, recording.error);
+  // A short warm-up creates the topics. A pinned Logging pane then plots a decoded field
+  // while the main selection moves on; the sampler's clicks move only the main selection.
+  await ask(
+    { type: 'stream', rate: 500, seconds: 1, topics: 500, sizes: [16], proto: PROTO },
+    'streamDone',
+  );
+  await selectTopic('load/proto/0');
+  await field('[aria-label="Message display"]', 'plot');
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.incoming-plot-decoder')?.textContent === 'Decoded with Load'",
+      ),
+    'decoded plot',
+    20_000,
+  );
+  await evaluate(`document.querySelector('[title="Show a second tab beside this one"]').click()`);
+  await evaluate(
+    "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }))",
+  );
+  await waitFor(
+    () => evaluate("!!document.querySelector('.tab-content.secondary .incoming-plot')"),
+    'plot in second pane',
+    20_000,
+  );
+  await evaluate(
+    `document.querySelector('[title="Keep the second pane on this connection and topic"]').click()`,
+  );
+  await selectTopic('load/live/100');
+  await field('[aria-label="Search topics"]', '');
   const stop = sampler(evaluate, heapUsage);
   const historyBefore = (await evaluate('window.electronAPI.history.status()')).data.store;
   const streaming = ask(
-    { type: 'stream', rate, seconds, topics: 500, sizes: [16, 16, 16, 256, 4096] },
+    { type: 'stream', rate, seconds, topics: 500, sizes: [16, 16, 16, 256, 4096], proto: PROTO },
     'streamDone',
   );
   await sleep(Math.max(1000, seconds * 1000 - 2000));
@@ -330,6 +391,11 @@ async function run() {
   const recorded = (await evaluate('window.electronAPI.recordings.list()')).data.find(
     (item) => item.id === recording.data.id,
   );
+  const pinnedPlot = await evaluate(`({
+    pinned: document.querySelector('.tab-content.secondary .pane-pin')?.textContent ?? null,
+    decoder: document.querySelector('.tab-content.secondary .incoming-plot-decoder')?.textContent ?? null,
+    readout: document.querySelector('.tab-content.secondary .incoming-plot-readout')?.textContent.slice(0, 120) ?? null,
+  })`);
   report.stream = {
     requestedRate: rate,
     seconds,
@@ -345,6 +411,8 @@ async function run() {
       (historyAfter.store?.expired ?? 0) -
       (historyBefore?.expired ?? 0),
     historyGaps: historyAfter.store?.gaps?.stream?.dropped ?? 0,
+    protobufTopics: PROTO.topics,
+    pinnedPlot,
     historyError: historyAfter.error ?? null,
     recording: {
       state: recorded.state,
@@ -355,6 +423,8 @@ async function run() {
     ...(await stop()),
   };
   assert.equal(recorded.state, 'complete');
+  assert.ok(pinnedPlot.pinned?.includes('load/proto/0'), JSON.stringify(pinnedPlot));
+  assert.equal(pinnedPlot.decoder, 'Decoded with Load');
   // Everything main received is accounted for: delivered, or counted as dropped.
   assert.ok(counts.processed + counts.dropped <= counts.received);
   assert.ok(recorded.messageCount + recorded.dropped <= counts.received);

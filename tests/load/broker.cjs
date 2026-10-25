@@ -2,12 +2,14 @@
  * Minimal loopback MQTT broker for load tests, run as a separate process so publishing cost does
  * not distort the app's main-process measurements. Controlled over the fork IPC channel:
  *   { type: 'retained', count, payloadBytes } sets the retained set sent on SUBSCRIBE.
- *   { type: 'stream', rate, seconds, topics, sizes } publishes live traffic and reports totals.
+ *   { type: 'stream', rate, seconds, topics, sizes, proto? } publishes live traffic and reports
+ *   totals. With proto: { source, topics }, the first topics carry protobuf `load.Reading` payloads.
  * Never point this at a public broker; it only listens on 127.0.0.1.
  */
 const net = require('node:net');
 const { createRequire } = require('node:module');
 const codec = createRequire(require.resolve('mqtt'))('mqtt-packet');
+const protobuf = require('protobufjs');
 
 const clients = new Set();
 let retained = { count: 0, payloadBytes: 16 };
@@ -83,7 +85,8 @@ const server = net.createServer((socket) => {
 });
 
 /** Publish at a fixed rate in 10 ms ticks. Socket backpressure delays rather than drops. */
-async function stream({ rate, seconds, topics, sizes }) {
+async function stream({ rate, seconds, topics, sizes, proto }) {
+  const reading = proto && protobuf.parse(proto.source).root.lookupType('load.Reading');
   const started = Date.now();
   const end = started + seconds * 1000;
   let sent = 0;
@@ -93,12 +96,17 @@ async function stream({ rate, seconds, topics, sizes }) {
     const due = Math.floor(((Date.now() - started) / 1000) * rate);
     const targets = [...clients].filter((client) => client.subscribed);
     while (sent < due) {
-      const size = sizes[sent % sizes.length];
-      const body = payload(size, sent);
+      const index = sent % topics;
+      const encoded = reading && index < proto.topics;
+      const body = encoded
+        ? Buffer.from(
+            reading.encode({ value: Math.sin(sent / 50), count: sent, id: `p${index}` }).finish(),
+          )
+        : payload(sizes[sent % sizes.length], sent);
       for (const client of targets)
         await write(client, {
           cmd: 'publish',
-          topic: `load/live/${sent % topics}`,
+          topic: encoded ? `load/proto/${index}` : `load/live/${index}`,
           payload: body,
           qos: 0,
           retain: false,
