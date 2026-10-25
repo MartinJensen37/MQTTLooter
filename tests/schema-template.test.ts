@@ -89,3 +89,32 @@ it('generates fresh values per expansion and terminates on recursive references'
   // Enum values that look like placeholders stay literal rather than becoming expressions.
   expect(JSON.parse(templateFromSchema({ enum: ['{{uuid}}', 'x'] }))).toBe('{{uuid}}');
 });
+
+it('binds properties named like supplied variables to their placeholders', () => {
+  const schema = {
+    type: 'object',
+    properties: {
+      device: { const: 'boiler' },
+      values: {
+        type: 'object',
+        properties: { temperature: { type: 'number' }, running: { type: 'boolean' } },
+      },
+    },
+  };
+  const template = templateFromSchema(schema, { variables: ['temperature', 'running', 'x}}'] });
+  expect(JSON.parse(template)).toEqual({
+    device: 'boiler',
+    values: { temperature: '{{temperature}}', running: '{{running}}' },
+  });
+  const { payload } = expandTemplate(
+    { topic: '', payload: template },
+    {
+      temperature: 21.5,
+      running: true,
+    },
+  );
+  expect(JSON.parse(payload)).toEqual({
+    device: 'boiler',
+    values: { temperature: 21.5, running: true },
+  });
+});

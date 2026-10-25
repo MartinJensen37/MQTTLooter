@@ -14,7 +14,17 @@ const safeArgument = (value: unknown) =>
   !JSON.stringify(value).includes('{{') &&
   !JSON.stringify(value).includes('}}');
 
-export function templateFromSchema(schema: unknown): string {
+/**
+ * `variables` names placeholders the caller supplies, such as simulator signals: an object
+ * property with the same name becomes `{{name}}` instead of a generated value.
+ */
+export function templateFromSchema(
+  schema: unknown,
+  options: { variables?: string[] } = {},
+): string {
+  const variables = new Set(
+    (options.variables ?? []).filter((name) => !name.includes('{{') && !name.includes('}}')),
+  );
   let nodes = 0;
   const resolve = (reference: string): unknown => {
     if (!reference.startsWith('#')) return undefined;
@@ -65,7 +75,7 @@ export function templateFromSchema(schema: unknown): string {
       case 'object': {
         const result: Record<string, unknown> = {};
         for (const [key, child] of Object.entries(value.properties ?? {}))
-          result[key] = build(child, depth + 1, seen);
+          result[key] = variables.has(key) ? placeholder(key) : build(child, depth + 1, seen);
         for (const key of value.required ?? []) if (!(key in result)) result[key] = null;
         return result;
       }
