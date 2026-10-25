@@ -70,12 +70,8 @@ it('defaults binary payloads to hex and offers an explicit text preview', async 
   await act(async () => root.render(<PayloadView value="/wAB" encoding="base64" />));
   expect(container.querySelector('.payload-preview')?.textContent).toBe('ff 00 01');
   expect(container.querySelector('pre')).toBeNull();
-  await act(async () => {
-    const select = container.querySelector('select')!;
-    select.value = 'text';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-  expect(container.textContent).toContain('may replace invalid UTF-8');
+  await act(async () => root.render(<PayloadView value="/wAB" encoding="base64" view="text" />));
+  expect(container.textContent).toContain('invalid bytes are replaced');
 });
 
 it('preserves a publishing draft when the selected topic metadata refreshes', async () => {

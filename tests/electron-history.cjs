@@ -156,7 +156,11 @@ module.exports = async ({ evaluate, waitFor, field, send, captureSearch, saveTo 
     () => evaluate('!!document.querySelector(\'[aria-label="Payload view"]\')'),
     'payload selector',
   );
-  await field('[aria-label="Payload view"]', 'json');
+  // Auto view indents JSON while keeping exact numbers.
+  assert.equal(
+    await evaluate('document.querySelector(\'[aria-label="Payload view"]\').value'),
+    'auto',
+  );
   await evaluate("document.querySelector('.payload-full input').click()");
   await waitFor(
     () =>

@@ -55,26 +55,49 @@ const select = async (label: string, value: string) =>
     element.dispatchEvent(new Event('change', { bubbles: true }));
   });
 
-it('shows decoded payloads by default for matching topics and keeps other views', async () => {
-  await act(async () =>
-    root.render(<PayloadView value="CCo=" encoding="base64" topic="plant/7/reading" />),
-  );
-  expect((container.querySelector('[aria-label="Payload view"]') as HTMLSelectElement).value).toBe(
-    'decoded',
-  );
+it('decodes matching topics in Auto, follows the topic-wide view and caches decoding', async () => {
+  const view = (
+    value: string,
+    mode?: 'auto' | 'text' | 'hex' | 'decoded',
+    topic = 'plant/7/reading',
+  ) =>
+    act(async () =>
+      root.render(<PayloadView value={value} encoding="base64" topic={topic} view={mode} />),
+    );
+  await view('CCo=');
   expect(container.querySelector('.payload-preview')!.textContent).toContain('"value": 42');
   expect(api.decode).toHaveBeenCalledWith('reading', 'CCo=', 'base64');
-  await select('Payload view', 'hex');
+  await view('CCo=', 'hex');
   expect(container.querySelector('.payload-preview')!.textContent).toBe('08 2a');
   // Cached: switching back does not decode again.
-  await select('Payload view', 'decoded');
+  await view('CCo=', 'decoded');
   expect(api.decode).toHaveBeenCalledTimes(1);
 
   await act(async () => root.render(<PayloadView value="bad" topic="plant/7/reading" />));
   expect(container.textContent).toContain('Payload does not match demo.Reading');
-  await act(async () => root.render(<PayloadView value="plain" topic="other/topic" />));
-  expect(container.querySelector('option[value="decoded"]')).toBeNull();
+  // Without a matching decoder, Decoded falls back to the payload itself.
+  await act(async () =>
+    root.render(<PayloadView value="plain" topic="other/topic" view="decoded" />),
+  );
   expect(container.querySelector('.payload-preview')!.textContent).toBe('plain');
+});
+
+it('formats JSON in Auto, shows text as received otherwise and keeps previews short', async () => {
+  const show = (value: string, mode?: 'auto' | 'text') =>
+    act(async () => root.render(<PayloadView value={value} topic="other" view={mode} />));
+  await show('{"a":1,"b":[1,2]}');
+  expect(container.querySelector('.payload-preview')!.textContent).toBe(
+    '{\n  "a": 1,\n  "b": [\n    1,\n    2\n  ]\n}',
+  );
+  await show('{"a":1,"b":[1,2]}', 'text');
+  expect(container.querySelector('.payload-preview')!.textContent).toBe('{"a":1,"b":[1,2]}');
+  await show('{not json');
+  expect(container.querySelector('.payload-preview')!.textContent).toBe('{not json');
+  // At most eight lines in the card; the inspector shows everything.
+  await show(Array.from({ length: 20 }, (_, i) => `line ${i}`).join('\n'));
+  const preview = container.querySelector('.payload-preview')!.textContent!;
+  expect(preview.split('\n')).toHaveLength(8);
+  expect(preview.endsWith('…')).toBe(true);
 });
 
 it('adds decoders from .proto files, reports compile errors and removes decoders', async () => {

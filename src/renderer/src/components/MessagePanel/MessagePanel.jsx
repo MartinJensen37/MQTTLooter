@@ -6,6 +6,8 @@ import MessageProperties from './MessageProperties';
 import TopicTreeService from '../../services/TopicTreeService';
 import { exportMessage, exportMessageCSV } from '../../utils/messageExport';
 import { plainLog } from '../../utils/payloadPresentation';
+import { matchDecoder } from '../../../../shared/decoders';
+import { useDecoders } from '../../services/DecoderRegistry';
 
 /**
  * @param {{
@@ -41,6 +43,10 @@ function MessagePanel({
   const panelRef = useRef(null);
   const [previewBytes, setPreviewBytes] = useState(100);
   const [displayMode, setDisplayMode] = useState('cards');
+  // One payload view for every card of the topic; Auto formats JSON and decodes protobuf.
+  const [payloadView, setPayloadView] = useState('auto');
+  const { decoders } = useDecoders();
+  const topicDecoder = selectedTopic && matchDecoder(decoders, selectedTopic.topicPath);
   // Pinned live topics keep their cached messages under memory pressure.
   const [, setPinVersion] = useState(0);
   const pinnable = !storedPage && Boolean(connectionId && selectedTopic);
@@ -215,6 +221,22 @@ function MessagePanel({
         )}
         {!plotContent && (
           <>
+            {displayMode === 'cards' && (
+              <label>
+                View{' '}
+                <select
+                  className="custom-select-button form-select form-select-compact"
+                  aria-label="Payload view"
+                  value={payloadView === 'decoded' && !topicDecoder ? 'auto' : payloadView}
+                  onChange={(event) => setPayloadView(event.target.value)}
+                >
+                  <option value="auto">Auto</option>
+                  <option value="text">Text as received</option>
+                  <option value="hex">Hex bytes</option>
+                  {topicDecoder && <option value="decoded">Decoded ({topicDecoder.name})</option>}
+                </select>
+              </label>
+            )}
             <label>
               Order{' '}
               <select
@@ -457,6 +479,7 @@ function MessagePanel({
                           encoding={msg.encoding}
                           previewBytes={previewBytes}
                           topic={msg.topic}
+                          view={payloadView}
                         />
                         <MessageProperties
                           protocolVersion={msg.protocolVersion}
