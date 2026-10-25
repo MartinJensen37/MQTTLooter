@@ -6,6 +6,22 @@ import MessageProperties from './MessageProperties';
 import { exportMessage, exportMessageCSV } from '../../utils/messageExport';
 import { plainLog } from '../../utils/payloadPresentation';
 
+/**
+ * @param {{
+ *   messages: any[];
+ *   selectedTopic: any;
+ *   onClearMessages?: (topicPath: string) => void;
+ *   connectionName?: string;
+ *   connectionId?: string | null;
+ *   showFeedback?: (message: string, type?: string) => void;
+ *   storedPage?: boolean;
+ *   plotContent?: any;
+ *   onPlotChange?: (open: boolean) => void;
+ *   clearLabel?: string;
+ *   onExportAll?: (format: 'json' | 'csv') => void;
+ *   exportAllLabel?: string;
+ * }} props
+ */
 function MessagePanel({
   messages,
   selectedTopic,
