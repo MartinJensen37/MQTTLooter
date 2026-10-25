@@ -20,7 +20,9 @@ const client = (onFailure: (message: string) => void) => {
         return { databaseBytes: database.usedBytes(), recovered: database.recovered };
       if (request.action === 'close') return null;
       if (request.action === 'append' && gate) await gate;
-      return structuredClone(database.handle(request));
+      return structuredClone(
+        database.handle(request as Parameters<RecordingDatabase['handle']>[0]),
+      );
     },
     async close() {},
   };

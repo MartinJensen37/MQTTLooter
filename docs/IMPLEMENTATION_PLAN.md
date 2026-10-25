@@ -27,7 +27,7 @@ Audited through `b705d91`. Baseline: 164 tests, typecheck, lint and the built El
 | Load test: one disk-history overflow stopped capture until a manual resume. A 20k-topic retained flood (about 100k msg/s for 0.2 s) overflowed the 8,192-message queue. | History was empty for everything after the flood, including a following 5,000 msg/s stream. | Fixed: 16,384 / 16 MiB queue, 1,024-message batches, WAL and durable gap records; capture continues. |
 | Load test: renderer delivery drops part of 20k/50k retained floods (2.5k / 16k messages). | Those messages are missing from the live cache, with a visible delivery-gap count. Disk history and recordings keep them. | By design within the 8,192-message delivery budget and 20,000-node tree cap; revisit with replaceable-update coalescing. |
 | Load test: renderer working set reaches 470-570 MiB at 5,000 msg/s across four connections. | Looked well above the 128 MiB estimated cache budget. | Measured via the DevTools protocol: the V8 heap peaks near 210 MiB and falls to 80-110 MiB after collection, consistent with the budget. The rest is Chromium process overhead and heap headroom. Bounded; reducing per-message allocation churn is optional. |
-| `tests/` is outside `tsconfig.json`. | Test type errors are not caught by `npm run typecheck`. | Add a test tsconfig in a cleanup slice. |
+| `tests/` was outside `tsconfig.json`. | Test type errors were not caught by `npm run typecheck`. | Fixed: `tsconfig.test.json` checks tests (allowing implicit `any` in mocks); it found a wrong request type in a test client and JS props that were inferred as required. |
 
 ### Durable recordings slice (implemented 2026-10-25)
 
