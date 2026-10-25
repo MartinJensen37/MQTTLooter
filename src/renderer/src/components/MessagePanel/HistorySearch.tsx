@@ -32,6 +32,8 @@ export default function HistorySearch({
   const [stats, setStats] = useState({ scanned: 0, large: 0, binary: 0 });
   const generation = useRef(0);
   const next = useRef<HistorySearchQuery>();
+  // The current search's criteria, without cursors, for exporting every match.
+  const started = useRef<HistorySearchQuery>();
   const invalidate = useCallback(() => {
     generation.current++;
   }, []);
@@ -69,6 +71,7 @@ export default function HistorySearch({
       setStats({ scanned: 0, large: 0, binary: 0 });
     }
     next.current = initial;
+    if (fresh) started.current = initial;
     let cursor = initial;
     try {
       while (generation.current === run) {
@@ -111,6 +114,25 @@ export default function HistorySearch({
       }
     } finally {
       if (generation.current === run) setBusy(false);
+    }
+  };
+  const exportAll = async (format: 'json' | 'csv') => {
+    if (!started.current) return;
+    setStatus('Exporting every match…');
+    try {
+      const result = await window.electronAPI.history.exportSearch(
+        started.current,
+        format,
+        panelProps.connectionName ?? 'Unknown',
+      );
+      if (!result.success) throw new Error(result.error || 'Export failed');
+      if (!result.data?.saved) return setStatus('Export cancelled.');
+      setStatus(
+        `Exported ${result.data.count?.toLocaleString()} matches from ${result.data.scanned?.toLocaleString()} scanned records.`,
+      );
+      panelProps.showFeedback?.(`Search results exported to ${result.data.path}`, 'success');
+    } catch (reason) {
+      setError((reason as Error).message);
     }
   };
   const messages =
@@ -263,6 +285,8 @@ export default function HistorySearch({
         showFeedback={panelProps.showFeedback}
         clearLabel="Clear topic history"
         connectionId={connectionId}
+        onExportAll={started.current && !busy ? exportAll : undefined}
+        exportAllLabel="Export all matches as"
         selectedTopic={{ topicPath: scope === 'filter' ? filter : topic, connectionId }}
         messages={messages}
         storedPage

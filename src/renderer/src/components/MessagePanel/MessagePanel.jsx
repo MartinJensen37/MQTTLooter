@@ -17,7 +17,8 @@ function MessagePanel({
   plotContent = null,
   onPlotChange = undefined,
   clearLabel = 'Clear Messages',
-  onExportAll = undefined,
+  onExportAll,
+  exportAllLabel = 'Export all stored as',
 }) {
   const plotting = Boolean(plotContent);
   const panelRef = useRef(null);
@@ -307,7 +308,7 @@ function MessagePanel({
                               onExportAll(format);
                             }}
                           >
-                            <i className="fas fa-database"></i> Export all stored as{' '}
+                            <i className="fas fa-database"></i> {exportAllLabel}{' '}
                             {format.toUpperCase()}
                           </button>
                         ))}

@@ -87,6 +87,16 @@ module.exports = async ({ evaluate, waitFor, field, send, captureSearch, saveTo 
     1,
   );
   await captureSearch?.();
+  // Every match of the search, not just the displayed page, streamed from main.
+  const searchExport = saveTo('search-export.csv');
+  await evaluate(`document.querySelector('.history-search [title="Export topic data"]').click()`);
+  await evaluate(
+    "[...document.querySelectorAll('.history-search .dropdown-option')].find(button => button.textContent.includes('Export all matches as CSV')).click()",
+  );
+  await waitFor(() => fs.existsSync(searchExport), 'search export file');
+  const rows = fs.readFileSync(searchExport, 'utf8').split('\n');
+  assert.equal(rows.length, 2);
+  assert.ok(rows[1].includes('"123"'), rows[1]);
   assert.equal(
     (
       await evaluate(
