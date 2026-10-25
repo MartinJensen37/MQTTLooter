@@ -151,8 +151,9 @@ export class TopicTreeService {
     return true;
   }
 
-  selectTopic(connectionId: string, path: string | null): void {
-    this.topicTrees.get(connectionId)?.selectTopic(path);
+  /** Protect a view's selected topic; `owner` separates the main selection from a pinned pane. */
+  selectTopic(connectionId: string, path: string | null, owner?: string): void {
+    this.topicTrees.get(connectionId)?.selectTopic(path, owner);
   }
 
   toggleTopicPin(connectionId: string, path: string): boolean {

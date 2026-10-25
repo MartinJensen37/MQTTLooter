@@ -19,7 +19,8 @@ class TopicTree {
   createdAt = Date.now();
   private sequence = 0;
   private historyTopics = new Map<string, TopicNode>();
-  private selectedPath: string | null = null;
+  // Selected path per view: the main selection and a pinned split-view pane are protected alike.
+  private selectedPaths = new Map<string, string>();
   private pinnedPaths = new Set<string>();
   private protectedNodes = new Set<TopicNode>();
 
@@ -36,8 +37,9 @@ class TopicTree {
     return [...this.pinnedPaths];
   }
 
-  selectTopic(path: string | null): void {
-    this.selectedPath = path !== null && this.getNode(path) ? path : null;
+  selectTopic(path: string | null, owner = 'main'): void {
+    if (path !== null && this.getNode(path)) this.selectedPaths.set(owner, path);
+    else this.selectedPaths.delete(owner);
     this.updateProtection();
   }
 
@@ -54,10 +56,7 @@ class TopicTree {
 
   private updateProtection(): void {
     this.protectedNodes.clear();
-    for (const path of [
-      ...this.pinnedPaths,
-      ...(this.selectedPath === null ? [] : [this.selectedPath]),
-    ]) {
+    for (const path of [...this.pinnedPaths, ...this.selectedPaths.values()]) {
       let node = this.getNode(path);
       while (node && node !== this.root) {
         this.protectedNodes.add(node);
@@ -347,7 +346,7 @@ class TopicTree {
       evictedTopics: this.evictedTopics,
       limits: { ...this.limits },
       pinnedTopics: this.pins,
-      selectedTopic: this.selectedPath,
+      selectedTopic: this.selectedPaths.get('main') ?? null,
       leafNodes,
       totalMessages: this.messageCount,
       totalRate: this.root.getTotalMessageRate(),
@@ -365,7 +364,7 @@ class TopicTree {
     this.topicLookup.clear();
     this.historyTopics.clear();
     this.pinnedPaths.clear();
-    this.selectedPath = null;
+    this.selectedPaths.clear();
     this.protectedNodes.clear();
     this.messageCount = 0;
     this.nodeCount = 0;

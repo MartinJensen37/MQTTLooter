@@ -132,6 +132,23 @@ describe('connection history budgets', () => {
     expect(tree.getStatistics().selectedTopic).toBeNull();
   });
 
+  it('protects one selected path per view', () => {
+    const tree = new TopicTree('broker', limits({ maxNodes: 4, maxMessages: 2 }));
+    tree.addMessage('main', 'kept');
+    tree.addMessage('pane', 'kept');
+    tree.selectTopic('main');
+    tree.selectTopic('pane', 'pane');
+    for (let i = 0; i < 20; i++) tree.addMessage(`noise/${i}`, 'new');
+    expect(tree.getNode('main')?.lastMessage?.payload).toBe('kept');
+    expect(tree.getNode('pane')?.lastMessage?.payload).toBe('kept');
+    expect(tree.getStatistics().selectedTopic).toBe('main');
+    // Clearing one view's selection leaves the other protected.
+    tree.selectTopic(null, 'pane');
+    for (let i = 20; i < 40; i++) tree.addMessage(`noise/${i}`, 'new');
+    expect(tree.getNode('pane')).toBeUndefined();
+    expect(tree.getNode('main')?.lastMessage?.payload).toBe('kept');
+  });
+
   it('rejects new paths when all nodes are protected and bounds pin count', () => {
     const tree = new TopicTree('broker', limits({ maxNodes: 2 }));
     tree.addMessage('a', 'a');
