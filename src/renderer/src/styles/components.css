@@ -316,9 +316,10 @@ select option::checkmark { color: var(--primary); }
 .dropdown-option.selected::before { content: '✓ '; }
 
 /* ── Check toggles: options and optional sections, as in the connection editor ── */
-.check-toggle-label {
+.check-toggle .check-toggle-label {
   position: relative;
   display: flex;
+  margin: 0;
   align-items: center;
   gap: var(--spacing-sm);
   min-height: 36px;
@@ -332,12 +333,13 @@ select option::checkmark { color: var(--primary); }
   cursor: pointer;
   transition: all var(--transition-fast);
 }
-.check-toggle-label:hover:not(:has(input:disabled)) { background: var(--bg-muted); color: var(--primary); border-color: var(--primary); }
-.check-toggle-label:has(input:disabled) { cursor: not-allowed; opacity: 0.6; }
+.check-toggle .check-toggle-label:hover:not(:has(input:disabled)) { background: var(--bg-muted); color: var(--primary); border-color: var(--primary); }
+.check-toggle .check-toggle-label:has(input:disabled) { cursor: not-allowed; opacity: 0.6; }
 /* Visually hidden but focusable, so keyboard users can still toggle it. */
-.check-toggle-label input { position: absolute; width: 1px; height: 1px; opacity: 0; margin: 0; pointer-events: none; }
-.check-toggle-box {
+.check-toggle .check-toggle-label input { position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; border: 0; opacity: 0; pointer-events: none; }
+.check-toggle .check-toggle-box {
   position: relative;
+  display: inline-block;
   flex-shrink: 0;
   width: 16px;
   height: 16px;
@@ -346,9 +348,9 @@ select option::checkmark { color: var(--primary); }
   background: var(--bg-surface);
   transition: all var(--transition-fast);
 }
-.check-toggle-label:hover .check-toggle-box { border-color: var(--primary); }
-.check-toggle-label input:checked + .check-toggle-box { background: var(--primary); border-color: var(--primary); }
-.check-toggle-label input:checked + .check-toggle-box::after {
+.check-toggle .check-toggle-label:hover .check-toggle-box { border-color: var(--primary); }
+.check-toggle .check-toggle-label input:checked + .check-toggle-box { background: var(--primary); border-color: var(--primary); }
+.check-toggle .check-toggle-label input:checked + .check-toggle-box::after {
   content: '\2713';
   position: absolute;
   top: 50%;
@@ -358,7 +360,7 @@ select option::checkmark { color: var(--primary); }
   font-size: 11px;
   font-weight: bold;
 }
-.check-toggle-label input:focus-visible + .check-toggle-box { box-shadow: 0 0 0 3px var(--primary-light); border-color: var(--primary); }
+.check-toggle .check-toggle-label input:focus-visible + .check-toggle-box { box-shadow: 0 0 0 3px var(--primary-light); border-color: var(--primary); }
 .check-toggle-text { flex: 1; min-width: 0; line-height: 1.4; }
 .check-toggle-hint { margin: 4px 0 0; font-size: 11px; font-style: italic; color: var(--text-muted); line-height: 1.3; }
 .check-toggle-body { margin-top: var(--spacing-sm); }
