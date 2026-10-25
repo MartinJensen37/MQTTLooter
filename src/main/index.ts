@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, safeStorage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage } from 'electron';
 import { join } from 'path';
 import { MQTTConnectionManager } from './mqtt-connection-manager';
 import { RecordingService } from './recording-service';
@@ -381,8 +381,33 @@ handleIPC('mqtt-get-connections', async () => {
   }
 });
 
+/** The standard menus plus Tools, which opens settings that are rarely changed. */
+function createMenu() {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
+      { role: 'fileMenu' },
+      { role: 'editMenu' },
+      { role: 'viewMenu' },
+      {
+        label: 'Tools',
+        submenu: [
+          {
+            id: 'advanced-settings',
+            label: 'Advanced settings…',
+            accelerator: 'CmdOrCtrl+,',
+            click: () => mainWindow?.webContents.send('app-open-advanced-settings'),
+          },
+        ],
+      },
+      { role: 'windowMenu' },
+    ]),
+  );
+}
+
 app.on('ready', () => {
   if (!primaryInstance) return;
+  createMenu();
   // Splash first, then the main window once it has had a moment to paint.
   createSplashWindow();
   setTimeout(createWindow, 100);

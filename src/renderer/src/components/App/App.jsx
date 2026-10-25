@@ -7,6 +7,7 @@ import ConnectionSidebar from '../ConnectionSidebar/ConnectionSidebar';
 import TopicTreeComponent from '../TopicTree/TopicTreeComponent';
 import MessagePanel from '../MessagePanel/MessageWorkspace';
 import RecordingPanel from '../RecordingPanel/RecordingPanel';
+import AdvancedSettingsDialog from './AdvancedSettingsDialog';
 import { useConnections } from '../../hooks/useConnections';
 import { useMessages } from '../../hooks/useMessages';
 import { useUIState } from '../../hooks/useUIState';
@@ -41,6 +42,9 @@ async function publishTo(connectionId, messageData) {
 function App() {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [notifications, setNotifications] = useState([]);
+  // Tools > Advanced settings in the app menu.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  useEffect(() => window.electronAPI?.app?.onOpenAdvancedSettings(() => setAdvancedOpen(true)), []);
   const mainPanelsRef = useRef(null);
   const [panelWidth, setPanelWidth] = useState(0);
   useEffect(() => {
@@ -395,6 +399,15 @@ function App() {
   // ── JSX ──────────────────────────────────────────────────────────────────
   return (
     <div className="app">
+      {advancedOpen && (
+        <AdvancedSettingsDialog
+          connections={connections.map((connection) => ({
+            id: connection.id,
+            name: connection.config?.name || 'Unnamed connection',
+          }))}
+          onClose={() => setAdvancedOpen(false)}
+        />
+      )}
       <div className="notification-stack">
         {notifications.map((n) => (
           <div

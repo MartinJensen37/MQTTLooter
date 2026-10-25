@@ -48,6 +48,10 @@ export type MqttEventCallback = (data: any) => void;
 
 /** The surface the preload bridge exposes on window.electronAPI. */
 export interface ElectronAPI {
+  app: {
+    /** Tools > Advanced settings in the app menu. Returns a function that stops listening. */
+    onOpenAdvancedSettings(callback: () => void): () => void;
+  };
   history: {
     status(): Promise<IpcResult<import('./history').HistoryStatus>>;
     search(

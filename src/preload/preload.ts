@@ -41,6 +41,16 @@ function createEventHandler(eventPrefix: string) {
 const mqttEvents = createEventHandler('mqtt');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  app: {
+    /** Tools > Advanced settings in the app menu. Returns a function that stops listening. */
+    onOpenAdvancedSettings: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('app-open-advanced-settings', listener);
+      return () => {
+        ipcRenderer.removeListener('app-open-advanced-settings', listener);
+      };
+    },
+  },
   history: {
     status: () => ipcRenderer.invoke('history-status'),
     search: (query: unknown) => ipcRenderer.invoke('history-search', query),
