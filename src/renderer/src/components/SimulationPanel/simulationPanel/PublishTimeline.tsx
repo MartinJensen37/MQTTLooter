@@ -7,6 +7,7 @@ import {
   type TimelineResult,
   type TimelineRow,
 } from './publishTimelineModel';
+import CheckToggle from '../../Controls/CheckToggle';
 import './PublishTimeline.css';
 
 const seconds = (ms: number) => `${Number((ms / 1000).toFixed(3))} s`;
@@ -18,13 +19,7 @@ export default function PublishTimeline({ device }: { device: SimulatedDevice })
   const [open, setOpen] = useState(false);
   return (
     <section className="publish-timeline">
-      <button
-        className="btn btn-sm btn-secondary"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-      >
-        Publish timeline
-      </button>
+      <CheckToggle label="Show publish timeline" checked={open} onChange={setOpen} />
       {open &&
         (device.publishMode === 'signals' ? (
           <Timeline device={device} />

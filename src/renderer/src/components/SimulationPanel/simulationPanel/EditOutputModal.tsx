@@ -11,6 +11,7 @@ import SignalTimingFields from './SignalTimingFields';
 import DynamicConfigFields from './DynamicConfigFields';
 import SignalWaveform from './SignalWaveform';
 import SimulationPayloadPreview from './SimulationPayloadPreview';
+import CheckToggle from '../../Controls/CheckToggle';
 
 interface Props {
   output: DeviceOutput;
@@ -30,6 +31,7 @@ export default function EditOutputModal({
   onRemove,
   lastPublished,
 }: Props) {
+  const [showLastPublished, setShowLastPublished] = useState(false);
   const [form, setForm] = useState<DeviceOutput>({
     ...output,
     decimalPrecision: output.decimalPrecision ?? 2,
@@ -289,15 +291,20 @@ export default function EditOutputModal({
             )}
           </div>
           {lastPublished && (
-            <details className="last-published">
-              <summary>Last successful publish</summary>
+            <CheckToggle
+              className="last-published"
+              label="Show last successful publish"
+              checked={showLastPublished}
+              onChange={setShowLastPublished}
+              keepMounted
+            >
               <code className="preview-topic">{lastPublished.topic}</code>
               <SimulationPayloadPreview
                 key={lastPublished.payloadMode ?? 'json'}
                 payload={lastPublished.payload}
                 mode={lastPublished.payloadMode}
               />
-            </details>
+            </CheckToggle>
           )}
           {confirmRemove && (
             <p role="alert">

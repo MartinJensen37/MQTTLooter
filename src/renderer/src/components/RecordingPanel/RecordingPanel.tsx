@@ -11,6 +11,7 @@ import { formatBytes } from './recordingPanel/recordingHelpers';
 import RecordingControls from './recordingPanel/RecordingControls';
 import RecordingItem from './recordingPanel/RecordingItem';
 import PlaybackControls from './recordingPanel/PlaybackControls';
+import CheckToggle from '../Controls/CheckToggle';
 
 interface RecordingPanelProps {
   connectionName?: string;
@@ -439,15 +440,13 @@ function RecordingPanel({
         stopRecording={stopRecording}
       />
 
-      <label className="recording-controls-section">
-        <input
-          type="checkbox"
-          checked={republish}
-          disabled={!isConnected || isPlaying}
-          onChange={(e) => setRepublish(e.target.checked)}
-        />
-        Republish playback messages to {connectionName || 'the selected broker'}
-      </label>
+      <CheckToggle
+        className="recording-republish"
+        label={`Republish playback to ${connectionName || 'the selected broker'}`}
+        checked={republish}
+        disabled={!isConnected || isPlaying}
+        onChange={setRepublish}
+      />
       <div className="recording-scrollable-content">
         <div className="recording-saved-list">
           <div className="recording-saved-list-header">

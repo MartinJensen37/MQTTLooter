@@ -51,7 +51,9 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 const open = async () => {
-  await act(async () => container.querySelector('button')!.click());
+  await act(async () =>
+    container.querySelector<HTMLInputElement>('.publish-timeline input[type=checkbox]')!.click(),
+  );
   await act(async () => vi.advanceTimersByTimeAsync(120));
 };
 

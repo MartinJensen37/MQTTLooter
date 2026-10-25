@@ -1,4 +1,5 @@
 import type { PropertyDraft } from './propertyDraft';
+import CheckToggle from '../../Controls/CheckToggle';
 import './PublishPropertiesEditor.css';
 
 export default function PublishPropertiesEditor({
@@ -17,25 +18,20 @@ export default function PublishPropertiesEditor({
   const change = (patch: Partial<PropertyDraft>) => onChange({ ...draft, ...patch });
   return (
     <div className="publish-properties">
-      <details>
-        <summary>MQTT 5 publish properties{draft.enabled ? ' · Enabled' : ''}</summary>
-        <label className="publish-properties-enable">
-          <input
-            type="checkbox"
-            checked={draft.enabled}
-            disabled={disabled || (protocolVersion !== 5 && !draft.enabled)}
-            onChange={(event) => change({ enabled: event.target.checked })}
-          />
-          Include MQTT 5 properties
-        </label>
-        {protocolVersion !== 5 && (
-          <p>
-            These properties require MQTT 5. Disable them to publish on this connection; the saved
-            fields are kept.
-          </p>
-        )}
-        <fieldset disabled={disabled || !draft.enabled || protocolVersion !== 5}>
-          <legend>Message properties</legend>
+      <CheckToggle
+        label="Include MQTT 5 properties"
+        hint={
+          protocolVersion !== 5
+            ? draft.enabled
+              ? 'This connection uses MQTT 3. Turn this off to publish; the fields are kept.'
+              : 'Needs an MQTT 5 connection.'
+            : undefined
+        }
+        checked={draft.enabled}
+        disabled={disabled || (protocolVersion !== 5 && !draft.enabled)}
+        onChange={(enabled) => change({ enabled })}
+      >
+        <fieldset disabled={disabled || protocolVersion !== 5}>
           <div className="publish-properties-grid">
             <label>
               Response topic
@@ -87,15 +83,12 @@ export default function PublishPropertiesEditor({
               </select>
             </label>
           </div>
-          <label className="publish-properties-enable">
-            <input
-              type="checkbox"
-              checked={draft.correlationEnabled}
-              onChange={(event) => change({ correlationEnabled: event.target.checked })}
-            />
-            Include correlation data
-          </label>
-          {draft.correlationEnabled && (
+          <CheckToggle
+            className="publish-properties-enable"
+            label="Include correlation data"
+            checked={draft.correlationEnabled}
+            onChange={(correlationEnabled) => change({ correlationEnabled })}
+          >
             <div className="publish-properties-grid">
               <label>
                 Correlation encoding
@@ -123,7 +116,7 @@ export default function PublishPropertiesEditor({
                 />
               </label>
             </div>
-          )}
+          </CheckToggle>
           <div className="publish-user-properties">
             <p>User properties ({draft.users.length})</p>
             {draft.users.length > 64 && (
@@ -191,7 +184,7 @@ export default function PublishPropertiesEditor({
             )}
           </div>
         </fieldset>
-      </details>
+      </CheckToggle>
       {error && (
         <p className="publish-properties-error" role="alert">
           {error}

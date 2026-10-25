@@ -1,6 +1,7 @@
 import { memo, useState } from 'react';
 import { serializeProperties } from '../../../../shared/history';
 import { correlationPreview, propertyRows } from '../../utils/mqttProperties';
+import CheckToggle from '../Controls/CheckToggle';
 import './MessageProperties.css';
 
 function PropertyDetails({ properties }: { properties: Record<string, unknown> }) {
@@ -74,15 +75,18 @@ function MessageProperties({
 }) {
   const [expanded, setExpanded] = useState(false);
   if (protocolVersion !== 5 && !properties) return null;
+  // Details mount only while shown; double-clicking them must not copy the card's payload.
   return (
-    <details
-      className="message-properties"
-      onToggle={(event) => setExpanded(event.currentTarget.open)}
-      onDoubleClick={(event) => event.stopPropagation()}
-    >
-      <summary>{protocolVersion === 5 ? 'MQTT 5 properties' : 'Message properties'}</summary>
-      {expanded && <PropertyDetails properties={properties ?? {}} />}
-    </details>
+    <div className="message-properties" onDoubleClick={(event) => event.stopPropagation()}>
+      <CheckToggle
+        compact
+        label={protocolVersion === 5 ? 'MQTT 5 properties' : 'Message properties'}
+        checked={expanded}
+        onChange={setExpanded}
+      >
+        <PropertyDetails properties={properties ?? {}} />
+      </CheckToggle>
+    </div>
   );
 }
 

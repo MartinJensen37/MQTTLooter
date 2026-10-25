@@ -249,7 +249,7 @@ async function run() {
       ),
     'binary hex display',
   );
-  await evaluate("document.querySelector('.message-properties').open = true");
+  await evaluate("document.querySelector('.message-properties input').click()");
   await waitFor(
     () =>
       evaluate(
@@ -271,7 +271,7 @@ async function run() {
     path.join(workspace, '.tmp', 'electron-properties.png'),
     (await window.webContents.capturePage()).toPNG(),
   );
-  await evaluate("document.querySelector('.message-properties').open = false");
+  await evaluate("document.querySelector('.message-properties input').click()");
   // Capture real export blobs without opening a download dialog.
   await evaluate(`
     window.smokeExports = [];
@@ -317,7 +317,7 @@ async function run() {
     () => evaluate("document.querySelector('.message-item .message-properties') !== null"),
     'stored property card',
   );
-  await evaluate("document.querySelector('.message-properties').open = true");
+  await evaluate("document.querySelector('.message-properties input').click()");
   await waitFor(
     () =>
       evaluate(
@@ -656,7 +656,7 @@ async function run() {
     (await window.webContents.capturePage()).toPNG(),
   );
   await clickButton('.signal-dialog', 'Save Signal');
-  await clickButton('.publish-timeline', 'Publish timeline');
+  await evaluate("document.querySelector('.publish-timeline input').click()");
   await waitFor(
     () =>
       evaluate(
@@ -690,7 +690,7 @@ async function run() {
     path.join(workspace, '.tmp', 'electron-timeline-small.png'),
     (await window.webContents.capturePage()).toPNG(),
   );
-  await clickButton('.publish-timeline', 'Publish timeline');
+  await evaluate("document.querySelector('.publish-timeline input').click()");
   window.setSize(1400, 900);
   const settings = await evaluate(
     "JSON.parse(localStorage.getItem('mqtt-simulation-devices-smoke'))",

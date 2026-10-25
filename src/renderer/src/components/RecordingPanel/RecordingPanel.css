@@ -107,6 +107,10 @@
   gap: var(--spacing-xl);
 }
 
+.recording-republish {
+  padding: 0 var(--spacing-xl) var(--spacing-md);
+}
+
 .recording-controls-section.recording-controls-disabled {
   opacity: 0.6;
   pointer-events: none;

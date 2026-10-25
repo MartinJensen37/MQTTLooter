@@ -24,11 +24,9 @@ afterEach(async () => {
   container.remove();
 });
 async function expand() {
-  await act(async () => {
-    const details = container.querySelector('details')!;
-    details.open = true;
-    details.dispatchEvent(new Event('toggle'));
-  });
+  await act(async () =>
+    container.querySelector<HTMLInputElement>('.message-properties input[type=checkbox]')!.click(),
+  );
 }
 
 const properties = {

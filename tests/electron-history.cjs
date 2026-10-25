@@ -157,7 +157,7 @@ module.exports = async ({ evaluate, waitFor, field, send, captureSearch, saveTo 
     'payload selector',
   );
   await field('[aria-label="Payload view"]', 'json');
-  await evaluate("document.querySelector('.payload-full').open = true");
+  await evaluate("document.querySelector('.payload-full input').click()");
   await waitFor(
     () =>
       evaluate("document.querySelector('.payload-code')?.textContent.includes('9007199254740993')"),

@@ -3,6 +3,7 @@ import { formatPayloadBytes, type PayloadEncoding } from '../../../../shared/pay
 import { matchDecoder } from '../../../../shared/decoders';
 import { prettyPayload } from '../../utils/payloadPresentation';
 import { decoderRegistry, useDecoders } from '../../services/DecoderRegistry';
+import CheckToggle from '../Controls/CheckToggle';
 
 type View = 'text' | 'hex' | 'json' | 'decoded';
 
@@ -82,20 +83,19 @@ function PayloadView({
           ? text.slice(0, previewBytes)
           : formatPayloadBytes(value, encoding, view === 'hex' ? 'hex' : 'text', previewBytes)}
       </div>
-      <details className="payload-full" onToggle={(e) => setExpanded(e.currentTarget.open)}>
-        <summary>Inspect payload</summary>
-        {expanded && (
-          <pre
-            className="payload-code payload-resizable"
-            tabIndex={0}
-            aria-label="Payload inspector"
-          >
-            {text !== null
-              ? text
-              : formatPayloadBytes(value, encoding, view === 'hex' ? 'hex' : 'text')}
-          </pre>
-        )}
-      </details>
+      <CheckToggle
+        compact
+        className="payload-full"
+        label="Inspect payload"
+        checked={expanded}
+        onChange={setExpanded}
+      >
+        <pre className="payload-code payload-resizable" tabIndex={0} aria-label="Payload inspector">
+          {text !== null
+            ? text
+            : formatPayloadBytes(value, encoding, view === 'hex' ? 'hex' : 'text')}
+        </pre>
+      </CheckToggle>
     </div>
   );
 }

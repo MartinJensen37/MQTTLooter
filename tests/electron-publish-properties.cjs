@@ -15,10 +15,9 @@ module.exports = async ({ evaluate, waitFor, published, capture }) => {
   await evaluate("document.dispatchEvent(new KeyboardEvent('keydown', {key:'F2',bubbles:true}))");
   // The window was reloaded, so Publishing loads again on first use.
   await waitFor(
-    () => evaluate("!!document.querySelector('.publish-properties details')"),
+    () => evaluate("!!document.querySelector('.publish-properties input')"),
     'publishing panel',
   );
-  await evaluate("document.querySelector('.publish-properties details').open=true");
   await field('#topic', 'smoke/properties');
   await check('Include MQTT 5 properties');
   await field('[aria-label="Publish response topic"]', 'reply//bytes');

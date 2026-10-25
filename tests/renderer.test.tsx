@@ -305,9 +305,7 @@ describe('renderer state', () => {
     );
     await settle();
     await act(async () =>
-      (
-        container.querySelector('label.recording-controls-section input') as HTMLInputElement
-      ).click(),
+      (container.querySelector('.recording-republish input') as HTMLInputElement).click(),
     );
     await act(async () =>
       (container.querySelector('[title="Start playback"]') as HTMLButtonElement).click(),
@@ -350,9 +348,7 @@ describe('renderer state', () => {
     expect(publish).not.toHaveBeenCalled();
     expect(container.textContent).toContain('Message 2 of 2');
     await act(async () =>
-      (
-        container.querySelector('label.recording-controls-section input') as HTMLInputElement
-      ).click(),
+      (container.querySelector('.recording-republish input') as HTMLInputElement).click(),
     );
     await start();
     await settle();
