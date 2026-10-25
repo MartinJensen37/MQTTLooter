@@ -28,6 +28,25 @@ const maintenance = setInterval(() => {
     /* The next request reports storage errors. */
   }
 }, 30_000);
+// Cleared messages are purged in short steps so appends and queries interleave.
+let purging = false;
+const purge = () => {
+  if (purging) return;
+  purging = true;
+  const step = () => {
+    try {
+      if (database.purgeStep()) {
+        setTimeout(step, 0);
+        return;
+      }
+    } catch {
+      /* Retried after the next clear or restart. */
+    }
+    purging = false;
+  };
+  setTimeout(step, 0);
+};
+purge();
 const status = () => ({ ...database.status(), persistent });
 parentPort!.on(
   'message',
@@ -53,6 +72,7 @@ parentPort!.on(
           break;
         case 'clear':
           database.clear(request.connectionId, request.topic);
+          purge();
           data = status();
           break;
         case 'status':

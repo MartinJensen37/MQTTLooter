@@ -362,22 +362,55 @@ export class HistoryDatabase {
       .all(connectionId, search) as { path: string }[];
   }
 
+  /**
+   * Cleared topics become unreachable tombstones at once (an empty connection id never matches a
+   * query); their messages are purged in bounded steps so a large clear cannot stall the worker.
+   */
   clear(connectionId: string, topic?: string): void {
-    this.db.exec('BEGIN IMMEDIATE');
-    try {
-      const condition = topic === undefined ? 'connection_id=?' : 'connection_id=? AND path=?';
-      const parameters = topic === undefined ? [connectionId] : [connectionId, topic];
+    const condition = topic === undefined ? 'connection_id=?' : 'connection_id=? AND path=?';
+    const parameters = topic === undefined ? [connectionId] : [connectionId, topic];
+    this.transaction(() => {
       this.db
-        .prepare(
-          `DELETE FROM messages WHERE topic_id IN (SELECT id FROM topics WHERE ${condition})`,
-        )
+        .prepare(`UPDATE topics SET connection_id='', path='cleared:' || id WHERE ${condition}`)
         .run(...parameters);
-      this.db.prepare(`DELETE FROM topics WHERE ${condition}`).run(...parameters);
       if (topic === undefined)
         this.db.prepare('DELETE FROM gaps WHERE connection_id=?').run(connectionId);
+    });
+    this.generation++;
+    this.purgeStep();
+  }
+
+  /** Remove one bounded chunk of cleared messages. Returns true while work remains. */
+  purgeStep(rows = 5000): boolean {
+    const topic = this.db.prepare("SELECT id FROM topics WHERE connection_id='' LIMIT 1").get();
+    if (!topic) return false;
+    const removed = this.transaction(() => {
+      const chunk = this.db
+        .prepare(
+          `SELECT count(*) count, coalesce(sum(storage_bytes),0) bytes
+        FROM (SELECT storage_bytes FROM messages WHERE topic_id=? LIMIT ?)`,
+        )
+        .get(topic.id, rows)!;
+      this.db
+        .prepare(
+          'DELETE FROM messages WHERE id IN (SELECT id FROM messages WHERE topic_id=? LIMIT ?)',
+        )
+        .run(topic.id, rows);
+      if (Number(chunk.count) < rows)
+        this.db.prepare('DELETE FROM topics WHERE id=?').run(topic.id);
+      return { count: Number(chunk.count), bytes: Number(chunk.bytes) };
+    });
+    this.retainedMessages -= removed.count;
+    this.retainedBytes -= removed.bytes;
+    return true;
+  }
+
+  private transaction<T>(action: () => T): T {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const result = action();
       this.db.exec('COMMIT');
-      this.generation++;
-      this.recount();
+      return result;
     } catch (error) {
       try {
         this.db.exec('ROLLBACK');

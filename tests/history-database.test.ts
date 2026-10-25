@@ -231,3 +231,29 @@ it('stores overflow gaps durably, expires them with history and clears them per 
   database.append([], now, [{ connectionId: 'broker', at: now, dropped: 1 }]);
   expect(database.status(now).gaps.broker.dropped).toBe(1);
 });
+
+it('hides cleared topics at once and purges their messages in bounded steps', () => {
+  database.append(
+    Array.from({ length: 12_000 }, (_, i) => message(i + 1)),
+    now,
+  );
+  database.append([message(20_000, 'keep')], now);
+  database.clear('broker', 'a//b');
+  // The first bounded step ran inside clear; the rest stays hidden until purged.
+  expect(database.status().retainedMessages).toBe(7001);
+  expect(database.page({ connectionId: 'broker', topic: 'a//b' }, now).messages).toEqual([]);
+  expect(database.topics('broker', '')).toEqual([{ path: 'keep' }]);
+  database.append([message(20_001)], now);
+  expect(
+    database.page({ connectionId: 'broker', topic: 'a//b' }, now).messages.map((m) => m.sequence),
+  ).toEqual([20_001]);
+  let steps = 0;
+  while (database.purgeStep() && steps < 10) steps++;
+  expect(steps).toBe(2);
+  expect(database.status().retainedMessages).toBe(2);
+  // Counters match the table after the purge.
+  database.close();
+  database = new HistoryDatabase(join(directory, 'test.sqlite'));
+  expect(database.status().retainedMessages).toBe(2);
+  expect(database.purgeStep()).toBe(false);
+});
