@@ -38,6 +38,10 @@ Module._load = function (request, ...args) {
       dialog: {
         ...electron.dialog,
         showSaveDialog: async () => ({ canceled: !saveDialog.path, filePath: saveDialog.path }),
+        showOpenDialog: async () => ({
+          canceled: !saveDialog.path,
+          filePaths: saveDialog.path ? [saveDialog.path] : [],
+        }),
       },
     };
   return load.call(this, request, ...args);
@@ -394,6 +398,21 @@ async function run() {
     (await window.webContents.capturePage()).toPNG(),
   );
   await evaluate("document.querySelector('.recording-item-header').click()");
+  // Export the newest capture through main, then import that file back in bounded steps.
+  saveDialog.path = path.join(temporary, 'recording-export.json');
+  await evaluate(`document.querySelector('[title="Save recording to file"]').click()`);
+  await waitFor(() => fs.existsSync(saveDialog.path), 'recording export file');
+  await evaluate(
+    "[...document.querySelectorAll('button')].find(button => button.textContent.includes('Load Recording')).click()",
+  );
+  await waitFor(
+    async () =>
+      (await evaluate('window.electronAPI.recordings.list()')).data.some(
+        (item) => item.name.endsWith('(Imported)') && item.messageCount === 4,
+      ),
+    'recording round trip',
+  );
+  saveDialog.path = null;
   await evaluate(
     "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1', bubbles: true }))",
   );
@@ -427,7 +446,7 @@ async function run() {
   );
   await evaluate("document.querySelector('.connection-card').click()");
   await waitFor(
-    () => evaluate("document.querySelectorAll('.recording-saved-item').length === 3"),
+    () => evaluate("document.querySelectorAll('.recording-saved-item').length === 4"),
     'saved recording recovery',
   );
   assert.equal(await evaluate("localStorage.getItem('mqtt-recordings')"), null);
