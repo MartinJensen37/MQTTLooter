@@ -14,6 +14,8 @@ export const MQTT_DEFAULTS = {
 
 export const MESSAGE_HISTORY = {
   MAX_ITEMS_PER_TOPIC: 300,
+  /** Choices for the messages each topic keeps in the live cache (Settings). */
+  ITEMS_PER_TOPIC_CHOICES: [100, 300, 500, 1000, 2000],
   MAX_BYTES_PER_TOPIC: 2 * 1024 * 1024, // 2MB
   COMPACTION_FACTOR: 10,
 };

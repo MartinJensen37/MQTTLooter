@@ -1,5 +1,11 @@
 import TopicTree from './models/TopicTree';
-import { UI, HISTORY_PROFILES, HISTORY_BUDGET, type HistoryProfile } from '../config';
+import {
+  UI,
+  HISTORY_PROFILES,
+  HISTORY_BUDGET,
+  MESSAGE_HISTORY,
+  type HistoryProfile,
+} from '../config';
 import MQTTService from './MQTTService';
 import type { PayloadEncoding } from '../../../shared/payload';
 
@@ -29,6 +35,7 @@ export interface DisplayMessage {
 
 export class TopicTreeService {
   private profile: HistoryProfile = 'larger';
+  private messagesPerTopic = MESSAGE_HISTORY.MAX_ITEMS_PER_TOPIC;
   private topicTrees = new Map<string, TopicTree>();
   private MQTTService: MQTTServiceInstance | null = null;
   private eventHandlers = new Map<string, Set<EventHandler>>();
@@ -42,6 +49,9 @@ export class TopicTreeService {
     try {
       const saved = localStorage.getItem('mqtt-history-profile');
       if (saved === 'compact' || saved === 'larger') this.profile = saved;
+      const perTopic = Number(localStorage.getItem('mqtt-messages-per-topic'));
+      if (Number.isSafeInteger(perTopic) && perTopic >= 1 && perTopic <= 10_000)
+        this.messagesPerTopic = perTopic;
     } catch {
       /* Storage can be unavailable in tests or restricted environments. */
     }
@@ -63,6 +73,7 @@ export class TopicTreeService {
     let topicTree = this.topicTrees.get(connectionId);
     if (!topicTree) {
       topicTree = new TopicTree(connectionId, { ...HISTORY_PROFILES[this.profile] });
+      topicTree.setMessagesPerTopic(this.messagesPerTopic);
       this.topicTrees.set(connectionId, topicTree);
       this.emitEvent('treeCreated', { connectionId, tree: topicTree });
     }
@@ -123,7 +134,25 @@ export class TopicTreeService {
         0,
       ),
       maxPinnedTopics: HISTORY_BUDGET.maxPinnedTopics,
+      messagesPerTopic: this.messagesPerTopic,
     };
+  }
+
+  /** Messages each topic keeps in the live cache, for every connection. */
+  setMessagesPerTopic(count: number): boolean {
+    if (!Number.isSafeInteger(count) || count < 1 || count > 10_000) return false;
+    this.messagesPerTopic = count;
+    try {
+      localStorage.setItem('mqtt-messages-per-topic', String(count));
+    } catch {
+      /* Keep this session's setting. */
+    }
+    for (const [id, tree] of this.topicTrees) {
+      tree.setMessagesPerTopic(count);
+      this.queueUpdate(id);
+    }
+    this.emitEvent('historySettingsChanged', this.getHistorySettings());
+    return true;
   }
 
   setHistoryProfile(profile: HistoryProfile): boolean {

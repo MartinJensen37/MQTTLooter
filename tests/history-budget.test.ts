@@ -132,6 +132,28 @@ describe('connection history budgets', () => {
     expect(tree.getStatistics().selectedTopic).toBeNull();
   });
 
+  it('changes how many messages each topic keeps, trimming the oldest', () => {
+    const tree = new TopicTree('broker');
+    for (let i = 0; i < 10; i++) tree.addMessage('a', `${i}`);
+    expect(tree.setMessagesPerTopic(0)).toBe(false);
+    expect(tree.setMessagesPerTopic(4)).toBe(true);
+    const node = tree.getNode('a')!;
+    expect(node.messageHistory.toArray().map((message) => message.payload)).toEqual([
+      '6',
+      '7',
+      '8',
+      '9',
+    ]);
+    expect(tree.getStatistics()).toMatchObject({ retainedMessages: 4, discardedMessages: 6 });
+    tree.addMessage('a', '10');
+    tree.addMessage('b', 'new');
+    expect(node.messageHistory.count).toBe(4);
+    expect(tree.getNode('b')!.messageHistory.maxItems).toBe(4);
+    tree.setMessagesPerTopic(500);
+    for (let i = 0; i < 10; i++) tree.addMessage('a', `more ${i}`);
+    expect(node.messageHistory.count).toBe(14);
+  });
+
   it('protects one selected path per view', () => {
     const tree = new TopicTree('broker', limits({ maxNodes: 4, maxMessages: 2 }));
     tree.addMessage('main', 'kept');

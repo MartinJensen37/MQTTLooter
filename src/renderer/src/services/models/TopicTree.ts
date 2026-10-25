@@ -1,5 +1,5 @@
 import TopicNode, { type IncomingMessage } from './TopicNode';
-import { CONNECTION_HISTORY, HISTORY_BUDGET } from '../../config';
+import { CONNECTION_HISTORY, HISTORY_BUDGET, MESSAGE_HISTORY } from '../../config';
 import type { PayloadEncoding } from '../../../../shared/payload';
 
 export type TopicNodeJSON = ReturnType<TopicNode['toJSON']>;
@@ -21,6 +21,8 @@ class TopicTree {
   private historyTopics = new Map<string, TopicNode>();
   // Selected path per view: the main selection and a pinned split-view pane are protected alike.
   private selectedPaths = new Map<string, string>();
+  /** Messages each topic keeps in the live cache; older ones are trimmed and counted. */
+  messagesPerTopic = MESSAGE_HISTORY.MAX_ITEMS_PER_TOPIC;
   private pinnedPaths = new Set<string>();
   private protectedNodes = new Set<TopicNode>();
 
@@ -111,6 +113,7 @@ class TopicTree {
       this.limitVersion++;
       return undefined;
     }
+    leafNode.messageHistory.maxItems = this.messagesPerTopic;
     const beforeBytes = leafNode.messageHistory.storageUsage;
     const beforeCount = leafNode.messageHistory.count;
     leafNode.addMessage(
@@ -162,6 +165,24 @@ class TopicTree {
     }
     this.topicLookup.set(topicPath, currentNode);
     return currentNode;
+  }
+
+  /** Change how many messages each topic keeps; topics over the new limit drop their oldest. */
+  setMessagesPerTopic(count: number): boolean {
+    if (!Number.isSafeInteger(count) || count < 1 || count > 10_000) return false;
+    this.messagesPerTopic = count;
+    for (const [path, node] of this.historyTopics) {
+      while (node.messageHistory.count > count) {
+        const removed = node.trimOldestMessage()!;
+        this.retainedBytes -= removed.storageBytes;
+        this.retainedMessages--;
+        this.discardedMessages++;
+      }
+      node.messageHistory.maxItems = count;
+      if (!node.messageHistory.count) this.historyTopics.delete(path);
+    }
+    this.limitVersion++;
+    return true;
   }
 
   /** Trim payloads without deleting topic identity, counts or rate buckets. */
