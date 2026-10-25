@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SplitPane, Pane } from 'react-split-pane';
 import MQTTService from '../../services/MQTTService';
 import TopicTreeService from '../../services/TopicTreeService';
+import { ConnectionNotices } from '../../services/ConnectionNotices';
 import ConnectionSidebar from '../ConnectionSidebar/ConnectionSidebar';
 import TopicTreeComponent from '../TopicTree/TopicTreeComponent';
 import MessagePanel from '../MessagePanel/MessageWorkspace';
@@ -71,13 +72,18 @@ function App() {
   } = useUIState(selectedConnection);
 
   // ── MQTT event listeners ─────────────────────────────────────────────────
+  const notices = useRef(new ConnectionNotices());
   useEffect(() => {
     setTopicTreeReady(TopicTreeService.isReady());
     const handleConnected = (data) => {
       setConnections((prev) =>
         prev.map((c) => (c.id === data.id ? { ...c, status: 'connected', isConnected: true } : c)),
       );
-      showFeedback('Connected to broker', 'success');
+      const kind = notices.current.connected(data.id);
+      showFeedback(
+        kind === 'reconnected' ? 'Reconnected to broker' : 'Connected to broker',
+        'success',
+      );
     };
     const handleDisconnected = (data) => {
       setConnections((prev) =>
@@ -87,6 +93,7 @@ function App() {
       );
     };
     const handleReconnecting = (data) => {
+      notices.current.reconnecting(data.id);
       setConnections((prev) =>
         prev.map((c) =>
           c.id === data.id ? { ...c, status: 'reconnecting', isConnected: false } : c,
@@ -94,7 +101,8 @@ function App() {
       );
     };
     const handleError = (data) => {
-      showFeedback(`MQTT error: ${data.error || data.message || 'Unknown error'}`, 'error');
+      const message = data.error || data.message || 'Unknown error';
+      if (notices.current.error(data.id, message)) showFeedback(`MQTT error: ${message}`, 'error');
     };
     const handleTreeCleared = ({ connectionId }) => {
       setSelectedTopic((previous) => (previous?.connectionId === connectionId ? null : previous));
