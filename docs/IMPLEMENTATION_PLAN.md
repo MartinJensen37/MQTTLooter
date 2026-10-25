@@ -26,7 +26,7 @@ Audited through `b705d91`. Baseline: 164 tests, typecheck, lint and the built El
 | Recording export built the whole JSON document in renderer memory. | Large recordings could exhaust renderer memory. | Fixed: main streams exports in chunks. |
 | Load test: one disk-history overflow stopped capture until a manual resume. A 20k-topic retained flood (about 100k msg/s for 0.2 s) overflowed the 8,192-message queue. | History was empty for everything after the flood, including a following 5,000 msg/s stream. | Fixed: 16,384 / 16 MiB queue, 1,024-message batches, WAL and durable gap records; capture continues. |
 | Load test: renderer delivery drops part of 20k/50k retained floods (2.5k / 16k messages). | Those messages are missing from the live cache, with a visible delivery-gap count. Disk history and recordings keep them. | By design within the 8,192-message delivery budget and 20,000-node tree cap; revisit with replaceable-update coalescing. |
-| Load test: renderer working set reaches 470-570 MiB at 5,000 msg/s across four connections. | Well above the 128 MiB estimated cache budget, though bounded over 60 s. | Profile the renderer heap: estimate accuracy, GC pressure and per-message objects. |
+| Load test: renderer working set reaches 470-570 MiB at 5,000 msg/s across four connections. | Looked well above the 128 MiB estimated cache budget. | Measured via the DevTools protocol: the V8 heap peaks near 210 MiB and falls to 80-110 MiB after collection, consistent with the budget. The rest is Chromium process overhead and heap headroom. Bounded; reducing per-message allocation churn is optional. |
 | `tests/` is outside `tsconfig.json`. | Test type errors are not caught by `npm run typecheck`. | Add a test tsconfig in a cleanup slice. |
 
 ### Durable recordings slice (implemented 2026-10-25)
@@ -73,7 +73,7 @@ Broker passwords, TLS private keys and passphrases are encrypted with `safeStora
 | Templates and schemas | Typed JSON substitutions, editable variable defaults, safe text escaping and per-application timestamp/UUID values; basic nested validation. | Full supported JSON Schema dialect, schema-driven construction and shared simulation fields. |
 | Plain simulator payloads | Raw UTF-8 scalar output, device defaults/per-signal overrides, exact text/hex previews and versioned legacy migration. | Composable typed fields and schema-driven payload construction. |
 | MQTT 5 properties | Live/disk inspection and exports preserve metadata. Publisher supports response topic, correlation bytes, content type, expiry, payload format and repeated user properties with main-process validation. | Broker-negotiated alias lifecycle and broader real-broker interoperability tests. |
-| Memory and throttling | Acknowledged transport batches, per-connection/shared budgets, protected topic metadata, worker-owned disk history and recordings with durable gap records. A load harness measures RSS, input latency, queues and accounting. | Renderer heap profiling under sustained load; replaceable-update coalescing for retained floods. |
+| Memory and throttling | Acknowledged transport batches, per-connection/shared budgets, protected topic metadata, worker-owned disk history and recordings with durable gap records. A load harness measures working sets, V8 heaps, input latency, queues and accounting. | Replaceable-update coalescing for retained floods; optional per-message allocation reduction. |
 | Recordings in a database | Main-owned capture into `recordings.sqlite` with per-batch commits, crash recovery, durable queue/outage/storage gaps, paged playback, streamed export and one-time JSON/localStorage migration. Kept up with 5,000 msg/s for 60 s under load. | Streaming import above 10 MiB and drift-free playback. |
 | Responsive disconnect control | MQTT clients run in main; storage runs in workers. Measured disconnect is 1-2 ms during 50k-topic floods and 5,000 msg/s streams. | Repeat with decoding and plots active once those land. |
 | Multiple tiled panels | Not implemented; current tabs preserve mounted workspaces. | Dockable layout with explicit panel lifecycle and persistence. |
@@ -247,7 +247,7 @@ Every phase includes targeted regression tests, typecheck/lint/build where relev
 
 ## Delivery order
 
-Current order (2026-10-25): durable recordings, the load harness and credential storage are done. Next: renderer heap profiling under load, chunked history clears, then the remaining phase 4/6 items (composable payload fields, JSON Schema validation, cross-topic search, payload-timestamp plots), then workspaces and decoding.
+Current order (2026-10-25): durable recordings, the load harness and credential storage are done. Renderer heap profiling and chunked history clears followed. Next: the remaining phase 4/6 items (composable payload fields, JSON Schema validation, cross-topic search, payload-timestamp plots), then workspaces and decoding.
 
 Original order: start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
 

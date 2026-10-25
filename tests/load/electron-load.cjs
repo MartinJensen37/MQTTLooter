@@ -15,6 +15,8 @@ const { app, BrowserWindow } = electron;
 const PROFILES = {
   quick: { floods: [5000], stream: { rate: 2000, seconds: 10 } },
   full: { floods: [5000, 20000, 50000], stream: { rate: 5000, seconds: 60 } },
+  // Sustained traffic only, for memory investigations.
+  stream: { floods: [], stream: { rate: 5000, seconds: 30 } },
 };
 const profileName = process.env.LOAD_PROFILE || 'quick';
 const profile = PROFILES[profileName];
@@ -92,7 +94,7 @@ const round = (value) => (value === null ? null : Math.round(value * 10) / 10);
 const mib = (kib) => Math.round((kib / 1024) * 10) / 10;
 
 /** Samples memory, queues and responsiveness until stopped. */
-function sampler(evaluate) {
+function sampler(evaluate, heapUsage) {
   const loop = monitorEventLoopDelay({ resolution: 10 });
   loop.enable();
   const samples = { memory: [], input: [], queues: [] };
@@ -104,7 +106,14 @@ function sampler(evaluate) {
       const byType = {};
       for (const metric of metrics)
         byType[metric.type] = (byType[metric.type] ?? 0) + metric.memory.workingSetSize;
-      samples.memory.push({ at: Date.now(), ...byType });
+      // JS heaps separate retained data from process overhead in the working sets.
+      const { usedSize: rendererHeap } = await heapUsage();
+      samples.memory.push({
+        at: Date.now(),
+        ...byType,
+        mainHeap: process.memoryUsage().heapUsed / 1024,
+        rendererHeap: rendererHeap / 1024,
+      });
       // Input round trip: the renderer must run a click handler and yield back.
       if (Date.now() - lastInput >= 250) {
         lastInput = Date.now();
@@ -143,11 +152,15 @@ function sampler(evaluate) {
         s: Math.round((sample.at - samples.memory[0].at) / 1000),
         main: mib(sample.Browser ?? 0),
         renderer: mib(sample.Tab ?? 0),
+        mainHeap: mib(sample.mainHeap),
+        rendererHeap: mib(sample.rendererHeap),
       }));
     return {
       memoryMiB: {
         mainPeak: peak('Browser'),
         rendererPeak: peak('Tab'),
+        mainHeapPeak: peak('mainHeap'),
+        rendererHeapPeak: peak('rendererHeap'),
         mainFinal: mib(last.Browser ?? 0),
         rendererFinal: mib(last.Tab ?? 0),
         timeline,
@@ -186,6 +199,11 @@ async function run() {
     return window && !window.webContents.isLoading();
   }, 'renderer load');
   const evaluate = (source) => window.webContents.executeJavaScript(source, true);
+  // performance.memory is quantized; the DevTools protocol reports the renderer's V8 heap.
+  const heapUsage = async () => {
+    if (!window.webContents.debugger.isAttached()) window.webContents.debugger.attach('1.3');
+    return window.webContents.debugger.sendCommand('Runtime.getHeapUsage');
+  };
   await waitFor(() => evaluate("document.querySelector('.app') !== null"), 'React mount');
   const connections = [...profile.floods.map((count) => `flood-${count}`), 'stream'].map((id) => ({
     id,
@@ -255,7 +273,7 @@ async function run() {
   for (const count of profile.floods) {
     const id = `flood-${count}`;
     await ask({ type: 'retained', count, payloadBytes: 64 });
-    const stop = sampler(evaluate);
+    const stop = sampler(evaluate, heapUsage);
     const started = Date.now();
     const sent = brokerReply('retainedSent');
     await connect(id);
@@ -294,7 +312,7 @@ async function run() {
     "window.electronAPI.recordings.start('stream', 'Load stream', 'Load recording')",
   );
   assert.equal(recording.success, true, recording.error);
-  const stop = sampler(evaluate);
+  const stop = sampler(evaluate, heapUsage);
   const historyBefore = (await evaluate('window.electronAPI.history.status()')).data.store;
   const streaming = ask(
     { type: 'stream', rate, seconds, topics: 500, sizes: [16, 16, 16, 256, 4096] },
