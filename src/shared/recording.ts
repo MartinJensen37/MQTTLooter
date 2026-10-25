@@ -83,12 +83,21 @@ export interface ActiveRecording {
   startTime: number;
   messageCount: number;
   topicCount: number;
-  pending: number;
   dropped: number;
+}
+
+/** A capture that stopped without the user asking, e.g. at the storage limit. */
+export interface RecordingNotice {
+  id: number;
+  recordingId: number;
+  connectionId: string;
+  reason: string;
 }
 
 export interface RecordingStatus {
   active: ActiveRecording[];
+  queuedMessages: number;
+  notices: RecordingNotice[];
   databaseBytes?: number;
   maxDatabaseBytes: number;
   recovered?: number;
@@ -114,6 +123,7 @@ export type RecordingRequest =
     }
   | { action: 'resolve-gaps'; recordingId: number; at: number }
   | { action: 'list' }
+  | { action: 'summary'; recordingId: number }
   | { action: 'gaps'; recordingId: number }
   | { action: 'topics'; recordingId: number }
   | { action: 'page'; query: RecordingPageQuery }

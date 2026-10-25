@@ -9,6 +9,7 @@ import {
   type RecordingGap,
   type RecordingPage,
   type RecordingPageQuery,
+  type RecordingRequest,
   type RecordingSummary,
   type StoredRecordingMessage,
 } from '../shared/recording';
@@ -616,6 +617,44 @@ export class RecordingDatabase {
       bytes += entry.length;
     }
     return { json: entries.join(','), cursor };
+  }
+
+  /** Dispatch a worker request. Status and close are handled by the worker itself. */
+  handle(request: Exclude<RecordingRequest, { action: 'status' | 'close' }>): unknown {
+    switch (request.action) {
+      case 'create':
+        return this.create(request.connectionId, request.connectionName, request.name, request.at);
+      case 'append':
+        return this.append(request.messages, request.drops);
+      case 'finish':
+        return this.finish(request.recordingId, request.at, request.reason);
+      case 'gap':
+        return this.gap(request.recordingId, request.at, request.kind, request.dropped);
+      case 'resolve-gaps':
+        return this.resolveGaps(request.recordingId, request.at);
+      case 'list':
+        return this.list();
+      case 'summary':
+        return this.summary(request.recordingId);
+      case 'gaps':
+        return this.gaps(request.recordingId);
+      case 'topics':
+        return this.topics(request.recordingId);
+      case 'page':
+        return this.page(request.query);
+      case 'count':
+        return this.count(request.recordingId, request.topics);
+      case 'rename':
+        return this.rename(request.recordingId, request.name);
+      case 'delete':
+        return this.delete(request.recordingId);
+      case 'import':
+        return this.import(request.recording);
+      case 'import-legacy':
+        return this.importLibrary(request.recordings, 'local');
+      case 'export-chunk':
+        return this.exportChunk(request.recordingId, request.after);
+    }
   }
 
   close(): void {

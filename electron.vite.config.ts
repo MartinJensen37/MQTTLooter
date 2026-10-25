@@ -12,6 +12,7 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
           'history-worker': resolve(__dirname, 'src/main/history-worker.ts'),
+          'recording-worker': resolve(__dirname, 'src/main/recording-worker.ts'),
         },
       },
     },
