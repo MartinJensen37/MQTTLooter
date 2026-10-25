@@ -86,24 +86,6 @@
   gap: var(--spacing-sm);
 }
 
-.format-json-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  text-decoration: none;
-  white-space: nowrap;
-  background: var(--success-green-light);
-  border: 1px solid rgba(40, 167, 69, 0.3);
-  border-radius: 6px;
-  color: #155724;
-}
 .copy-payload-btn {
   display: inline-flex;
   align-items: center;
@@ -121,11 +103,6 @@
 
   border-radius: 6px;
   color: var(--gray-600);
-}
-
-.format-json-btn:hover {
-  background: rgba(40, 167, 69, 0.2);
-  border-color: rgba(40, 167, 69, 0.5);
 }
 
 .copy-payload-btn:hover {
@@ -187,6 +164,25 @@
 
 .json-indicator i {
   font-size: 10px;
+}
+
+/* Format sits inside the Valid JSON status, in the same color. */
+.json-format-btn {
+  margin-left: 2px;
+  padding: 0 0 0 6px;
+  border: none;
+  border-left: 1px solid rgba(40, 167, 69, 0.3);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.json-format-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.json-format-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 /* Form options */

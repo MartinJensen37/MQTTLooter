@@ -25,17 +25,6 @@ function PayloadEditor({
       <div className="payload-header">
         <label htmlFor="payload">Payload:</label>
         <div className="payload-tools">
-          {payload && isValidJson(payload) && (
-            <button
-              type="button"
-              onClick={formatJsonPayload}
-              className="format-json-btn"
-              title="Format JSON"
-              disabled={isPublishing}
-            >
-              <i className="fas fa-code"></i> Format JSON
-            </button>
-          )}
           {payload && (
             <button
               type="button"
@@ -63,6 +52,15 @@ function PayloadEditor({
           {payload && isValidJson(payload) && (
             <span className="json-indicator">
               <i className="fas fa-check-circle"></i> Valid JSON
+              <button
+                type="button"
+                className="json-format-btn"
+                onClick={formatJsonPayload}
+                disabled={isPublishing}
+                title="Indent the JSON payload"
+              >
+                Format
+              </button>
             </span>
           )}
           {schemaValidation && (
