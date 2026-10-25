@@ -53,6 +53,24 @@ function generateNumberValue(generator, config, decimalPrecision = 2, context) {
       value = (config.min ?? 0) + ((config.max ?? 100) - (config.min ?? 0)) * fraction;
       break;
     }
+    case 'ramp':
+    case 'step':
+    case 'response': {
+      const start = config.start ?? 0;
+      const end = config.end ?? 100;
+      const elapsed = context.elapsedMs - (config.delayMs ?? (generator === 'ramp' ? 0 : 1000));
+      const fraction =
+        elapsed < 0
+          ? 0
+          : generator === 'step'
+            ? 1
+            : generator === 'ramp'
+              ? Math.min(1, elapsed / (config.durationMs ?? 5000))
+              : -Math.expm1(-elapsed / (config.timeConstantMs ?? 1000));
+      // Weighted endpoints avoid overflowing end - start for large opposite values.
+      value = start * (1 - fraction) + end * fraction;
+      break;
+    }
     case 'counter':
       value = (config.start ?? 0) + context.sampleIndex * (config.step ?? 1);
       value = Math.max(config.min ?? 0, Math.min(config.max ?? 100, value));

@@ -17,7 +17,7 @@ export default memo(function SignalSparkline({ output }: { output: DeviceOutput 
           {...plot}
           label={`${label}, ${plot.periodic && plot.frequency > 0 ? 'three cycles' : 'representative pattern'}`}
           compact
-          stepped={output.dataType === 'boolean' || output.generator === 'square'}
+          stepped={output.dataType === 'boolean' || ['square', 'step'].includes(output.generator)}
         />
       ) : (
         <span className="signal-pattern-label">{label}</span>

@@ -132,6 +132,39 @@ it('drops busy ticks without delaying another signal or drifting the shared cloc
   expect(JSON.parse(publish.mock.calls[4][0].payload).value).toBe(1);
 });
 
+it('keeps timed ramps aligned through skipped probability and busy ticks and restarts the clock', async () => {
+  const d = device([
+    {
+      ...signal(1, { mode: 'sync', probability: 0.5 }),
+      generator: 'ramp',
+      config: { start: 0, end: 10, delayMs: 0, durationMs: 1000 },
+    },
+  ]);
+  random.mockReturnValue(0.9);
+  engine.sync([d], true);
+  await vi.advanceTimersByTimeAsync(100);
+  expect(publish).not.toHaveBeenCalled();
+  random.mockReturnValue(0.1);
+  let finish!: () => void;
+  publish.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await vi.advanceTimersByTimeAsync(300);
+  expect(publish).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(publish.mock.calls[0][0].payload).value).toBe(2);
+  finish();
+  await vi.advanceTimersByTimeAsync(100);
+  expect(JSON.parse(publish.mock.calls[1][0].payload).value).toBe(5);
+  engine.stop(1);
+  engine.sync([d], true);
+  await vi.advanceTimersByTimeAsync(100);
+  expect(JSON.parse(publish.mock.calls[2][0].payload).value).toBe(1);
+  expect(error).not.toHaveBeenCalled();
+});
+
 it('varies random intervals within bounds and independently applies send probability', async () => {
   const start = Date.now();
   const times: number[] = [];

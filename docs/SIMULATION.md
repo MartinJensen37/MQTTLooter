@@ -6,7 +6,7 @@ The workspace shows device status in a list and signals as compact, single-line 
 
 ## Signals and payloads
 
-- Numbers: static, uniform, normal, sine, square, triangle, sawtooth, counter, random walk and exponential.
+- Numbers: static, uniform, normal, sine, square, triangle, sawtooth, ramp, step, first-order step response, counter, random walk and exponential.
 - Booleans: static, probability and repeating sequences.
 - Strings and enums: static, random selection, weighted selection and repeating sequences.
 - Numeric signals support units and 0-10 decimal places. Each signal can include a timestamp. Names must be nonempty and unique within the device.
@@ -22,6 +22,22 @@ Existing devices keep **Combined device payload** mode and their topic, timing a
 Payload previews live in the signal editor, alongside the effective destination. Individual-topic mode previews that signal; combined mode previews the full device payload including unsaved edits to the signal. Last successful publish shows the last accepted message containing that particular signal and its original destination, even when another signal publishes afterwards. It may reflect older settings and does not confirm subscriber processing. These live results are not saved as device configuration.
 
 The signal editor uses the same payload construction and generators as publishing, with its own independent preview sampled twice per second. Waveform charts show three cycles, including phase and square-wave duty cycle, with numeric value ticks on the left and time in seconds along the bottom. A zero-frequency wave is constant. Overview patterns have no axes: random patterns are repeatable representative samples, counters/random walks scale to their sampled range, and text/enum signals display their generator label. They describe the value pattern, not publishing times or a prediction of random values. Drawing them never advances live generator state or randomness.
+
+## Transition signals
+
+Choose **Ramp**, **Step** or **Step Response** for a numeric signal. Each uses **Starting value**, **Final value** and **Transition delay (ms)**. Values may rise, fall or remain constant; the signal holds its starting value before the delay.
+
+| Generator | Behavior after the delay | Default timing |
+| --- | --- | --- |
+| Ramp | Moves linearly to the final value over **Ramp duration (ms)**, then holds it. | No delay; 5,000 ms duration. |
+| Step | Changes to the final value at the delay and holds it. | 1,000 ms delay. |
+| Step Response | Approaches the final value exponentially without overshoot. **Time constant (ms)** sets the response speed: about 63.2% of the change after one time constant, 99.3% after five. | 1,000 ms delay; 1,000 ms time constant. |
+
+These are single transitions, not repeating waves. Delay accepts 0 to 24 hours; ramp duration and response time constant accept 1 ms to 24 hours. Publishing still has a minimum interval of 100 ms, so a short transition can finish between messages. JSON and raw output use the same generated values and configured decimal precision.
+
+Transition delay changes the value pattern; the publishing **Time offset** changes when samples are sent. In individual-topic mode, transitions use elapsed time from device start, including time spent skipping probability decisions or waiting for earlier publishes. Combined mode keeps the existing origin at each signal's first sample. Starting a new loop resets the clock. Editing generator parameters during a loop keeps individual signals on the device clock; combined signals restart their transition on their next sample.
+
+Editor charts show the delay and transition with numeric axes: ramp includes a short final-value hold, step includes time after the change, and response shows five time constants. Overview rows retain tiny patterns. Preview samples are independent of live publishing and include exact transition boundaries; drawing a chart does not advance the simulator.
 
 ## Raw scalar output
 

@@ -308,7 +308,10 @@ async function run() {
       evaluate("document.querySelector('.connection-status-text')?.textContent === 'disconnected'"),
     'disconnect',
   );
-  assert.equal(await evaluate("document.querySelectorAll('.message-item').length"), 2);
+  await waitFor(
+    () => evaluate("document.querySelectorAll('.message-item').length === 2"),
+    'captured messages remain visible after disconnect',
+  );
   assert.equal(await evaluate('typeof window.require'), 'undefined');
   assert.equal(await evaluate('document.fonts.check(\'900 16px "Font Awesome 6 Free"\')'), true);
   assert.deepEqual(errors, []);
@@ -605,6 +608,40 @@ async function run() {
   );
   await clickButton('.signal-dialog', 'Cancel');
 
+  await require('./electron-transitions.cjs')({
+    evaluate,
+    waitFor,
+    field,
+    clickButton,
+    published,
+    capture: async () => {
+      window.setSize(800, 600);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await evaluate("document.querySelector('.signal-waveform').scrollIntoView({block:'center'})");
+      await waitFor(
+        () =>
+          evaluate(`(() => {
+          const plot = document.querySelector('.signal-waveform').getBoundingClientRect();
+          return plot.top >= 90 && plot.bottom <= innerHeight - 30;
+        })()`),
+        'transition preview fits the narrow editor',
+      );
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      assert.equal(
+        await evaluate(`(() => {
+          const badge = document.querySelector('.connection-card .connection-status').getBoundingClientRect();
+          return !!document.elementFromPoint(badge.x + badge.width / 2, badge.y + badge.height / 2)?.closest('.modal-overlay');
+        })()`),
+        true,
+        'connection badge stays behind the signal editor',
+      );
+      fs.writeFileSync(
+        path.join(workspace, '.tmp', 'electron-response-small.png'),
+        (await window.webContents.capturePage()).toPNG(),
+      );
+      window.setSize(1400, 900);
+    },
+  });
   await require('./electron-navigation.cjs')({
     evaluate,
     waitFor,

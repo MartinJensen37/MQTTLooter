@@ -91,6 +91,52 @@ it('keeps random mini-patterns repeatable without consuming live randomness or s
   expect(output.currentValue).toBe(75);
 });
 
+it('configures, previews, saves and publishes timed transition signals', async () => {
+  seed('transitions');
+  const publish = vi.fn().mockResolvedValue(undefined);
+  await act(async () =>
+    root.render(
+      <SimulationPanel connectionId="transitions" isConnected onPublishMessage={publish} />,
+    ),
+  );
+  await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
+  await click('Edit value');
+  await input('Generator', 'ramp');
+  await input('Ramp duration', '0');
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain('durationMs');
+  expect(container.querySelector('.signal-waveform')).toBeNull();
+  await input('Ramp duration', '2000');
+  expect(container.querySelector('.signal-waveform svg')?.getAttribute('aria-label')).toContain(
+    'ramp waveform',
+  );
+  await input('Generator', 'response');
+  await input('Time constant', '500');
+  expect(container.querySelector('.signal-waveform svg')?.getAttribute('aria-label')).toContain(
+    'response waveform',
+  );
+  await click('Save Signal');
+  await click('Edit value');
+  expect((container.querySelector('.signal-dialog select') as HTMLSelectElement).value).toBe(
+    'number',
+  );
+  expect(container.querySelector('.signal-waveform svg')?.getAttribute('aria-label')).toContain(
+    'response waveform',
+  );
+  await input('Generator', 'step');
+  await input('Starting value', '10');
+  await input('Final value', '-20');
+  await input('Transition delay', '0');
+  expect(container.querySelector('.preview-section pre')?.textContent).toContain('-20');
+  await click('Save Signal');
+  await click('Publish Once');
+  expect(JSON.parse(publish.mock.calls[0][0].payload).value).toBe(-20);
+  const saved = JSON.parse(localStorage.getItem('mqtt-simulation-devices-transitions')!);
+  expect(saved[0].outputs[0]).toMatchObject({
+    generator: 'step',
+    config: { start: 10, end: -20, delayMs: 0 },
+  });
+});
+
 it('publishes raw strings, previews exact bytes and reopens non-JSON last publications', async () => {
   seed('a');
   const saved = JSON.parse(localStorage.getItem('mqtt-simulation-devices-a')!);

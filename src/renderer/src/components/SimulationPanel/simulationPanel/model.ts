@@ -65,6 +65,12 @@ export function defaultConfig(type: string, generator: string): Record<string, a
     case 'counter':
     case 'walk':
       return { start: 0, step: 1, min: 0, max: 100 };
+    case 'ramp':
+      return { start: 0, end: 100, delayMs: 0, durationMs: 5000 };
+    case 'step':
+      return { start: 0, end: 100, delayMs: 1000 };
+    case 'response':
+      return { start: 0, end: 100, delayMs: 1000, timeConstantMs: 1000 };
     case 'exponential':
       return { lambda: 1, min: 0, max: 100 };
     case 'probability':
@@ -127,7 +133,13 @@ export function validateOutput(output: DeviceOutput, others: DeviceOutput[] = []
     )
       errors.push('Decimal places must be between 0 and 10.');
     if (output.generator === 'static') number('value');
-    else {
+    else if (['ramp', 'step', 'response'].includes(output.generator)) {
+      number('start');
+      number('end');
+      number('delayMs', 0, 86400000);
+      if (output.generator === 'ramp') number('durationMs', 1, 86400000);
+      if (output.generator === 'response') number('timeConstantMs', 1, 86400000);
+    } else {
       number('min');
       number('max');
       if (c.min > c.max) errors.push('Minimum must not exceed maximum.');
