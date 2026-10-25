@@ -94,5 +94,25 @@ module.exports = async ({ evaluate, waitFor, field, send, userData, capture }) =
     'decoded field plotted',
   );
   await field('[aria-label="Message display"]', 'cards');
+
+  // Content search can match decoded fields that never appear as text in the stored bytes.
+  await field('[aria-label="Message source"]', 'stored');
+  await evaluate(
+    "[...document.querySelectorAll('.message-history-toolbar button')].find(button => button.textContent === 'Search message contents').click()",
+  );
+  await field('[aria-label="Content search mode"]', 'decoded');
+  await field('[aria-label="Search message contents"]', '"9007199254740993"');
+  await evaluate("document.querySelector('.history-search form').requestSubmit()");
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelectorAll('.history-search .message-item').length === 1 && document.querySelector('.history-search .message-item').textContent.includes('proto/pump/reading')",
+      ),
+    'decoded content search',
+  );
+  await evaluate(
+    "[...document.querySelectorAll('.message-history-toolbar button')].find(button => button.textContent === 'Close content search').click()",
+  );
+  await field('[aria-label="Message source"]', 'live');
   await field('[aria-label="Search topics"]', '');
 };

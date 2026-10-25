@@ -5,6 +5,7 @@ import {
   type HistorySearchQuery,
   type HistorySearchPage,
 } from '../../../../shared/history-search';
+import { useDecoders } from '../../services/DecoderRegistry';
 import './HistorySearch.css';
 
 export default function HistorySearch({
@@ -21,7 +22,8 @@ export default function HistorySearch({
   onClearMessages?: any;
 }) {
   const [term, setTerm] = useState('');
-  const [mode, setMode] = useState<'text' | 'hex'>('text');
+  const [mode, setMode] = useState<'text' | 'hex' | 'decoded'>('text');
+  const { decoders } = useDecoders();
   const [windowMs, setWindowMs] = useState(86400000);
   const [scope, setScope] = useState<'topic' | 'filter'>('topic');
   const [filter, setFilter] = useState('#');
@@ -184,11 +186,14 @@ export default function HistorySearch({
               value={mode}
               onChange={(event) => {
                 reset();
-                setMode(event.target.value as 'text' | 'hex');
+                setMode(event.target.value as 'text' | 'hex' | 'decoded');
               }}
             >
               <option value="text">UTF-8 text</option>
               <option value="hex">Hex bytes</option>
+              {(decoders.length > 0 || mode === 'decoded') && (
+                <option value="decoded">Decoded protobuf</option>
+              )}
             </select>
           </label>
           <label>
@@ -273,8 +278,9 @@ export default function HistorySearch({
         )}
         {!!stats.binary && (
           <p>
-            {stats.binary.toLocaleString()} non-UTF-8 payloads skipped in text mode. Use hex to
-            search their bytes.
+            {mode === 'decoded'
+              ? `${stats.binary.toLocaleString()} payloads without a matching decoder, or that did not decode, were skipped.`
+              : `${stats.binary.toLocaleString()} non-UTF-8 payloads skipped in text mode. Use hex to search their bytes.`}
           </p>
         )}
         {error && <p role="alert">{error}</p>}
