@@ -139,13 +139,12 @@ class MQTTConnection extends EventEmitter {
         if (brokerUrl.startsWith('ws://') || brokerUrl.startsWith('wss://')) {
           console.log(`WebSocket connection with path: ${this.config.wsPath || 'default'}`);
 
-          // Additional WebSocket options can be added here if needed
-          // For example, custom headers, protocols, etc.
-          if (this.config.wsHeaders) {
-            options.wsOptions = {
-              headers: this.config.wsHeaders,
-            };
-          }
+          const wsOptions = {};
+          if (this.config.wsHeaders) wsOptions.headers = this.config.wsHeaders;
+          // MQTT.js forwards CA, certificate and key to secure WebSockets, but not the server
+          // name, so SNI and the host name check would otherwise use the URL's host.
+          if (options.servername) wsOptions.servername = options.servername;
+          if (Object.keys(wsOptions).length) options.wsOptions = wsOptions;
         }
 
         // Last Will and Testament
