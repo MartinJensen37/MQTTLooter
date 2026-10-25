@@ -83,7 +83,7 @@ Broker passwords, TLS private keys and passphrases are encrypted with `safeStora
 | CSS cleanup and refactoring | Shared tokens/controls and simulator scoping exist; older globals and broad JS types remain. | Incremental cleanup in touched features, scoped styles, typed service boundaries. |
 | Lazy loading | Virtual topic/signal rows, paged history and lazily mounted property details. | Panel modules, recording metadata/payload pages and decoder assets. |
 | Documentation | README, simulator guide and review notes exist. | Update with each feature and add usage examples for storage, plots and timing. |
-| TLS / WebSocket verification | Configuration exists; automated desktop coverage currently uses loopback MQTT TCP. | Real-broker integration matrix, failure cases and release testing. |
+| TLS / WebSocket verification | `tests/transport-matrix.test.ts` runs the real connection manager and MQTT.js against loopback TLS, mutual-TLS, WebSocket and secure WebSocket servers: CA trust, host name mismatch, disabled verification, client certificates and passphrases, WebSocket paths, rejected credentials and QoS 1/2. It found that the TLS server name was not applied to secure WebSockets (fixed). | Third-party broker interoperability, session expiry and persistent-session reconnects; installer/upgrade checks. |
 
 Keep the completed saved profiles, clear-history action, sidebar collapse, notifications, dropdown controls and template import. Retained-message removal currently prioritizes the selected topic over the publishing form; preserve that behavior. Do not rebuild these features solely because they appear in the old backlog.
 
@@ -250,7 +250,14 @@ Every phase includes targeted regression tests, typecheck/lint/build where relev
 
 ## Delivery order
 
-Current order (2026-10-25): durable recordings, the load harness and credential storage are done. Renderer heap profiling and chunked history clears followed. JSON Schema validation and simulator payload templates followed. Payload-time plots, per-field scales and width-based point budgets followed. Cross-topic (MQTT filter) content search followed. Next: schema-driven construction, workspaces and decoding.
+Done on 2026-10-25, in order: durable recordings, the load harness, credential storage, renderer heap profiling, chunked history clears, JSON Schema validation, simulator payload templates, plot time sources and scales, cross-topic search, drift-free playback, negotiated topic aliases, whole-topic export and the transport test matrix.
+
+Next, in order:
+
+1. Third-party broker checks (Mosquitto, EMQX or HiveMQ CE locally) for session expiry, persistent sessions and alias limits, plus an installer/upgrade check.
+2. Schema-driven payload construction shared by templates and the simulator.
+3. Full-result export for content search; streaming recording import above 10 MiB.
+4. Tiled workspaces, then decoding (protobuf descriptors first; decoding must run where the renderer CSP allows it).
 
 Original order: start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
 
