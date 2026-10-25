@@ -71,7 +71,7 @@ Broker passwords, TLS private keys and passphrases are encrypted with `safeStora
 | Incoming topic plots | Four numeric fields, disk queries, shared chart styling, extrema aggregation, zoom, pause and cursor. Optional payload time (ms, s or zoned ISO 8601) with rejected/outside counts, per-field scales and a width-based point budget. | Plot load measurements alongside capture. |
 | Message-content search | Disk search beyond loaded pages for an exact topic or an MQTT topic filter across the connection, text/hex, fixed time windows and stop/continue. | Reverse paging, custom times, oversized-payload streaming and full-result export. |
 | Payload inspection | Text/hex, Pretty JSON, resizable inspector, plain log and adaptive previews; byte-preserving copy/export. Whole-topic disk history streams to JSON/CSV from a fixed snapshot. | On-demand large-payload fetching; full-result export for content search. |
-| Templates and schemas | Typed JSON substitutions, editable variable defaults, safe text escaping and per-application timestamp/UUID values. Standards-based JSON Schema validation (draft-04 to 2020-12, local `$ref`, combinators, formats) without code generation, so it runs under the renderer CSP. | Schema-driven construction and shared simulation fields. |
+| Templates and schemas | Typed JSON substitutions, editable variable defaults, safe text escaping and per-application timestamp/UUID values. Standards-based JSON Schema validation (draft-04 to 2020-12, local `$ref`, combinators, formats) without code generation, so it runs under the renderer CSP. Imported schemas become templates whose placeholders generate valid values (verified by expanding and validating). | Building simulator payload templates from a schema. |
 | Plain simulator payloads | Raw UTF-8 scalar output, device defaults/per-signal overrides, exact text/hex previews and versioned legacy migration. Combined payload templates place several typed signals, timestamps, ISO times, UUIDs and random helpers in nested JSON or raw text. | Schema-driven payload construction. |
 | MQTT 5 properties | Live/disk inspection and exports preserve metadata. Publisher supports response topic, correlation bytes, content type, expiry, payload format and repeated user properties with main-process validation. | Broader real-broker interoperability tests. Opt-in outgoing topic aliases follow the broker's CONNACK limit and reset on reconnect (via MQTT.js), verified against the loopback broker. |
 | Memory and throttling | Acknowledged transport batches, per-connection/shared budgets, protected topic metadata, worker-owned disk history and recordings with durable gap records. A load harness measures working sets, V8 heaps, input latency, queues and accounting. | Replaceable-update coalescing for retained floods; optional per-message allocation reduction. |
@@ -255,7 +255,7 @@ Done on 2026-10-25, in order: durable recordings, the load harness, credential s
 Next, in order:
 
 1. Third-party broker checks (Mosquitto, EMQX or HiveMQ CE locally) for session expiry, persistent sessions and alias limits, plus an installer/upgrade check.
-2. Schema-driven payload construction shared by templates and the simulator.
+2. Building simulator payload templates from an imported schema (publishing templates already do).
 3. Full-result export for content search; streaming recording import above 10 MiB.
 4. Tiled workspaces, then decoding (protobuf descriptors first; decoding must run where the renderer CSP allows it).
 

@@ -55,4 +55,19 @@ Save this as a JSON file and use **Import Templates**:
 
 The library remains compatible with the existing template collection format. Unmodified saved stock Device Status and GPS Location templates gain their missing identifier defaults when loaded. Custom templates remain unchanged. JSON numeric generators now produce numbers instead of numeric strings; use a text variable or surrounding text if a string value is required.
 
-Expansion is bounded to 1,048,576 text code units, 128 declared variables and 2,000 placeholder occurrences. Each substituted JSON value is bounded to 10,000 nodes and depth 64. These are editor work limits, not broker payload guarantees. A full schema validator, schema-driven field construction and using these typed fields within simulator payloads remain planned.
+Expansion is bounded to 1,048,576 text code units, 128 declared variables and 2,000 placeholder occurrences. Each substituted JSON value is bounded to 10,000 nodes and depth 64. These are editor work limits, not broker payload guarantees. Simulator devices can use the same placeholder syntax for combined payloads; see the simulator guide.
+
+## Importing a JSON Schema
+
+**Import Templates** also accepts a standalone JSON Schema (a file with `$schema`, `$id`, `title`, or `type` and `properties`). It becomes a template in **Imported Schemas** that keeps the schema for validation. Its payload follows the schema's structure, with placeholders that produce a fresh valid value on each **Apply template**:
+
+| Schema | Generated value |
+| --- | --- |
+| `number` / `integer` with bounds (inclusive or exclusive) | `randomFloat` / `randomInt` within them; 0-100 when unbounded |
+| `enum` with several scalar values | `randomChoice` of the values |
+| `boolean` | `randomChoice(true, false)` |
+| `string` with `format: uuid` / `date-time` | `{{uuid}}` / `{{isoTimestamp}}` |
+| `const`, `default`, `examples` | that value |
+| other strings | `sample`, padded or cut to `minLength`/`maxLength`; email, URI and date formats get a valid example |
+
+Objects include every listed and required property; arrays get `minItems` items (at least one, at most three). Local `$ref`s, `allOf`, and the first `oneOf`/`anyOf` branch are followed; recursive references stop with `null`, and remote references are not fetched. A `pattern` cannot be generated, so edit those values by hand; schema validation shows what still fails.
