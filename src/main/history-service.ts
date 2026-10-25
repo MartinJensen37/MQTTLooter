@@ -1,10 +1,13 @@
+import { open, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { CSV_HEADER } from '../shared/message-export';
 import { MessageDelivery } from './message-delivery';
 import { WorkerClient } from './worker-client';
 import type { IncomingPublish } from '../shared/traffic';
 import {
   HISTORY_QUEUE,
   type HistoryDrop,
+  type HistoryExportChunk,
   type HistoryRequest,
   type HistoryStatus,
   type HistoryStoreStatus,
@@ -108,6 +111,52 @@ export class HistoryService {
     await this.flush();
     this.store = await this.request({ action: 'clear', connectionId, topic });
     return this.store!;
+  }
+
+  /** Stream a topic's retained history to a file; the target is replaced only when complete. */
+  async exportTo(
+    connectionId: string,
+    topic: string,
+    format: 'json' | 'csv',
+    path: string,
+    connectionName: string,
+  ): Promise<number> {
+    await this.flush();
+    const temporary = `${path}.${process.pid}.tmp`;
+    const handle = await open(temporary, 'w');
+    let count = 0;
+    try {
+      await handle.write(
+        format === 'csv'
+          ? CSV_HEADER
+          : `{"exportDate":${JSON.stringify(new Date().toISOString())},"connectionName":${JSON.stringify(connectionName)},"topic":${JSON.stringify(topic)},"messages":[`,
+      );
+      let after = 0;
+      let snapshot: number | undefined;
+      for (;;) {
+        const chunk: HistoryExportChunk = await this.request({
+          action: 'export-chunk',
+          query: { connectionId, topic, format, after, snapshot },
+        });
+        snapshot = chunk.snapshot;
+        if (chunk.count) {
+          const separator = format === 'csv' ? '\n' : count ? ',' : '';
+          await handle.write(separator + chunk.text);
+        }
+        count += chunk.count;
+        if (chunk.cursor === null) break;
+        after = chunk.cursor;
+      }
+      if (format === 'json') await handle.write(`],"messageCount":${count}}`);
+      await handle.sync();
+      await handle.close();
+      await rename(temporary, path);
+      return count;
+    } catch (error) {
+      await handle.close().catch(() => {});
+      await unlink(temporary).catch(() => {});
+      throw error;
+    }
   }
 
   async close(): Promise<void> {

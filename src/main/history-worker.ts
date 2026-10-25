@@ -70,6 +70,9 @@ parentPort!.on(
         case 'topics':
           data = database.topics(request.connectionId, request.search);
           break;
+        case 'export-chunk':
+          data = database.exportChunk(request.query);
+          break;
         case 'clear':
           database.clear(request.connectionId, request.topic);
           purge();

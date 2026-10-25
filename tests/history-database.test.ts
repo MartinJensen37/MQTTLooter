@@ -257,3 +257,45 @@ it('hides cleared topics at once and purges their messages in bounded steps', ()
   expect(database.status().retainedMessages).toBe(2);
   expect(database.purgeStep()).toBe(false);
 });
+
+it('exports a whole topic in bounded chunks from a fixed snapshot', () => {
+  database.append(
+    Array.from({ length: 4500 }, (_, i) => message(i + 1)),
+    now,
+  );
+  database.append([{ ...message(4501), message: 'AP+A', encoding: 'base64', byteLength: 3 }], now);
+  database.append([message(1, 'other')], now);
+  const run = (format: 'json' | 'csv') => {
+    const parts: string[] = [];
+    let after = 0;
+    let snapshot: number | undefined;
+    let count = 0;
+    for (let step = 0; step < 10; step++) {
+      const chunk = database.exportChunk(
+        { connectionId: 'broker', topic: 'a//b', format, after, snapshot },
+        now,
+      );
+      expect(chunk.count).toBeLessThanOrEqual(2000);
+      // Arrivals after the export started stay out of it.
+      if (snapshot === undefined) database.append([message(9999)], now);
+      snapshot = chunk.snapshot;
+      count += chunk.count;
+      if (chunk.text) parts.push(chunk.text);
+      if (chunk.cursor === null) return { parts, count };
+      after = chunk.cursor;
+    }
+    throw new Error('Export did not finish');
+  };
+  const json = run('json');
+  expect(json.count).toBe(4501);
+  const rows = JSON.parse(`[${json.parts.join(',')}]`);
+  expect(rows.map((row: { payload: string }) => row.payload).slice(-2)).toEqual(['42', 'AP+A']);
+  expect(rows.at(-1)).toMatchObject({
+    encoding: 'base64',
+    connectionId: 'broker',
+    protocolVersion: 5,
+    properties: { correlationData: { encoding: 'base64', data: 'AP+A' } },
+  });
+  const csv = run('csv');
+  expect(csv.parts.join('\n').split('\n')).toHaveLength(4502);
+});

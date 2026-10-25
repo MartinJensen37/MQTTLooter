@@ -32,6 +32,22 @@ export interface HistoryQuery {
   generation?: number;
 }
 
+/** One step of a whole-topic export in capture order, bounded by a fixed snapshot. */
+export interface HistoryExportQuery {
+  connectionId: string;
+  topic: string;
+  format: 'json' | 'csv';
+  after: number;
+  snapshot?: number;
+}
+
+export interface HistoryExportChunk {
+  text: string;
+  count: number;
+  cursor: number | null;
+  snapshot: number;
+}
+
 export interface HistoryMessage extends IncomingPublish {
   rowId: number;
 }
@@ -68,6 +84,7 @@ export type HistoryRequest =
   | { action: 'search'; query: import('./history-search').HistorySearchQuery }
   | { action: 'series'; query: import('./numeric-series').NumericQuery }
   | { action: 'topics'; connectionId: string; search: string }
+  | { action: 'export-chunk'; query: HistoryExportQuery }
   | { action: 'clear'; connectionId: string; topic?: string }
   | { action: 'status' }
   | { action: 'persist'; enabled: boolean }

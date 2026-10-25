@@ -252,6 +252,34 @@ for (const [channel, handler] of Object.entries({
     return historyService!.request({ action: 'persist', enabled });
   },
   'history-resume': () => historyService!.resume(),
+  'history-export': async (
+    connectionId: unknown,
+    topic: unknown,
+    format: unknown,
+    connectionName: unknown,
+  ) => {
+    if (
+      !validId(connectionId) ||
+      !validTopic(topic) ||
+      (format !== 'json' && format !== 'csv') ||
+      typeof connectionName !== 'string' ||
+      connectionName.length > 256
+    )
+      throw new Error('Invalid history export');
+    const result = await dialog.showSaveDialog(mainWindow!, {
+      defaultPath: `mqtt-topic-${topic.replace(/[/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 10)}.${format}`,
+      filters: [{ name: format.toUpperCase(), extensions: [format] }],
+    });
+    if (result.canceled || !result.filePath) return { saved: false };
+    const count = await historyService!.exportTo(
+      connectionId,
+      topic,
+      format,
+      result.filePath,
+      connectionName,
+    );
+    return { saved: true, path: result.filePath, count };
+  },
 })) {
   handleIPC(channel, async (_event, ...args) => {
     try {

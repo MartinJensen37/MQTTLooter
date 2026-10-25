@@ -11,11 +11,14 @@ import {
   DISK_HISTORY,
   serializeProperties,
   type HistoryDrop,
+  type HistoryExportChunk,
+  type HistoryExportQuery,
   type HistoryPage,
   type HistoryMessage,
   type HistoryQuery,
 } from '../shared/history';
 import { encodePayload, payloadBytes } from '../shared/payload';
+import { csvRow, exportRow } from '../shared/message-export';
 import type { IncomingPublish } from '../shared/traffic';
 
 /** Synchronous SQLite is confined to the storage worker. */
@@ -358,6 +361,47 @@ export class HistoryDatabase {
       result.messages.push(this.decodeMessage(match));
     }
     return result;
+  }
+
+  /** Up to 2,000 rows / 4 MiB of export text, oldest first, never past the snapshot. */
+  exportChunk(query: HistoryExportQuery, now = Date.now()): HistoryExportChunk {
+    const snapshot =
+      query.snapshot ??
+      Number(this.db.prepare('SELECT coalesce(max(id),0) id FROM messages').get()!.id);
+    const entries: string[] = [];
+    let bytes = 0;
+    let cursor: number | null = null;
+    let last = query.after;
+    for (const row of this.db
+      .prepare(
+        `SELECT m.*, t.path, t.connection_id FROM messages m JOIN topics t ON t.id=m.topic_id
+      WHERE t.connection_id=? AND t.path=? AND m.id>? AND m.id<=? AND m.timestamp>=?
+      ORDER BY m.id LIMIT 2001`,
+      )
+      .iterate(
+        query.connectionId,
+        query.topic,
+        query.after,
+        snapshot,
+        now - this.limits.maxAgeMs,
+      )) {
+      if (entries.length >= 2000 || bytes >= 4 * 1024 * 1024) {
+        cursor = last;
+        break;
+      }
+      const message = this.decodeMessage(row);
+      const exported = { ...message, connectionId: message.id };
+      const entry = query.format === 'csv' ? csvRow(exported) : JSON.stringify(exportRow(exported));
+      entries.push(entry);
+      bytes += entry.length;
+      last = Number(row.id);
+    }
+    return {
+      text: entries.join(query.format === 'csv' ? '\n' : ','),
+      count: entries.length,
+      cursor,
+      snapshot,
+    };
   }
 
   topics(connectionId: string, search: string): { path: string }[] {

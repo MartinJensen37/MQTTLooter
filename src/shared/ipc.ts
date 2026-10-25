@@ -63,6 +63,12 @@ export interface ElectronAPI {
     clear(connectionId: string, topic?: string): Promise<IpcResult>;
     persist(enabled: boolean): Promise<IpcResult>;
     resume(): Promise<IpcResult>;
+    export(
+      connectionId: string,
+      topic: string,
+      format: 'json' | 'csv',
+      connectionName: string,
+    ): Promise<IpcResult<{ saved: boolean; path?: string; count?: number }>>;
   };
   credentials: {
     status(): Promise<IpcResult<import('./credentials').CredentialStatus>>;
