@@ -27,11 +27,11 @@ const historyService = primaryInstance
 const recordingService = primaryInstance ? new RecordingService(app.getPath('userData')) : null;
 // Linux without a keyring falls back to a fixed key; treat that as unavailable.
 const credentialStore = new CredentialStore(join(app.getPath('userData'), 'credentials.json'), {
-  available: () =>
-    safeStorage.isEncryptionAvailable() &&
-    !(process.platform === 'linux' && safeStorage.getSelectedStorageBackend?.() === 'basic_text'),
-  encrypt: (text) => safeStorage.encryptString(text),
-  decrypt: (data) => safeStorage.decryptString(data),
+  available: async () =>
+    (await safeStorage.isAsyncEncryptionAvailable()) &&
+    !(process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text'),
+  encrypt: (text) => safeStorage.encryptStringAsync(text),
+  decrypt: (data) => safeStorage.decryptStringAsync(data),
 });
 if (!primaryInstance) app.quit();
 app.on('second-instance', () => {

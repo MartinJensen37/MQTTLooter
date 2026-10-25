@@ -10,9 +10,10 @@ import {
 
 /** OS-backed encryption, injected so the store can be tested without Electron. */
 export interface SecretCipher {
-  available(): boolean;
-  encrypt(text: string): Buffer;
-  decrypt(data: Buffer): string;
+  available(): Promise<boolean>;
+  encrypt(text: string): Promise<Buffer>;
+  /** `shouldReEncrypt` reports a rotated key; the entry is then written again. */
+  decrypt(data: Buffer): Promise<{ result: string; shouldReEncrypt?: boolean }>;
 }
 
 interface Entry {
@@ -77,7 +78,7 @@ export class CredentialStore {
     return this.enqueue(async () => {
       const entries = await this.read();
       return {
-        available: this.cipher.available(),
+        available: await this.cipher.available(),
         stored: Object.fromEntries(
           Object.entries(entries).map(([id, { password, tlsKey, passphrase }]) => [
             id,
@@ -90,14 +91,28 @@ export class CredentialStore {
 
   get(connectionId: string): Promise<ConnectionSecrets | null> {
     return this.enqueue(async () => {
-      const entry = (await this.read())[connectionId];
+      const entries = await this.read();
+      const entry = entries[connectionId];
       if (!entry) return null;
-      if (!this.cipher.available()) throw new Error('OS encryption is unavailable');
+      if (!(await this.cipher.available())) throw new Error('OS encryption is unavailable');
+      let secrets: ConnectionSecrets;
+      let rotated: boolean | undefined;
       try {
-        return validateSecrets(JSON.parse(this.cipher.decrypt(Buffer.from(entry.data, 'base64'))));
+        const decrypted = await this.cipher.decrypt(Buffer.from(entry.data, 'base64'));
+        secrets = validateSecrets(JSON.parse(decrypted.result));
+        rotated = decrypted.shouldReEncrypt;
       } catch {
         throw new Error('Saved credentials could not be decrypted. Enter them again.');
       }
+      if (rotated)
+        await this.write({
+          ...entries,
+          [connectionId]: {
+            ...entry,
+            data: (await this.cipher.encrypt(JSON.stringify(secrets))).toString('base64'),
+          },
+        });
+      return secrets;
     });
   }
 
@@ -109,7 +124,7 @@ export class CredentialStore {
         if (!(connectionId in entries)) return;
         delete entries[connectionId];
       } else {
-        if (!this.cipher.available()) throw new Error('OS encryption is unavailable');
+        if (!(await this.cipher.available())) throw new Error('OS encryption is unavailable');
         const valid = validateSecrets(secrets);
         if (
           !(connectionId in entries) &&
@@ -117,7 +132,7 @@ export class CredentialStore {
         )
           throw new Error('Too many saved credentials');
         entries[connectionId] = {
-          data: this.cipher.encrypt(JSON.stringify(valid)).toString('base64'),
+          data: (await this.cipher.encrypt(JSON.stringify(valid))).toString('base64'),
           password: Boolean(valid.password),
           tlsKey: Boolean(valid.tlsKey),
           passphrase: Boolean(valid.passphrase),

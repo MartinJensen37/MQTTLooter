@@ -9,13 +9,15 @@ let directory: string;
 let file: string;
 let available: boolean;
 // Reversible stand-in for safeStorage that visibly changes the bytes.
+let rotate = false;
+let nonce = 0;
 const cipher: SecretCipher = {
-  available: () => available,
-  encrypt: (text) => Buffer.from(`enc:${Buffer.from(text).toString('hex')}`),
-  decrypt: (data) => {
+  available: async () => available,
+  encrypt: async (text) => Buffer.from(`enc:${nonce++}:${Buffer.from(text).toString('hex')}`),
+  decrypt: async (data) => {
     const text = data.toString();
     if (!text.startsWith('enc:')) throw new Error('bad');
-    return Buffer.from(text.slice(4), 'hex').toString();
+    return { result: Buffer.from(text.split(':')[2], 'hex').toString(), shouldReEncrypt: rotate };
   },
 };
 const key = { name: 'client.key', content: '-----BEGIN KEY-----', size: 19, lastModified: 1 };
@@ -24,6 +26,7 @@ beforeEach(() => {
   directory = mkdtempSync(join(tmpdir(), 'mqtt-credentials-'));
   file = join(directory, 'credentials.json');
   available = true;
+  rotate = false;
 });
 afterEach(() => rmSync(directory, { recursive: true, force: true }));
 
@@ -47,6 +50,12 @@ it('stores encrypted secrets, reports only flags and removes cleared entries', a
     tlsKey: key,
     passphrase: 'sesame-77',
   });
+  // A rotated key re-encrypts the entry on read.
+  rotate = true;
+  const before = readFileSync(file, 'utf8');
+  expect((await reopened.get('b'))?.password).toBe('other-secret');
+  expect(readFileSync(file, 'utf8')).not.toBe(before);
+  expect(readFileSync(file, 'utf8')).not.toMatch(/other-secret/);
   await reopened.set('a', {});
   await reopened.set('b', null);
   expect(await reopened.get('a')).toBeNull();
