@@ -109,7 +109,7 @@ Properties are saved per connection with the draft and successful publication hi
 
 ### Searching message contents
 
-In Logging, choose **Source > Disk history**, select a stored topic, and open **Search message contents**. Search literal, case-sensitive UTF-8 text or a hexadecimal byte sequence such as `00 ff 80`. Hex searches the original bytes, including binary payloads. Choose the last 5 minutes, last hour or retained 24 hours; the time range and captured-message snapshot are fixed when the search starts.
+In Logging, choose **Source > Disk history**, select a stored topic, and open **Search message contents**. Search literal, case-sensitive UTF-8 text or a hexadecimal byte sequence such as `00 ff 80`. Hex searches the original bytes, including binary payloads. Choose the last 5 minutes, last hour, retained 24 hours or **Custom range**, which takes a start and end receive time in local time (seconds allowed); parts of a range older than the retained 24 hours are left out. Search walks a time index newest first, so an earlier range is reached directly rather than after scanning newer messages. The time range and captured-message snapshot are fixed when the search starts.
 
 Set **Topics > Topic filter** to search every stored topic of the connection that matches an MQTT filter, such as `sensors/+/temperature` or `#`. Each result shows its topic. As with subscriptions, `#` also matches the parent level, and wildcards do not match topics starting with `$` unless the filter names that level. Messages from non-matching topics still count toward each bounded scan step, so a narrow filter over a busy connection may need several **Continue search** steps. **Clear topic history** is not offered for filter results.
 
