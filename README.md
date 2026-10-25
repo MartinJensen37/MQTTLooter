@@ -35,6 +35,7 @@ The Electron smoke test uses hidden windows, isolated storage under `.tmp/`, and
 ## Features and behavior
 
 - Multiple MQTT 3.1.1 and MQTT 5 connections, including TLS and WebSocket configuration.
+- **Split** in the header shows a second tab beside the current one, for example Logging next to Simulation. Drag the divider or focus it and use the arrow keys to resize; below about 560 px of content width the panes stack instead. Choosing the second pane's tab in the tab bar swaps the panes. Both panes follow the selected connection and topic, each panel exists once (no duplicated simulators or recorders), and the layout is restored after a restart.
 - Saved connection settings, subscriptions, reconnect intervals, and last wills, including empty will payloads.
 - Virtualized topic tree that preserves exact MQTT paths, including empty levels such as `a//b`. Topic search includes collapsed branches, and first-seen ordering keeps existing siblings stable as traffic arrives.
 - Message history, retained-message filtering, sorting, copying, and JSON/CSV export. The list follows the top in either sort order; scrolling down pins the visible message and returning to the top resumes following. History remains available after disconnect, subject to its limits, until cleared or the connection is deleted.
