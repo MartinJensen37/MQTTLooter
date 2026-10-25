@@ -30,8 +30,10 @@ export class HistoryDatabase {
     private limits = DISK_HISTORY,
   ) {
     this.db = new DatabaseSync(path);
-    // One worker owns reads and writes; rollback journaling avoids an unbounded WAL.
-    this.db.exec(`PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA cache_size=-8192;
+    // WAL avoids a journal sync per batch. One connection lets automatic checkpoints complete,
+    // and the size limit truncates the WAL afterwards. NORMAL is crash-safe in WAL mode.
+    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;
+      PRAGMA journal_size_limit=67108864; PRAGMA cache_size=-8192;
       PRAGMA temp_store=FILE; PRAGMA foreign_keys=ON; PRAGMA secure_delete=ON;`);
     const version = Number(this.db.prepare('PRAGMA user_version').get()!.user_version);
     if (version > 3) {
