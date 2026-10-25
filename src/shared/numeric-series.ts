@@ -3,6 +3,7 @@ export interface NumericPoint {
   y: number;
   breakBefore?: boolean;
 }
+export type TimeUnit = 'ms' | 's' | 'iso';
 export interface NumericQuery {
   connectionId: string;
   topic: string;
@@ -10,6 +11,9 @@ export interface NumericQuery {
   from: number;
   to: number;
   maxPoints: number;
+  /** Plot by this payload field instead of receive time. Messages are still selected by receive time. */
+  timePath?: string[];
+  timeUnit?: TimeUnit;
 }
 export interface NumericResult {
   from: number;
@@ -18,6 +22,9 @@ export interface NumericResult {
   truncated: boolean;
   availablePaths: string[][];
   series: { path: string[]; points: NumericPoint[]; valid: number; gaps: number }[];
+  /** Payload-time mode: samples without a valid time, and samples whose time is outside the window. */
+  timeRejected?: number;
+  outsideWindow?: number;
 }
 
 export const fieldPointer = (path: string[]) =>
@@ -51,17 +58,38 @@ export function numericPayload(bytes: Uint8Array | null): unknown {
   }
 }
 
-export function numericField(value: unknown, path: string[]): number | null {
+export function fieldValue(value: unknown, path: string[]): unknown {
   for (const segment of path) {
     if (
       !value ||
       typeof value !== 'object' ||
       !Object.prototype.hasOwnProperty.call(value, segment)
     )
-      return null;
+      return undefined;
     value = (value as Record<string, unknown>)[segment];
   }
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  return value;
+}
+
+export function numericField(value: unknown, path: string[]): number | null {
+  const field = fieldValue(value, path);
+  return typeof field === 'number' && Number.isFinite(field) ? field : null;
+}
+
+// ISO 8601 with an explicit zone, so a payload time never depends on this computer's time zone.
+const isoTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/** A payload time in epoch milliseconds, or null when it is missing or invalid for the unit. */
+export function payloadTime(value: unknown, unit: TimeUnit): number | null {
+  let time: number;
+  if (unit === 'iso') {
+    if (typeof value !== 'string' || !isoTime.test(value)) return null;
+    time = Date.parse(value);
+  } else {
+    if (typeof value !== 'number') return null;
+    time = unit === 's' ? value * 1000 : value;
+  }
+  return Number.isFinite(time) && time >= 0 && time <= 8.64e15 ? time : null;
 }
 
 interface Sample {
@@ -86,6 +114,8 @@ export class NumericSampler {
   private previousSession?: string;
   private binsCount: number;
   private scanned = 0;
+  private timeRejected = 0;
+  private outsideWindow = 0;
 
   constructor(private query: NumericQuery) {
     this.binsCount = Math.max(1, Math.floor(query.maxPoints / 4));
@@ -99,6 +129,18 @@ export class NumericSampler {
     this.scanned++;
     const value = numericPayload(payload);
     if (this.scanned <= 20) this.discover(value);
+    if (this.query.timePath) {
+      const time = payloadTime(fieldValue(value, this.query.timePath), this.query.timeUnit ?? 'ms');
+      if (time === null) {
+        this.timeRejected++;
+        return;
+      }
+      if (time < this.query.from || time > this.query.to) {
+        this.outsideWindow++;
+        return;
+      }
+      timestamp = time;
+    }
     const index = Math.min(
       this.binsCount - 1,
       Math.max(
@@ -161,6 +203,10 @@ export class NumericSampler {
       scanned: this.scanned,
       truncated,
       availablePaths: [...this.available.values()],
+      ...(this.query.timePath && {
+        timeRejected: this.timeRejected,
+        outsideWindow: this.outsideWindow,
+      }),
       series: this.query.paths.map((path, field) => {
         const points: NumericPoint[] = [];
         let previousBin = -1;

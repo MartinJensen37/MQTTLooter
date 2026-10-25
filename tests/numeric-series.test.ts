@@ -5,6 +5,7 @@ import {
   numericPayload,
   numericField,
   NumericSampler,
+  payloadTime,
 } from '../src/shared/numeric-series';
 
 const bytes = (value: string) => new TextEncoder().encode(value);
@@ -79,4 +80,31 @@ it('discovers bounded JSON paths and leaves missing field values as gaps', () =>
   expect(sampler.result().availablePaths.map(fieldPointer)).toEqual(['/a~1b', '/values/0']);
   expect(sampler.result().series[1].points.map((point) => point.y)).toEqual([0, 2]);
   expect(sampler.result().series[1].points[1].breakBefore).toBe(true);
+});
+
+it('plots by a validated payload time and counts samples it cannot place', () => {
+  expect(payloadTime(1500, 'ms')).toBe(1500);
+  expect(payloadTime(1.5, 's')).toBe(1500);
+  expect(payloadTime('1970-01-01T00:00:01.250Z', 'iso')).toBe(1250);
+  expect(payloadTime('1970-01-01T01:00:00+01:00', 'iso')).toBe(0);
+  // Zone-less or loose dates would depend on this computer's time zone.
+  for (const value of ['1970-01-01T00:00:01', '1970-01-01', 'Jan 1 1970', 1250])
+    expect(payloadTime(value, 'iso')).toBeNull();
+  for (const value of ['1500', null, -1, Number.NaN, 9e15])
+    expect(payloadTime(value, 'ms')).toBeNull();
+
+  const sampler = new NumericSampler({ ...query, paths: [['v']], timePath: ['ts'], timeUnit: 's' });
+  // Receive times are all 999; payload times spread the samples across the window.
+  sampler.add(999, 1, 's', bytes('{"ts":0.1,"v":1}'));
+  sampler.add(999, 2, 's', bytes('{"ts":0.9,"v":9}'));
+  sampler.add(999, 3, 's', bytes('{"ts":"0.5","v":5}'));
+  sampler.add(999, 4, 's', bytes('{"ts":2,"v":20}'));
+  sampler.add(999, 5, 's', bytes('{"v":7}'));
+  const result = sampler.result();
+  expect(result.series[0].points.map((point) => [point.x, point.y])).toEqual([
+    [100, 1],
+    [900, 9],
+  ]);
+  expect(result).toMatchObject({ timeRejected: 2, outsideWindow: 1 });
+  expect(new NumericSampler(query).result()).not.toHaveProperty('timeRejected');
 });

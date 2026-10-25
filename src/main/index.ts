@@ -227,12 +227,13 @@ for (const [channel, handler] of Object.entries({
       !Array.isArray(query.paths) ||
       query.paths.length < 1 ||
       query.paths.length > 4 ||
-      query.paths.some(
+      [...query.paths, ...(query.timePath === undefined ? [] : [query.timePath])].some(
         (path: unknown) =>
           !Array.isArray(path) ||
           path.length > 16 ||
           path.some((segment) => typeof segment !== 'string' || segment.length > 1024),
-      )
+      ) ||
+      (query.timeUnit !== undefined && !['ms', 's', 'iso'].includes(query.timeUnit))
     )
       throw new Error('Invalid numeric history query');
     return historyService!.request({ action: 'series', query });
