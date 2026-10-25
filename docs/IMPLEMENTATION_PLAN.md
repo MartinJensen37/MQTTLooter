@@ -83,7 +83,7 @@ Broker passwords, TLS private keys and passphrases are encrypted with `safeStora
 | Protobuf / Sparkplug B | User-provided `.proto` decoders mapped to MQTT topic filters, compiled and applied in a main-process worker (the renderer CSP forbids generated code), with a Decoded payload view, 1 MiB input/output limits and exact 64-bit integers. | Decoded fields also plot and are searchable (decoded in the history worker), and decoders compile from several `.proto` files that import each other. Sparkplug B stays optional. |
 | Password visibility and credentials | Shared show/hide controls; passwords, TLS keys and passphrases encrypted with `safeStorage` in main, migrated from localStorage. | WebSocket header and MQTT 5 authentication secrets once those settings exist. |
 | CSS cleanup and refactoring | Shared tokens/controls and simulator scoping exist; older globals and broad JS types remain. | Incremental cleanup in touched features, scoped styles, typed service boundaries. |
-| Lazy loading | Virtual topic/signal rows, paged history and lazily mounted property details. | Panel modules, recording metadata/payload pages and decoder assets. |
+| Lazy loading | Virtual topic/signal rows, paged history, lazily mounted property details, and Publishing and Simulation loaded as separate chunks on first use (main bundle 842 to 608 kB). | Recording metadata/payload pages and on-demand large payloads. The renderer build is not minified (electron-vite's default). |
 | Documentation | README, simulator guide and review notes exist. | Update with each feature and add usage examples for storage, plots and timing. |
 | TLS / WebSocket verification | `tests/transport-matrix.test.ts` runs the real connection manager and MQTT.js against loopback TLS, mutual-TLS, WebSocket and secure WebSocket servers: CA trust, host name mismatch, disabled verification, client certificates and passphrases, WebSocket paths, rejected credentials and QoS 1/2. It found that the TLS server name was not applied to secure WebSockets (fixed). | Installer/upgrade checks and more brokers (EMQX, HiveMQ). `tests/mosquitto.test.ts` covers Mosquitto 2.0 when installed: credential rejection, persistent sessions and expiry, negotiated aliases, retained QoS 2 with binary payloads and properties. |
 
@@ -252,12 +252,13 @@ Every phase includes targeted regression tests, typecheck/lint/build where relev
 
 ## Delivery order
 
-Done on 2026-10-25, in order: durable recordings, the load harness, credential storage, renderer heap profiling, chunked history clears, JSON Schema validation, simulator payload templates, plot time sources and scales, cross-topic search, drift-free playback, negotiated topic aliases, whole-topic export, the transport test matrix, Mosquitto interoperability tests, schema-built publishing and simulator templates, protobuf decoding, full search-result export, streamed recording import, split view, decoded-field plots, decoded search, multi-file `.proto` decoders, pinned split panes and custom search ranges.
+Done on 2026-10-25, in order: durable recordings, the load harness, credential storage, renderer heap profiling, chunked history clears, JSON Schema validation, simulator payload templates, plot time sources and scales, cross-topic search, drift-free playback, negotiated topic aliases, whole-topic export, the transport test matrix, Mosquitto interoperability tests, schema-built publishing and simulator templates, protobuf decoding, full search-result export, streamed recording import, split view, decoded-field plots, decoded search, multi-file `.proto` decoders, pinned split panes, custom search ranges, coalesced renderer delivery and lazily loaded panels.
 
 Next, in order:
 
 1. Installer/upgrade checks and other brokers (Mosquitto checks are in place). The installer changes the system, so it runs only as an agreed release step.
-2. Lazy-loaded panel modules.
+2. Reverse paging and oversized-payload streaming for content search.
+3. Cross-recording search.
 
 Original order: start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
 
