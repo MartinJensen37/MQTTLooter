@@ -44,6 +44,8 @@ function RecordingPanel({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentMessage, setCurrentMessage] = useState<StoredRecordingMessage | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  // Wall-clock origin for the current play run, so publish latency does not accumulate.
+  const anchor = useRef<{ wall: number; time: number; speed: number } | null>(null);
   const [stepSize, setStepSize] = useState(1);
 
   // UI state.
@@ -175,9 +177,19 @@ function RecordingPanel({
       const previous = currentIndex > 0 ? await cursor.at(currentIndex - 1) : undefined;
       if (cancelled) return;
       if (!message) return stop();
-      const delay = previous
-        ? Math.max(0, (message.timestamp - previous.timestamp) / playbackSpeed)
-        : 0;
+      if (!anchor.current || anchor.current.speed !== playbackSpeed)
+        anchor.current = {
+          wall: Date.now(),
+          time: previous?.timestamp ?? message.timestamp,
+          speed: playbackSpeed,
+        };
+      // A late or slow publish shortens the next wait instead of delaying every later message.
+      const delay = Math.max(
+        0,
+        anchor.current.wall +
+          (message.timestamp - anchor.current.time) / playbackSpeed -
+          Date.now(),
+      );
       timer = setTimeout(
         async () => {
           try {
@@ -248,6 +260,7 @@ function RecordingPanel({
 
   const startRealtimePlayback = () => {
     if (!playback?.total) return;
+    anchor.current = null;
     if (currentIndex >= playback.total) setCurrentIndex(0);
     setIsPlaying(true);
     setIsPaused(false);

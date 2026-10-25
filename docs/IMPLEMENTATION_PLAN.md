@@ -37,7 +37,8 @@ Audited through `b705d91`. Baseline: 164 tests, typecheck, lint and the built El
 - Queue overflow, storage errors and automatic reconnects are stored as gap records; the recording is marked incomplete rather than claiming lossless capture.
 - The library lists metadata only. Playback and topic filters read pages; export streams chunks to a file chosen in main.
 - The legacy `recordings.json` library and any localStorage copy are imported idempotently. The JSON file is kept as `recordings.json.migrated` once its counts are verified.
-- Remaining: streaming import of files above 10 MiB, playback timing that does not wait for each publish acknowledgement, and cross-recording search.
+- Playback schedules each message against a fixed start anchor, so slow publish acknowledgements no longer accumulate drift; a stalled publish is followed by catch-up sends.
+- Remaining: streaming import of files above 10 MiB and cross-recording search.
 
 ### Load baseline (2026-10-25)
 
@@ -74,7 +75,7 @@ Broker passwords, TLS private keys and passphrases are encrypted with `safeStora
 | Plain simulator payloads | Raw UTF-8 scalar output, device defaults/per-signal overrides, exact text/hex previews and versioned legacy migration. Combined payload templates place several typed signals, timestamps, ISO times, UUIDs and random helpers in nested JSON or raw text. | Schema-driven payload construction. |
 | MQTT 5 properties | Live/disk inspection and exports preserve metadata. Publisher supports response topic, correlation bytes, content type, expiry, payload format and repeated user properties with main-process validation. | Broker-negotiated alias lifecycle and broader real-broker interoperability tests. |
 | Memory and throttling | Acknowledged transport batches, per-connection/shared budgets, protected topic metadata, worker-owned disk history and recordings with durable gap records. A load harness measures working sets, V8 heaps, input latency, queues and accounting. | Replaceable-update coalescing for retained floods; optional per-message allocation reduction. |
-| Recordings in a database | Main-owned capture into `recordings.sqlite` with per-batch commits, crash recovery, durable queue/outage/storage gaps, paged playback, streamed export and one-time JSON/localStorage migration. Kept up with 5,000 msg/s for 60 s under load. | Streaming import above 10 MiB and drift-free playback. |
+| Recordings in a database | Main-owned capture into `recordings.sqlite` with per-batch commits, crash recovery, durable queue/outage/storage gaps, paged playback, streamed export and one-time JSON/localStorage migration. Kept up with 5,000 msg/s for 60 s under load. | Streaming import above 10 MiB. |
 | Responsive disconnect control | MQTT clients run in main; storage runs in workers. Measured disconnect is 1-2 ms during 50k-topic floods and 5,000 msg/s streams. | Repeat with decoding and plots active once those land. |
 | Multiple tiled panels | Not implemented; current tabs preserve mounted workspaces. | Dockable layout with explicit panel lifecycle and persistence. |
 | Protobuf / Sparkplug B | Not implemented. | Schema-selected decoding first; Sparkplug B remains an optional later feature. |

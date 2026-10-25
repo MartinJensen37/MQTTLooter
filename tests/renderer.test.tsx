@@ -274,6 +274,48 @@ describe('renderer state', () => {
     expect(publish).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps playback on the recorded schedule when publishes are slow', async () => {
+    recordings.import({
+      name: 'Timed',
+      startTime: 0,
+      endTime: 3000,
+      connectionName: 'A',
+      messages: [0, 1000, 2000, 3000].map((timestamp) => ({
+        topic: 't',
+        message: String(timestamp),
+        timestamp,
+      })),
+    });
+    const started = Date.now();
+    const sent: number[] = [];
+    // Each acknowledgement takes 400 ms; waiting for it must not delay later messages.
+    const publish = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          sent.push(Date.now() - started);
+          setTimeout(resolve, 400);
+        }),
+    );
+    await act(async () =>
+      root.render(<RecordingPanel activeConnectionId="a" isConnected onPublishMessage={publish} />),
+    );
+    await settle();
+    await act(async () =>
+      (container.querySelector('.recording-item-header') as HTMLElement).click(),
+    );
+    await settle();
+    await act(async () =>
+      (
+        container.querySelector('label.recording-controls-section input') as HTMLInputElement
+      ).click(),
+    );
+    await act(async () =>
+      (container.querySelector('[title="Start playback"]') as HTMLButtonElement).click(),
+    );
+    for (let i = 0; i < 40; i++) await settle(100);
+    expect(sent).toEqual([0, 1000, 2000, 3000]);
+  });
+
   it('plays offline by default and publishes each message once when enabled', async () => {
     recordings.import({
       name: 'Saved',
