@@ -11,7 +11,8 @@ export const SEARCH_LIMITS = {
 };
 export interface HistorySearchQuery extends HistoryQuery {
   term: string;
-  mode: 'text' | 'hex';
+  /** 'decoded' searches the JSON text of protobuf payloads decoded for each message's topic. */
+  mode: 'text' | 'hex' | 'decoded';
   from: number;
   to: number;
   /** 'filter' searches every stored topic of the connection matching an MQTT topic filter. */
@@ -81,7 +82,8 @@ export function validateSearch(query: HistorySearchQuery): void {
     query.term.length > SEARCH_LIMITS.termLength
   )
     throw new Error('Enter between 1 and 1,024 search characters.');
-  if (query.mode !== 'text' && query.mode !== 'hex') throw new Error('Choose text or hex search.');
+  if (!['text', 'hex', 'decoded'].includes(query.mode))
+    throw new Error('Choose text, hex or decoded search.');
   if (query.scope !== undefined && query.scope !== 'topic' && query.scope !== 'filter')
     throw new Error('Choose a search scope.');
   if (query.scope === 'filter' && !validTopicFilter(query.filter))

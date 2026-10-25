@@ -269,7 +269,15 @@ export class HistoryDatabase {
   }
 
   /** One resumable slice. Time filtering happens here so SQL cannot scan an unbounded time-filtered tail. */
-  search(query: HistorySearchQuery, now = Date.now()): HistorySearchPage {
+  /**
+   * `decode` returns a payload's decoded text for 'decoded' searches, or undefined when the
+   * message's topic has no decoder or the payload does not decode.
+   */
+  search(
+    query: HistorySearchQuery,
+    now = Date.now(),
+    decode: (topic: string, payload: Uint8Array) => string | undefined = () => undefined,
+  ): HistorySearchPage {
     validateSearch(query);
     if (query.generation !== undefined && query.generation !== this.generation)
       throw new Error('History was cleared. Start a new search.');
@@ -338,7 +346,11 @@ export class HistoryDatabase {
           matches = Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength).includes(
             needle,
           );
-        else {
+        else if (query.mode === 'decoded') {
+          const text = decode(String(row.path), payload);
+          if (text === undefined) binary = true;
+          else matches = text.includes(query.term);
+        } else {
           try {
             matches = decoder.decode(payload).includes(query.term);
           } catch {

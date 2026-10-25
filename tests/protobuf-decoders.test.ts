@@ -137,3 +137,72 @@ it('plots decoded fields from stored protobuf payloads, including zero values', 
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+it('searches decoded protobuf text and counts payloads that do not decode', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { HistoryDatabase } = await import('../src/main/history-database');
+  const decoders = new ProtobufDecoders();
+  decoders.configure([definition]);
+  const directory = mkdtempSync(join(tmpdir(), 'mqtt-decoded-search-'));
+  const database = new HistoryDatabase(join(directory, 'history.sqlite'));
+  try {
+    const now = Date.now();
+    const payloads: [string, Uint8Array][] = [
+      ['plant/1/reading', encode({ id: 'pump-1', count: '9007199254740993' })],
+      ['plant/2/reading', encode({ id: 'pump-2' })],
+      ['plant/3/reading', Uint8Array.of(0x0a, 0xff)],
+      ['other/topic', encode({ id: 'pump-1' })],
+    ];
+    database.append(
+      payloads.map(([topic, bytes], index) => ({
+        id: 'broker',
+        sessionId: 's',
+        sequence: index + 1,
+        topic,
+        message: Buffer.from(bytes).toString('base64'),
+        encoding: 'base64' as const,
+        byteLength: bytes.byteLength,
+        timestamp: now,
+        qos: 0,
+        retain: false,
+        protocolVersion: 5,
+      })),
+      now,
+    );
+    const decode = (topic: string, payload: Uint8Array) => {
+      const decoder = matchDecoder([definition], topic);
+      if (!decoder) return undefined;
+      try {
+        return decoders.decode(decoder.id, payload);
+      } catch {
+        return undefined;
+      }
+    };
+    const search = (term: string) =>
+      database.search(
+        {
+          connectionId: 'broker',
+          topic: '',
+          scope: 'filter',
+          filter: '#',
+          mode: 'decoded',
+          term,
+          from: now - 1000,
+          to: now,
+        },
+        now,
+        decode,
+      );
+    // The exact 64-bit value exists only in the decoded text, not in the bytes.
+    const exact = search('"9007199254740993"');
+    expect(exact.messages.map((message) => message.topic)).toEqual(['plant/1/reading']);
+    // Undecodable payloads and topics without a decoder are counted, not matched.
+    expect(exact.skippedBinary).toBe(2);
+    expect(search('pump-2').messages.map((message) => message.topic)).toEqual(['plant/2/reading']);
+  } finally {
+    database.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

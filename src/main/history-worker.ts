@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, renameSync, rmSync, mkdirSync } from 'node
 import { join } from 'node:path';
 import { HistoryDatabase } from './history-database';
 import { ProtobufDecoders } from './protobuf-decoders';
+import { matchDecoder, type DecoderDefinition } from '../shared/decoders';
 import type { HistoryRequest } from '../shared/history';
 
 const directory: string = workerData.directory;
@@ -24,6 +25,16 @@ if (!persistent) cleanSession();
 const database = new HistoryDatabase(databasePath);
 // Plots of protobuf topics decode stored payloads here, next to the data.
 const decoders = new ProtobufDecoders();
+let decoderList: DecoderDefinition[] = [];
+const decodeText = (topic: string, payload: Uint8Array) => {
+  const decoder = matchDecoder(decoderList, topic);
+  if (!decoder) return undefined;
+  try {
+    return decoders.decode(decoder.id, payload);
+  } catch {
+    return undefined;
+  }
+};
 const maintenance = setInterval(() => {
   try {
     database.append([]);
@@ -72,13 +83,14 @@ parentPort!.on(
           break;
         }
         case 'decoders':
+          decoderList = request.decoders;
           data = decoders.configure(request.decoders);
           break;
         case 'page':
           data = database.page(request.query);
           break;
         case 'search':
-          data = database.search(request.query);
+          data = database.search(request.query, Date.now(), decodeText);
           break;
         case 'topics':
           data = database.topics(request.connectionId, request.search);
