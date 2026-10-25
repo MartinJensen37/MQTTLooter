@@ -3,25 +3,35 @@ const fs = require('node:fs');
 const path = require('node:path');
 const protobuf = require('protobufjs');
 
+const units = `syntax = "proto3";
+package units;
+enum Unit { NONE = 0; KPA = 1; }`;
 const proto = `syntax = "proto3";
 package smoke;
-message Reading { string id = 1; double value = 2; int64 count = 3; }`;
+import "units.proto";
+message Reading { string id = 1; double value = 2; int64 count = 3; units.Unit unit = 4; }`;
 
 module.exports = async ({ evaluate, waitFor, field, send, userData, capture }) => {
-  const type = protobuf.parse(proto).root.lookupType('smoke.Reading');
+  const root = new protobuf.Root();
+  protobuf.parse(units, root);
+  protobuf.parse(proto, root);
+  const type = root.lookupType('smoke.Reading');
   const payload = Buffer.from(
-    type.encode(type.fromObject({ id: 'pump', value: 2.5, count: '9007199254740993' })).finish(),
+    type
+      .encode(type.fromObject({ id: 'pump', value: 2.5, count: '9007199254740993', unit: 'KPA' }))
+      .finish(),
   );
   const button = (text) =>
     `[...document.querySelectorAll('button')].find(button => button.textContent.trim().startsWith(${JSON.stringify(text)}))`;
 
-  // Add the decoder through the real dialog and a real file input.
+  // Add the decoder through the real dialog and a real file input, with an imported file.
   await evaluate(`${button('Decoders')}.click()`);
   await waitFor(() => evaluate("!!document.querySelector('.decoder-dialog')"), 'decoder dialog');
   await evaluate(`(() => {
     const input = document.querySelector('[aria-label="Protobuf schema file"]');
     const transfer = new DataTransfer();
     transfer.items.add(new File([${JSON.stringify(proto)}], 'smoke.proto', { type: 'text/plain' }));
+    transfer.items.add(new File([${JSON.stringify(units)}], 'units.proto', { type: 'text/plain' }));
     input.files = transfer.files;
     input.dispatchEvent(new Event('change', { bubbles: true }));
   })()`);
@@ -43,9 +53,11 @@ module.exports = async ({ evaluate, waitFor, field, send, userData, capture }) =
   );
   await capture();
   await evaluate(`${button('Close')}.click()`);
-  assert.ok(
-    fs.readFileSync(path.join(userData, 'decoders.json'), 'utf8').includes('smoke.Reading'),
-  );
+  const [stored] = JSON.parse(
+    fs.readFileSync(path.join(userData, 'decoders.json'), 'utf8'),
+  ).decoders;
+  assert.equal(stored.messageType, 'smoke.Reading');
+  assert.deepEqual(stored.imports, [{ name: 'units.proto', source: units }]);
 
   send('proto/pump/reading', payload);
   await field('[aria-label="Search topics"]', 'proto/pump/reading');
@@ -64,14 +76,19 @@ module.exports = async ({ evaluate, waitFor, field, send, userData, capture }) =
       ),
     'decoded protobuf payload',
   );
-  const stored = await evaluate(
+  const page = await evaluate(
     "window.electronAPI.history.page({connectionId:'smoke',topic:'proto/pump/reading'})",
   );
-  const [message] = stored.data.messages;
+  const [message] = page.data.messages;
   assert.deepEqual(
     Buffer.from(message.message, message.encoding === 'base64' ? 'base64' : 'utf8'),
     payload,
   );
+  // The enum comes from the imported file; the card preview is too short to show it.
+  const decoded = await evaluate(
+    `window.electronAPI.decoders.decode(${JSON.stringify(stored.id)}, ${JSON.stringify(message.message)}, ${JSON.stringify(message.encoding)})`,
+  );
+  assert.equal(JSON.parse(decoded.data).unit, 'KPA');
   // The history worker decodes stored payloads for plots, so decoded fields plot like JSON.
   for (const value of [1.5, 3.5])
     send(
