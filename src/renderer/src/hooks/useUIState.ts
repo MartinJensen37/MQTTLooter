@@ -105,6 +105,10 @@ export function useUIState(selectedConnection: string | null) {
       const index = ['F1', 'F2', 'F3', 'F4'].indexOf(e.key);
       if (index === -1) return;
       e.preventDefault();
+      // A key press makes Chromium draw the focus ring on whatever was last clicked, which then
+      // lingers on a control in the panel being left. Tab buttons keep focus; App moves it.
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && !focused.classList.contains('tab-btn')) focused.blur();
       setActiveTab(TABS[index]);
     };
     window.addEventListener('keydown', onKey);

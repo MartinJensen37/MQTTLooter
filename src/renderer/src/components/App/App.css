@@ -140,6 +140,11 @@
   padding: 0;
 }
 
+.tab-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -3px;
+}
+
 .tab-btn {
   padding: 12px var(--spacing-xl) 15px var(--spacing-xl);
   background: var(--gray-200);

@@ -84,6 +84,19 @@ it('resizes the connection list and collapses it when dragged fully in', async (
   });
 });
 
+it('clears focus left on a clicked control when F-keys switch panels', async () => {
+  await render();
+  const button = document.createElement('button');
+  document.body.append(button);
+  button.focus();
+  await act(async () =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true })),
+  );
+  expect(state.activeTab).toBe('publishing');
+  expect(document.activeElement).not.toBe(button);
+  button.remove();
+});
+
 it('restores the split layout after a restart', async () => {
   await render();
   await act(async () => state.setSplitTab('simulation'));

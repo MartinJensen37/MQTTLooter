@@ -118,6 +118,11 @@ function App() {
       setPanePin(null);
   }, [connections, panePin, setPanePin]);
   const tabContainerRef = useRef(null);
+  // Keyboard focus on a tab follows F-key switches to the newly active tab.
+  useEffect(() => {
+    if (document.activeElement?.classList.contains('tab-btn'))
+      document.querySelector('.main-tabs .tab-btn.active')?.focus();
+  }, [activeTab]);
   // Below 560 px of content width the panes stack instead of sitting side by side.
   const [stacked, setStacked] = useState(false);
   useEffect(() => {
@@ -493,6 +498,8 @@ function App() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
+                      // Clicking selects without focusing, so F-keys leave no focus ring behind.
+                      onMouseDown={(event) => event.preventDefault()}
                       className={`tab-btn ${activeTab === tab.id ? 'active' : tab.id === splitTab ? 'secondary' : ''}`}
                       title={`${tab.key} - ${tab.label} Panel`}
                     >
@@ -521,6 +528,7 @@ function App() {
                       className={`btn btn-sm ${panePin ? 'btn-primary' : 'btn-secondary'}`}
                       aria-pressed={Boolean(panePin)}
                       aria-label="Pin second pane"
+                      onMouseDown={(event) => event.preventDefault()}
                       title={
                         panePin
                           ? 'Let the second pane follow the sidebar again'
@@ -547,6 +555,7 @@ function App() {
                     className={`btn btn-sm ${splitTab ? 'btn-primary' : 'btn-secondary'}`}
                     aria-pressed={Boolean(splitTab)}
                     aria-label="Split view"
+                    onMouseDown={(event) => event.preventDefault()}
                     title={splitTab ? 'Close split view' : 'Show a second tab beside this one'}
                     onClick={() =>
                       setSplitTab(splitTab ? null : TAB_LIST.find((tab) => tab.id !== activeTab).id)
