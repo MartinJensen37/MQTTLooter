@@ -14,7 +14,7 @@ function TemplateDeleteDialog({
   confirmTemplateDelete,
 }: Props) {
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay template-delete-dialog">
       <div className="confirmation-modal">
         <div className="modal-header">
           <h3>Delete Template</h3>

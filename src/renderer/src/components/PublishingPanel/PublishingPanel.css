@@ -909,8 +909,8 @@
   line-height: 1.3;
 }
 
-/* Modal Styles */
-.modal-overlay {
+/* Template delete dialog. Scoped: this file loads with the panel, after shared styles. */
+.template-delete-dialog.modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -924,7 +924,7 @@
   backdrop-filter: blur(2px);
 }
 
-.confirmation-modal {
+.template-delete-dialog .confirmation-modal {
   background: white;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
@@ -934,35 +934,35 @@
   overflow: auto;
 }
 
-.modal-header {
+.template-delete-dialog .modal-header {
   padding: var(--spacing-lg);
   border-bottom: 1px solid var(--gray-200);
 }
 
-.modal-header h3 {
+.template-delete-dialog .modal-header h3 {
   margin: 0;
   color: var(--gray-700);
   font-size: 18px;
   font-weight: 600;
 }
 
-.modal-content {
+.template-delete-dialog .modal-content {
   padding: var(--spacing-lg);
 }
 
-.modal-content p {
+.template-delete-dialog .modal-content p {
   margin: 0 0 var(--spacing-md) 0;
   color: var(--gray-600);
   line-height: 1.5;
 }
 
-.warning-text {
+.template-delete-dialog .warning-text {
   color: var(--danger-red) !important;
   font-weight: 500;
   font-size: 14px;
 }
 
-.modal-actions {
+.template-delete-dialog .modal-actions {
   padding: var(--spacing-lg);
   border-top: 1px solid var(--gray-200);
   display: flex;

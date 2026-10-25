@@ -12,13 +12,16 @@
   backdrop-filter: blur(2px);
 }
 
+/* Size and frame as rendered before the publishing panel's modal rules were scoped. */
 .confirmation-modal {
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   min-width: 200px;
-  max-width: 300px;
-  max-height: 200px;
+  max-width: 400px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: auto;
   margin: 20px;
   animation: confirmationSlideIn 0.2s ease-out;
   border: 1px solid #e9ecef;
