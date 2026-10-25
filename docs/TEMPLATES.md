@@ -21,6 +21,7 @@ Declare variables using `text` (or `string`), `number`, `integer`, `boolean` or 
 | Placeholder | Value |
 | --- | --- |
 | `{{timestamp}}` | Unix time in milliseconds, sampled once per application. |
+| `{{isoTimestamp}}` | The same time as an ISO 8601 UTC string. |
 | `{{uuid}}` | A random UUID shared by all UUID occurrences in that application, including the topic. The next application generates a new UUID. |
 | `{{randomInt(-10, 10)}}` | An integer including both bounds. |
 | `{{randomFloat(-1, 1, 3)}}` | A number rounded to the specified 0-10 decimal places. |

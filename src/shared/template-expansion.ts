@@ -127,6 +127,7 @@ export function expandTemplate(
       return resolved.get(name);
     }
     if (name === 'timestamp') return now;
+    if (name === 'isoTimestamp') return new Date(now).toISOString();
     if (name === 'uuid')
       return (uuid ??= (context.uuid ?? (() => globalThis.crypto.randomUUID()))());
     const call = /^(randomInt|randomFloat|randomChoice)\(([\s\S]*)\)$/.exec(name);
