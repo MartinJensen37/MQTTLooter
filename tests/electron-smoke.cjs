@@ -1,4 +1,8 @@
-/* Run after npm run build. Uses isolated storage and a loopback-only test broker. */
+/*
+ * Run after building into out-test (npm run test:electron does both). A separate folder from
+ * out/ keeps test builds from changing an app started with npm run dev or npm start.
+ * Uses isolated storage and a loopback-only test broker.
+ */
 const assert = require('node:assert/strict');
 const net = require('node:net');
 const fs = require('node:fs');
@@ -165,7 +169,7 @@ async function run() {
       ],
     }),
   );
-  require(path.join(workspace, 'out/main/index.js'));
+  require(path.join(workspace, 'out-test/main/index.js'));
   await new Promise((resolve) => broker.listen(0, '127.0.0.1', resolve));
   await app.whenReady();
   let window;

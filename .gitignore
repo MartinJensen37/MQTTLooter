@@ -21,6 +21,7 @@ pids
 dist-builder
 build/
 out/
+out-test/
 
 # Dependency directories
 node_modules/

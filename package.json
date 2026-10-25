@@ -9,8 +9,8 @@
   },
   "scripts": {
     "test": "vitest run",
-    "test:electron": "npm run build && node tests/run-electron-smoke.cjs",
-    "test:load": "npm run build && node tests/run-electron-load.cjs",
+    "test:electron": "node tests/build-test-app.cjs && node tests/run-electron-smoke.cjs",
+    "test:load": "node tests/build-test-app.cjs && node tests/run-electron-load.cjs",
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
     "build": "electron-vite build",

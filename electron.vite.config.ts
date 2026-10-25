@@ -4,10 +4,14 @@ import react from '@vitejs/plugin-react';
 
 // Unified build for all three Electron processes. externalizeDepsPlugin keeps
 // node_modules (e.g. mqtt) as runtime requires instead of bundling them.
+// Tests build into their own folder (MQTTLOOTER_OUT_DIR=out-test), leaving a running app's out/ alone.
+const outDir = resolve(__dirname, process.env.MQTTLOOTER_OUT_DIR || 'out');
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
     build: {
+      outDir: resolve(outDir, 'main'),
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
@@ -21,12 +25,14 @@ export default defineConfig({
   preload: {
     plugins: [externalizeDepsPlugin()],
     build: {
+      outDir: resolve(outDir, 'preload'),
       lib: { entry: resolve(__dirname, 'src/preload/preload.ts') },
     },
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
     build: {
+      outDir: resolve(outDir, 'renderer'),
       rollupOptions: {
         input: resolve(__dirname, 'src/renderer/index.html'),
       },

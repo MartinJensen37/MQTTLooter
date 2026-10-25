@@ -1,5 +1,5 @@
 /*
- * Load harness. Run after `npm run build` through tests/run-electron-load.cjs.
+ * Load harness. Run through `npm run test:load`, which builds into out-test first.
  * LOAD_PROFILE=quick (default) or full. LOAD_STRICT=1 also fails on missed performance targets.
  * Uses isolated storage and a loopback broker in a separate process; never a public broker.
  */
@@ -195,7 +195,7 @@ function sampler(evaluate, heapUsage) {
 async function run() {
   // Load main before awaiting anything so it sees Electron's ready event.
   const brokerReady = brokerReply('ready');
-  require(path.join(workspace, 'out/main/index.js'));
+  require(path.join(workspace, 'out-test/main/index.js'));
   const { port } = await brokerReady;
   await app.whenReady();
   let window;
