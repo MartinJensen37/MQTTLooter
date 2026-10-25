@@ -108,9 +108,11 @@ Properties are saved per connection with the draft and successful publication hi
 
 In Logging, choose **Source > Disk history**, select a stored topic, and open **Search message contents**. Search literal, case-sensitive UTF-8 text or a hexadecimal byte sequence such as `00 ff 80`. Hex searches the original bytes, including binary payloads. Choose the last 5 minutes, last hour or retained 24 hours; the time range and captured-message snapshot are fixed when the search starts.
 
+Set **Topics > Topic filter** to search every stored topic of the connection that matches an MQTT filter, such as `sensors/+/temperature` or `#`. Each result shows its topic. As with subscriptions, `#` also matches the parent level, and wildcards do not match topics starting with `$` unless the filter names that level. Messages from non-matching topics still count toward each bounded scan step, so a narrow filter over a busy connection may need several **Continue search** steps. **Clear topic history** is not offered for filter results.
+
 Search scans beyond the displayed page and the live cache. **Stop search** pauses scanning, and **Continue search** resumes from the last completed step or looks for older matches. Changing criteria, switching topics or leaving Logging stops further scan requests. Start a new search to include new arrivals. Result pages hold up to 100 matches / 1 MiB estimated; sorting, copying and export apply to those displayed matches. **Clear topic history** removes all stored and cached messages for the selected topic, including unmatched messages.
 
-Payloads above 256 KiB and records above 1 MiB estimated are skipped with a visible count. Text mode also counts non-UTF-8 payloads it skips. Retention may remove records while browsing, and searches cannot recover expired data. Search currently covers one exact topic at a time; cross-topic search and whole-result export are still planned.
+Payloads above 256 KiB and records above 1 MiB estimated are skipped with a visible count. Text mode also counts non-UTF-8 payloads it skips. Retention may remove records while browsing, and searches cannot recover expired data. Whole-result export is still planned.
 
 ### Previewing publish schedules
 
