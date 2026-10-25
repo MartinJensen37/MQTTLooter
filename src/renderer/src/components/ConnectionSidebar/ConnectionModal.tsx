@@ -199,6 +199,7 @@ function ConnectionModal({ connection, onSave, onCancel }: ConnectionModalProps)
         receiveMaximum: formData.receiveMaximum,
         maximumPacketSize: formData.maximumPacketSize,
         topicAliasMaximum: formData.topicAliasMaximum,
+        autoAssignTopicAlias: formData.autoAssignTopicAlias,
         requestResponseInformation: formData.requestResponseInformation,
         requestProblemInformation: formData.requestProblemInformation,
         userProperties: formData.userProperties,

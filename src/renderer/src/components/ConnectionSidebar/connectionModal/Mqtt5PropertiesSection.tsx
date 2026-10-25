@@ -82,7 +82,9 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
               onChange={(e) => handleInputChange('requestResponseInformation', e.target.checked)}
             />
             <div className="mqtt-connection-modal-checkbox-custom"></div>
-            <span className="mqtt-connection-modal-checkbox-text">Request Response Information</span>
+            <span className="mqtt-connection-modal-checkbox-text">
+              Request Response Information
+            </span>
           </label>
           <div className="mqtt-field-hint">Request server to return response information</div>
         </div>
@@ -99,6 +101,25 @@ function Mqtt5PropertiesSection({ formData, handleInputChange }: Props) {
           </label>
           <div className="mqtt-field-hint">
             Request server to return problem information in case of failures
+          </div>
+        </div>
+      </div>
+
+      <div className="mqtt-form-row">
+        <div className="mqtt-form-group">
+          <label className="mqtt-connection-modal-checkbox-label">
+            <input
+              type="checkbox"
+              checked={formData.autoAssignTopicAlias}
+              onChange={(e) => handleInputChange('autoAssignTopicAlias', e.target.checked)}
+            />
+            <div className="mqtt-connection-modal-checkbox-custom"></div>
+            <span className="mqtt-connection-modal-checkbox-text">
+              Use topic aliases when publishing
+            </span>
+          </label>
+          <div className="mqtt-field-hint">
+            Within the broker's limit from CONNACK; aliases reset on every reconnect
           </div>
         </div>
       </div>

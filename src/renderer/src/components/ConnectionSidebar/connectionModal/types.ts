@@ -42,6 +42,7 @@ export interface ConnectionFormData {
   receiveMaximum: number;
   maximumPacketSize: number;
   topicAliasMaximum: number;
+  autoAssignTopicAlias: boolean;
   requestResponseInformation: boolean;
   requestProblemInformation: boolean;
   userProperties: Record<string, unknown>;

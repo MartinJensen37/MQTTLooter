@@ -189,6 +189,24 @@ describe('MQTT lifecycle', () => {
     expect(client.publish).toHaveBeenCalledTimes(1);
   });
 
+  it('enables negotiated outgoing topic aliases only for MQTT 5 connections that opt in', async () => {
+    for (const [protocolVersion, autoAssignTopicAlias, expected] of [
+      [5, true, true],
+      [5, false, undefined],
+      [4, true, undefined],
+    ] as const) {
+      const result = manager.connect('a', {
+        brokerUrl: 'mqtt://localhost',
+        protocolVersion,
+        autoAssignTopicAlias,
+      });
+      client.emit('connect', {});
+      await result;
+      expect(client.options.autoAssignTopicAlias).toBe(expected);
+      await manager.disconnect('a');
+    }
+  });
+
   it('keeps credentials out of connection status', async () => {
     const result = manager.connect('a', {
       brokerUrl: 'mqtt://localhost',

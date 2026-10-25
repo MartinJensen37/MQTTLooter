@@ -171,6 +171,9 @@ class MQTTConnection extends EventEmitter {
 
         // MQTT.js uses `clean` for both MQTT 3.1.1 and MQTT 5.
         if (this.config.protocolVersion === 5) {
+          // MQTT.js sizes the alias table from each CONNACK's Topic Alias Maximum and discards
+          // it on reconnect, so aliases follow the negotiated limit and session lifecycle.
+          if (this.config.autoAssignTopicAlias === true) options.autoAssignTopicAlias = true;
           options.properties = { ...this.config.properties };
           for (const key of [
             'sessionExpiryInterval',

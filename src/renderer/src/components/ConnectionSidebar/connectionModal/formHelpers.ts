@@ -65,6 +65,7 @@ export function createDefaultFormData(): ConnectionFormData {
     receiveMaximum: 65535,
     maximumPacketSize: 268435455,
     topicAliasMaximum: 0,
+    autoAssignTopicAlias: false,
     requestResponseInformation: false,
     requestProblemInformation: true,
     userProperties: {},
@@ -126,6 +127,7 @@ export function buildInitialFormData(connection: any): ConnectionFormData {
     receiveMaximum: config.receiveMaximum || 65535,
     maximumPacketSize: config.maximumPacketSize || 268435455,
     topicAliasMaximum: config.topicAliasMaximum || 0,
+    autoAssignTopicAlias: config.autoAssignTopicAlias === true,
     requestResponseInformation: config.requestResponseInformation || false,
     requestProblemInformation:
       config.requestProblemInformation !== undefined ? config.requestProblemInformation : true,

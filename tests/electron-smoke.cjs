@@ -37,19 +37,28 @@ const sockets = new Set();
 const binaryPayload = Buffer.from([0, 255, 128, 13, 10]);
 const published = [];
 const connectPasswords = [];
+let aliasedPublishes = 0;
 const broker = net.createServer((socket) => {
   sockets.add(socket);
   socket.on('close', () => sockets.delete(socket));
   socket.on('error', () => {});
   const parser = codec.parser();
   const subscriptions = new Set();
+  // Like a real broker, resolve this connection's topic aliases before handling a publish.
+  const aliases = new Map();
   let protocolVersion = 4;
   const send = (packet) => socket.write(codec.generate(packet, { protocolVersion }));
   parser.on('packet', (packet) => {
     if (packet.cmd === 'connect') {
       connectPasswords.push(packet.password?.toString());
       protocolVersion = packet.protocolVersion;
-      send({ cmd: 'connack', sessionPresent: false, returnCode: 0, reasonCode: 0 });
+      send({
+        cmd: 'connack',
+        sessionPresent: false,
+        returnCode: 0,
+        reasonCode: 0,
+        ...(protocolVersion === 5 && { properties: { topicAliasMaximum: 4 } }),
+      });
     } else if (packet.cmd === 'subscribe') {
       packet.subscriptions.forEach(({ topic }) => subscriptions.add(topic));
       send({
@@ -77,6 +86,12 @@ const broker = net.createServer((socket) => {
         },
       });
     } else if (packet.cmd === 'publish') {
+      const alias = packet.properties?.topicAlias;
+      if (alias && packet.topic) aliases.set(alias, packet.topic);
+      else if (alias) {
+        packet.topic = aliases.get(alias);
+        aliasedPublishes++;
+      }
       published.push(packet);
       if (subscriptions.has('#') && packet.topic.startsWith('smoke/')) {
         send({
@@ -156,6 +171,7 @@ async function run() {
     subscriptions: [{ topic: '#', qos: 0 }],
     username: 'smoke-user',
     password: 'smoke-secret',
+    autoAssignTopicAlias: true,
   };
   await evaluate(
     `localStorage.setItem('mqtt-connections', JSON.stringify([{id:'smoke',config:${JSON.stringify(config)}}]))`,
@@ -869,6 +885,8 @@ async function run() {
         );
     },
   });
+  // Repeated simulator topics were sent as aliases within the broker's limit.
+  assert.ok(aliasedPublishes > 0, 'topic aliases used');
   assert.deepEqual(errors, []);
   console.log(
     'Electron smoke passed: MQTT 5, binary payloads, recording recovery, simulator/QoS 1+2, topic search, anchored scrolling, responsive layout and sandbox.',
