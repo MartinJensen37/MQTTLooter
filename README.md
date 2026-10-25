@@ -21,9 +21,12 @@ npm run typecheck
 npm run lint
 npm run build            # Main, preload, and renderer output in out/
 npm run test:electron    # Build and test the real app against a local MQTT broker
+npm run test:load        # Build and measure the real app under load (LOAD_PROFILE=full for 50k topics / 5,000 msg/s)
 npm run pack             # Unpacked Windows application in dist-builder/win-unpacked/
 npm run dist             # Windows NSIS installer in dist-builder/
 ```
+
+The load test drives retained floods and a sustained stream with history and a recording active, from a loopback broker in a separate process. It writes `.tmp/load-report-<profile>.json` with memory, event-loop delay, input round trips, queue peaks, disconnect time and per-connection accounting, and removes its isolated app data afterwards (`LOAD_KEEP=1` keeps it). Performance targets are reported; `LOAD_STRICT=1` also fails the run when one is missed. Never point it at a public broker.
 
 The Electron smoke test uses hidden windows, isolated storage under `.tmp/`, and a loopback broker. It does not connect to saved user brokers or modify the user's app data. Screenshots are written to `.tmp/electron-smoke.png`, `.tmp/electron-simulator.png`, `.tmp/electron-simulator-small.png`, and `.tmp/electron-signal-editor.png`.
 
@@ -49,7 +52,7 @@ The Electron smoke test uses hidden windows, isolated storage under `.tmp/`, and
 - Resizable topic panel, collapsible connection sidebar, and F1-F4 panel shortcuts.
 - Compact simulator signal rows with interval/mode pills and static mini-patterns. Open a signal for its payload preview, last successful publish and full configuration; combined-mode previews show the entire device payload.
 
-Connection credentials and certificates are currently stored in renderer localStorage along with connection settings. The app allows one running instance per user-data directory to keep recording and history writes coordinated. See the review notes before treating this as a production data-capture tool.
+Broker passwords, TLS private keys and key passphrases are encrypted with the operating system's credential protection (`safeStorage`) and stored by the main process in `credentials.json`; other connection settings and CA/client certificates stay in renderer localStorage. Secrets saved by earlier versions move there on first start. Connecting merges them in main, and the editor loads them only while that connection is open for editing. If OS encryption is unavailable (for example Linux without a keyring), secrets stay in localStorage as before and the editor says so. The app allows one running instance per user-data directory to keep recording and history writes coordinated. See the review notes before treating this as a production data-capture tool.
 
 ## Structure
 
@@ -77,9 +80,9 @@ The topic tree's **Message delivery** section shows received, processed and drop
 
 In Logging, choose **Source > Disk history** to browse older messages. Pages hold up to 300 messages or about 2 MiB; one larger message can exceed the byte target. **Older page** and **Newer page** navigate a fixed snapshot, while **Latest stored page** includes newly committed messages. Sorting and export apply to the current page. The stored-topic search also finds retained paths that have left the live topic tree.
 
-A worker owns `history/history.sqlite` in Electron's user-data directory. It stores payload bytes, receive timestamps, session/sequence identity, QoS, retained flags and normalized MQTT 5 properties (binary properties use tagged base64). Writes are transactional and use an independent 8,192-message / 8 MiB queue. Overflow, worker failure or write failure stops disk capture visibly; **Resume capture** retries without hiding the earlier gap. Received/committed/dropped diagnostics cover the current app run, not a lossless-capture guarantee across crashes.
+A worker owns `history/history.sqlite` in Electron's user-data directory. It stores payload bytes, receive timestamps, session/sequence identity, QoS, retained flags and normalized MQTT 5 properties (binary properties use tagged base64). Writes are transactional, in batches of up to 1,024 messages / 1 MiB, through an independent 16,384-message / 16 MiB queue. Messages that do not fit in the queue are stored as gap records and capture continues; Logging shows how many messages are missing. Worker or write failure stops disk capture visibly; **Resume capture** retries without hiding the earlier gap.
 
-History is session-only by default: it is removed on normal exit, or on the next startup after a crash. Enable **Disk history settings > Keep history across app restarts** to retain it. Messages older than 24 hours are excluded from pages and removed incrementally. Retention trims oldest records at a 256 MiB payload/metadata estimate; SQLite has a separate 512 MiB database ceiling, with additional temporary rollback-journal space. Database free pages are reused, so deleting messages need not shrink the file. The worker uses an 8 MiB SQLite page cache and rollback journaling; WAL is not enabled.
+History is session-only by default: it is removed on normal exit, or on the next startup after a crash. Enable **Disk history settings > Keep history across app restarts** to retain it. Messages older than 24 hours are excluded from pages and removed incrementally. Retention trims oldest records at a 256 MiB payload/metadata estimate; SQLite has a separate 512 MiB database ceiling, plus a write-ahead log truncated to 64 MiB after checkpoints. Database free pages are reused, so deleting messages need not shrink the file. The worker uses an 8 MiB SQLite page cache.
 
 **Clear Messages** in Disk history removes that topic's stored and cached messages. Live-cache clearing remains a cache-only action. Exports currently cover the displayed page; streaming whole-history export is still planned.
 
@@ -127,4 +130,4 @@ Message cards offer Text, Hex and Pretty JSON. JSON formatting is bounded and pr
 
 Choose **Display > Plain log** for selectable text rows, then **Copy visible log** to copy the displayed preview. Binary payloads are labeled base64. The plain preview is limited to 4,096 payload characters per row and 262,144 characters overall, with a truncation notice; JSON/CSV exports still contain the complete payloads in the current view/page.
 
-Connection settings now have **Show/Hide** controls for the broker password and TLS private-key passphrase. Values start masked when the dialog opens. Credential storage has not changed; OS-backed secret migration remains planned.
+Connection settings have **Show/Hide** controls for the broker password and TLS private-key passphrase. Values start masked when the dialog opens.
