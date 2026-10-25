@@ -248,14 +248,16 @@ function MessagePanel({
             </div>
             {!plotContent && (
               <div className="topic-actions-section">
-                <button
-                  onClick={clearTopicMessages}
-                  className="btn btn-sm btn-danger"
-                  title="Clear messages for this topic"
-                  disabled={processedMessages.length === 0}
-                >
-                  <i className="fas fa-trash"></i> {clearLabel}
-                </button>
+                {onClearMessages && (
+                  <button
+                    onClick={clearTopicMessages}
+                    className="btn btn-sm btn-danger"
+                    title="Clear messages for this topic"
+                    disabled={processedMessages.length === 0}
+                  >
+                    <i className="fas fa-trash"></i> {clearLabel}
+                  </button>
+                )}
                 {!storedPage && (
                   <button
                     className={`btn btn-sm ${autoScroll ? 'btn-primary' : 'btn-secondary'}`}

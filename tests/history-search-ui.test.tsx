@@ -129,3 +129,31 @@ it('stops hidden searches and exposes skipped records rather than claiming exhau
   expect(container.textContent).toContain('2 oversized records skipped');
   expect(container.textContent).toContain('3 non-UTF-8');
 });
+
+it('searches a topic filter across topics and rejects an invalid filter before scanning', async () => {
+  search.mockResolvedValue(page([]));
+  await input('needle');
+  const set = async (label: string, value: string, event: string) =>
+    act(async () => {
+      const element = container.querySelector(`[aria-label="${label}"]`) as
+        | HTMLInputElement
+        | HTMLSelectElement;
+      const prototype =
+        element.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(element, value);
+      element.dispatchEvent(new Event(event, { bubbles: true }));
+    });
+  await set('Content search scope', 'filter', 'change');
+  await set('Content search topic filter', 'sensors/#/x', 'input');
+  await click('Search history');
+  expect(search).not.toHaveBeenCalled();
+  expect(container.querySelector('[role="alert"]')!.textContent).toContain('MQTT topic filter');
+  await set('Content search topic filter', 'sensors/+/temp', 'input');
+  await click('Search history');
+  expect(search.mock.calls[0][0]).toMatchObject({
+    topic: 'topic',
+    scope: 'filter',
+    filter: 'sensors/+/temp',
+    term: 'needle',
+  });
+});

@@ -23,6 +23,8 @@ export default function HistorySearch({
   const [term, setTerm] = useState('');
   const [mode, setMode] = useState<'text' | 'hex'>('text');
   const [windowMs, setWindowMs] = useState(86400000);
+  const [scope, setScope] = useState<'topic' | 'filter'>('topic');
+  const [filter, setFilter] = useState('#');
   const [page, setPage] = useState<HistorySearchPage>();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('Enter text or hex bytes to search.');
@@ -124,7 +126,18 @@ export default function HistorySearch({
           onSubmit={(event) => {
             event.preventDefault();
             const to = Date.now();
-            void scan({ connectionId, topic, term, mode, from: to - windowMs, to }, true);
+            void scan(
+              {
+                connectionId,
+                topic,
+                term,
+                mode,
+                from: to - windowMs,
+                to,
+                ...(scope === 'filter' && { scope, filter }),
+              },
+              true,
+            );
           }}
         >
           <label>
@@ -156,6 +169,36 @@ export default function HistorySearch({
               <option value="hex">Hex bytes</option>
             </select>
           </label>
+          <label>
+            Topics{' '}
+            <select
+              className="form-select custom-select-button"
+              aria-label="Content search scope"
+              value={scope}
+              onChange={(event) => {
+                reset();
+                setScope(event.target.value as 'topic' | 'filter');
+              }}
+            >
+              <option value="topic">This topic</option>
+              <option value="filter">Topic filter</option>
+            </select>
+          </label>
+          {scope === 'filter' && (
+            <label>
+              Filter{' '}
+              <input
+                className="form-input"
+                aria-label="Content search topic filter"
+                value={filter}
+                placeholder="sensors/+/temperature"
+                onChange={(event) => {
+                  reset();
+                  setFilter(event.target.value);
+                }}
+              />
+            </label>
+          )}
           <label>
             Received{' '}
             <select
@@ -216,11 +259,11 @@ export default function HistorySearch({
       </div>
       <MessagePanel
         connectionName={panelProps.connectionName}
-        onClearMessages={panelProps.onClearMessages}
+        onClearMessages={scope === 'topic' ? panelProps.onClearMessages : undefined}
         showFeedback={panelProps.showFeedback}
         clearLabel="Clear topic history"
         connectionId={connectionId}
-        selectedTopic={{ topicPath: topic, connectionId }}
+        selectedTopic={{ topicPath: scope === 'filter' ? filter : topic, connectionId }}
         messages={messages}
         storedPage
       />
