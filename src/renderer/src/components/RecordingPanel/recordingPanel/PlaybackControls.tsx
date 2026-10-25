@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { formatPayloadBytes } from '../../../../../shared/payload';
 import type { PlaybackState, StoredRecordingMessage } from './types';
 import { formatPayload } from './recordingHelpers';
@@ -53,6 +53,8 @@ function PlaybackControls({
   stepForward,
 }: Props) {
   const { topics, total } = playback;
+  const [topicSearch, setTopicSearch] = useState('');
+  const shownTopics = topicSearch ? topics.filter((topic) => topic.includes(topicSearch)) : topics;
 
   return (
     <div className="recording-expanded-area">
@@ -75,18 +77,28 @@ function PlaybackControls({
         {showTopicFilter && (
           <div className="recording-topic-filter-panel">
             <div className="recording-filter-actions">
+              <input
+                type="search"
+                className="form-input search-input"
+                aria-label="Search recorded topics"
+                placeholder="Search topics"
+                value={topicSearch}
+                onChange={(event) => setTopicSearch(event.target.value)}
+              />
               <button
-                onClick={() => setSelectedTopicsFilter(topics)}
+                onClick={() =>
+                  setSelectedTopicsFilter([...new Set([...selectedTopicsFilter, ...shownTopics])])
+                }
                 className="btn btn-sm btn-success"
               >
-                Select All
+                {topicSearch ? 'Select shown' : 'Select All'}
               </button>
               <button onClick={clearTopicFilter} className="btn btn-sm btn-secondary">
                 Clear All
               </button>
             </div>
             <div className="recording-topic-list">
-              {topics.map((topic) => (
+              {shownTopics.map((topic) => (
                 <label key={topic} className="recording-topic-checkbox">
                   <input
                     type="checkbox"

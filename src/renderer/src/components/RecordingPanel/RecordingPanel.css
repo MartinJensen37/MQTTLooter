@@ -507,7 +507,13 @@
 
 .recording-filter-actions {
   display: flex;
+  align-items: center;
   gap: var(--spacing-sm);
+}
+
+.recording-filter-actions .search-input {
+  flex: 1;
+  min-width: 120px;
 }
 
 .recording-topic-list {
