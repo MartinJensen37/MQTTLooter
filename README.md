@@ -39,26 +39,28 @@ The Electron smoke test uses hidden windows, isolated storage under `.tmp/`, and
 - The retained-storage budget estimates encoded strings and bookkeeping. It is **not a process-memory limit**: transport queues, runtime overhead, recordings and publishing drafts need additional memory. Message previews are bounded; export contains the complete stored payload. Changing profiles applies across connections and can immediately discard older history; it does not restore messages previously discarded.
 - Adaptive message-rate estimates measured independently of retained history. Rates update while idle and eventually return to zero; bucket boundary precision is 100 ms.
 - Publishing drafts and history per connection, templates with editable typed variables, timestamp/UUID/random placeholders, and a limited subset of JSON Schema validation. JSON substitutions retain their types and escaping; Apply template rebuilds a draft, and Publish sends the displayed bytes. See [publishing templates](docs/TEMPLATES.md).
-- Recording directly from live MQTT events, independent of the selected topic. A recording stops on disconnect, connection switch, or the 10,000-message / 2 MiB capture limit. Saved recordings can be exported and imported (up to 10 MiB per import).
-- Stopped captures, imports, renames and deletions are saved through the main process to `recordings.json` in Electron's user-data directory. Saves replace the file atomically, with a visible status and retry button. Existing localStorage recordings migrate automatically and are removed only after a successful disk write. The library currently loads into memory and is capped at 64 MiB / 1,000 recordings; export and remove older captures when needed.
+- Recording runs in the main process, ahead of renderer delivery, into `recordings.sqlite` in Electron's user-data directory. Each connection can record independently; selecting another connection, reloading the window or an automatic reconnect does not stop a capture. Disconnecting, deleting the connection or quitting finishes it. MQTT 5 properties and protocol versions are kept.
+- Every write batch is a transaction. After a crash, the recording is listed as interrupted and keeps every message committed before the crash.
+- Captures have a separate bounded queue (16,384 messages / 16 MiB). If it overflows, the dropped count is stored as a gap, connection outages are stored with their start and end, and the recording is shown as incomplete. The recording database is capped at 2 GiB; reaching it stops active captures with a notice.
+- The library loads metadata only. Playback and topic filters read pages from the database, and **Save recording to file** streams the export to a chosen file. Imports are limited to 10 MiB per file. The previous `recordings.json` library and any localStorage recordings are imported once on first start; the JSON file is kept as `recordings.json.migrated`.
 - Playback with speed, stepping, and topic filters. Republish is an explicit option, off by default; enabling it sends messages to the selected broker with their recorded QoS and retain flags.
 - Device simulation with temperature, room and machine presets, named signals, live previews, waveform plots and JSON or raw UTF-8 scalar payloads. Generators include square, triangle, sawtooth, ramp, step, first-order step response, counter and random walk alongside existing distributions and sequences. Each signal can publish to its own topic, follow a shared clock or independent period, add an offset or random interval variation, and apply a publish probability. Interval sliders, three-cycle wave charts and single-transition previews use the shared control styles. Devices support QoS 0/1/2 and retain; individual signals skip busy ticks without queuing. Existing combined-topic devices retain their completion-based timing. Saved devices load stopped, and loops stop on disconnect or unmount. See [the simulator guide](docs/SIMULATION.md) for timing and payload compatibility.
 - Simulator payload format can be set per device or overridden per signal. Raw mode sends only the scalar value; the editor offers exact text/hex, byte counts and full payload copying. Existing devices keep their JSON format.
 - Resizable topic panel, collapsible connection sidebar, and F1-F4 panel shortcuts.
 - Compact simulator signal rows with interval/mode pills and static mini-patterns. Open a signal for its payload preview, last successful publish and full configuration; combined-mode previews show the entire device payload.
 
-Connection credentials and certificates are currently stored in renderer localStorage along with connection settings. Active captures remain in memory until stopped; closing or reloading during a capture can lose it. Wait for the recording save status before closing. Failed saves remain available for retry or export from memory. The app allows one running instance per user-data directory to keep recording writes coordinated. See the review notes before treating this as a production data-capture tool.
+Connection credentials and certificates are currently stored in renderer localStorage along with connection settings. The app allows one running instance per user-data directory to keep recording and history writes coordinated. See the review notes before treating this as a production data-capture tool.
 
 ## Structure
 
 ```text
-src/main/           Electron lifecycle, IPC handlers, MQTT clients
+src/main/           Electron lifecycle, IPC handlers, MQTT clients, storage workers
 src/preload/        Restricted renderer-to-main bridge
 src/shared/         IPC types and payload encoding
 src/renderer/src/
   components/       Connection, topic, message, publishing, recording, simulation UI
   hooks/            Connection, message, and layout state
-  services/         MQTT events, topic trees, recording capture, templates
+  services/         MQTT events, topic trees, recording playback cursor, templates
   utils/            History buffer, value generators, helpers
 tests/              Regression tests and Electron smoke test
 ```
@@ -79,7 +81,7 @@ A worker owns `history/history.sqlite` in Electron's user-data directory. It sto
 
 History is session-only by default: it is removed on normal exit, or on the next startup after a crash. Enable **Disk history settings > Keep history across app restarts** to retain it. Messages older than 24 hours are excluded from pages and removed incrementally. Retention trims oldest records at a 256 MiB payload/metadata estimate; SQLite has a separate 512 MiB database ceiling, with additional temporary rollback-journal space. Database free pages are reused, so deleting messages need not shrink the file. The worker uses an 8 MiB SQLite page cache and rollback journaling; WAL is not enabled.
 
-**Clear Messages** in Disk history removes that topic's stored and cached messages. Live-cache clearing remains a cache-only action. Exports currently cover the displayed page; streaming whole-history export and database-backed recording migration are still planned. Saved recordings remain in their existing JSON library.
+**Clear Messages** in Disk history removes that topic's stored and cached messages. Live-cache clearing remains a cache-only action. Exports currently cover the displayed page; streaming whole-history export is still planned.
 
 ### Inspecting MQTT 5 properties
 
