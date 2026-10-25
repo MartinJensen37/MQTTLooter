@@ -1,6 +1,7 @@
 import { NumericSampler, type NumericQuery } from '../shared/numeric-series';
 import {
   SEARCH_LIMITS,
+  topicMatches,
   validateSearch,
   type HistorySearchQuery,
   type HistorySearchPage,
@@ -282,18 +283,22 @@ export class HistoryDatabase {
       skippedLarge: 0,
       skippedBinary: 0,
     };
+    // A topic filter scans the connection's messages in the same bounded chunks; rows from
+    // non-matching topics count toward the chunk, so sparse filters cannot scan unboundedly.
+    const filter = query.scope === 'filter' ? query.filter! : null;
     const rows = this.db
       .prepare(
-        `SELECT m.id, m.timestamp, m.storage_bytes,
+        `SELECT m.id, m.timestamp, m.storage_bytes, t.path,
       CASE WHEN length(m.payload)<=? AND m.storage_bytes<=? THEN m.payload ELSE NULL END payload
       FROM messages m JOIN topics t ON t.id=m.topic_id
-      WHERE t.connection_id=? AND t.path=? AND m.id<=? AND m.id<? ORDER BY m.id DESC LIMIT ?`,
+      WHERE t.connection_id=? ${filter === null ? 'AND t.path=?' : ''}
+      AND m.id<=? AND m.id<? ORDER BY m.id DESC LIMIT ?`,
       )
       .iterate(
         SEARCH_LIMITS.payloadBytes,
         SEARCH_LIMITS.resultBytes,
         query.connectionId,
-        query.topic,
+        ...(filter === null ? [query.topic] : []),
         snapshot,
         query.before ?? Number.MAX_SAFE_INTEGER,
         SEARCH_LIMITS.rows + 1,
@@ -321,7 +326,8 @@ export class HistoryDatabase {
       }
       const inRange =
         Number(row.timestamp) >= Math.max(query.from, now - this.limits.maxAgeMs) &&
-        Number(row.timestamp) <= query.to;
+        Number(row.timestamp) <= query.to &&
+        (filter === null || topicMatches(filter, String(row.path)));
       let matches = false;
       let binary = false;
       if (inRange && payload) {
