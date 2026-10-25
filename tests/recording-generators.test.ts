@@ -116,9 +116,7 @@ describe('import validation', () => {
     };
     expect(validate.call(service, null, schema).valid).toBe(false);
     expect(validate.call(service, [], schema).valid).toBe(false);
-    expect(validate.call(service, { items: [1] }, schema).errors).toContain(
-      'Missing required property: missing',
-    );
+    expect(validate.call(service, { items: [1] }, schema).errors.join()).toContain('"missing"');
     expect(validate.call(service, { missing: true, items: [1, 2] }, schema).valid).toBe(true);
     expect(validate.call(service, { missing: true, items: ['bad'] }, schema).valid).toBe(false);
   });

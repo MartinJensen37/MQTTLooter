@@ -4,7 +4,7 @@ In Publishing, enable **Message Templates** and select a template. Selection fil
 
 An empty topic is filled from the template. Further applications update that generated topic until you edit it, load a history entry, or select another topic through auto-load. An existing manually chosen topic is preserved. Template QoS, retain and MQTT 5 properties are applied with the payload; a template without properties clears previous property settings. MQTT 5 properties still require an MQTT 5 connection.
 
-Expansion errors leave the previous draft intact and disable Publish while that template is selected. Correct the variables and apply again, or deselect/hide templates to work directly with the draft. Schema validation is separate from expansion and currently covers only the existing limited subset of JSON Schema; it remains advisory.
+Expansion errors leave the previous draft intact and disable Publish while that template is selected. Correct the variables and apply again, or deselect/hide templates to work directly with the draft. Schema validation is separate from expansion and remains advisory. It uses a standards-based validator for the dialect declared in `$schema` (draft-04, draft-06/07, 2019-09 or 2020-12; 2020-12 when none is declared), including `$ref`/`$defs`, combinators, `const`, `format` and `additionalProperties`. References resolve only within the schema; remote schemas are never fetched. Errors name the failing location as a JSON Pointer, and at most 20 are listed.
 
 ## JSON and raw text
 

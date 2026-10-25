@@ -1,3 +1,4 @@
+import { validateJson } from '../../../shared/json-schema';
 import { expandTemplate } from '../../../shared/template-expansion';
 
 class MessageTemplateService {
@@ -394,106 +395,9 @@ class MessageTemplateService {
     }
   }
 
-  // Simple JSON Schema validation
+  // Standards-based JSON Schema validation for the dialect the schema declares.
   validateAgainstSchema(data, schema) {
-    const errors = [];
-
-    // Handle schema references and metadata - extract the actual validation schema
-    let validationSchema = schema;
-    if (schema.$schema || schema.$id || schema.title) {
-      // This is a full JSON Schema document, use it as-is but focus on validation rules
-      validationSchema = schema;
-    }
-
-    if (
-      validationSchema.type === 'object' &&
-      (data === null || typeof data !== 'object' || Array.isArray(data))
-    ) {
-      errors.push('Expected object type');
-      return { valid: false, errors };
-    }
-
-    if (
-      validationSchema.properties &&
-      (data === null || typeof data !== 'object' || Array.isArray(data))
-    ) {
-      return { valid: false, errors: ['Expected object type'] };
-    }
-    for (const key of validationSchema.required || []) {
-      if (data === null || typeof data !== 'object' || !Object.hasOwn(data, key))
-        errors.push(`Missing required property: ${key}`);
-    }
-    if (validationSchema.properties) {
-      for (const [key, propSchema] of Object.entries(validationSchema.properties)) {
-        if (key in data) {
-          const value = data[key];
-          const propErrors = this.validateProperty(key, value, propSchema);
-          errors.push(...propErrors);
-        }
-      }
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
-  }
-
-  validateProperty(key, value, schema) {
-    const errors = [];
-
-    // Type validation
-    if (schema.type) {
-      const expectedType = schema.type;
-      const actualType = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
-
-      if (expectedType === 'integer' && !Number.isInteger(value)) {
-        errors.push(`${key}: Expected integer, got ${typeof value}`);
-      } else if (expectedType !== 'integer' && actualType !== expectedType) {
-        errors.push(`${key}: Expected ${expectedType}, got ${actualType}`);
-      }
-    }
-
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      errors.push(
-        ...this.validateAgainstSchema(value, schema).errors.map((error) => `${key}.${error}`),
-      );
-    }
-    if (Array.isArray(value) && schema.items) {
-      value.forEach((item, index) =>
-        errors.push(...this.validateProperty(`${key}[${index}]`, item, schema.items)),
-      );
-    }
-
-    // Enum validation
-    if (schema.enum && !schema.enum.includes(value)) {
-      errors.push(`${key}: Value must be one of: ${schema.enum.join(', ')}`);
-    }
-
-    // Number/integer constraints
-    if (typeof value === 'number') {
-      if (schema.minimum !== undefined && value < schema.minimum) {
-        errors.push(`${key}: Value ${value} is below minimum ${schema.minimum}`);
-      }
-      if (schema.maximum !== undefined && value > schema.maximum) {
-        errors.push(`${key}: Value ${value} is above maximum ${schema.maximum}`);
-      }
-    }
-
-    // String constraints
-    if (typeof value === 'string') {
-      if (schema.minLength !== undefined && value.length < schema.minLength) {
-        errors.push(`${key}: String length ${value.length} is below minimum ${schema.minLength}`);
-      }
-      if (schema.maxLength !== undefined && value.length > schema.maxLength) {
-        errors.push(`${key}: String length ${value.length} is above maximum ${schema.maxLength}`);
-      }
-      if (schema.pattern && !new RegExp(schema.pattern).test(value)) {
-        errors.push(`${key}: String does not match required pattern`);
-      }
-    }
-
-    return errors;
+    return validateJson(data, schema);
   }
 
   // Generate sample payload from schema
