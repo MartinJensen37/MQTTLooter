@@ -51,8 +51,9 @@ Audited through `b705d91`. Baseline: 164 tests, typecheck, lint and the built El
 | 20,000 retained topics | 2,464 dropped | All stored (peak queue 7,555) | - | 5 ms | 1 ms | 285 / 216 MiB |
 | 50,000 retained topics | 16,263 dropped | All stored (peak queue 15,360) | - | 8 ms | 2 ms | 297 / 293 MiB |
 | 5,000 msg/s for 60 s, mixed 16 B-4 KiB payloads | All 289,953 | All 289,953, no gaps | All 289,953, 253 MB | 4 ms | 1 ms | 438 / 564 MiB |
+| Same stream with 50 protobuf topics, a decoder and a decoded plot in a pinned pane (rerun later the same day) | All 290,481 | All stored, no gaps | All 290,481, 228 MB | 3 ms | 1 ms | 448 / 587 MiB |
 
-The 100 ms input and 500 ms disconnect targets are met with a wide margin. Main event-loop delay p95 is about 16-20 ms, near Windows timer resolution. Memory oscillates with garbage collection but does not grow steadily over the 60 s stream. Before the history changes, the same run stopped disk history during the 20k flood. Measure with real brokers and payloads before treating these as release limits.
+The 100 ms input and 500 ms disconnect targets are met with a wide margin. Main event-loop delay p95 is about 16-20 ms, near Windows timer resolution. Memory oscillates with garbage collection but does not grow steadily over the 60 s stream. Decoding and a pinned decoded plot left the stream results unchanged; the renderer V8 heap still peaked near 210 MiB. Before the history changes, the same run stopped disk history during the 20k flood. Measure with real brokers and payloads before treating these as release limits.
 
 ### Credential storage (implemented 2026-10-25)
 
@@ -77,7 +78,7 @@ Broker passwords, TLS private keys and passphrases are encrypted with `safeStora
 | MQTT 5 properties | Live/disk inspection and exports preserve metadata. Publisher supports response topic, correlation bytes, content type, expiry, payload format and repeated user properties with main-process validation. | Broader real-broker interoperability tests. Opt-in outgoing topic aliases follow the broker's CONNACK limit and reset on reconnect (via MQTT.js), verified against the loopback broker. |
 | Memory and throttling | Acknowledged transport batches, per-connection/shared budgets, protected topic metadata, worker-owned disk history and recordings with durable gap records. A load harness measures working sets, V8 heaps, input latency, queues and accounting. | Replaceable-update coalescing for retained floods; optional per-message allocation reduction. |
 | Recordings in a database | Main-owned capture into `recordings.sqlite` with per-batch commits, crash recovery, durable queue/outage/storage gaps, paged playback, streamed export and one-time JSON/localStorage migration. Kept up with 5,000 msg/s for 60 s under load. | Cross-recording search. |
-| Responsive disconnect control | MQTT clients run in main; storage runs in workers. Measured disconnect is 1-2 ms during 50k-topic floods and 5,000 msg/s streams. | Repeat with decoding and plots active once those land. |
+| Responsive disconnect control | MQTT clients run in main; storage runs in workers. Measured disconnect is 1-2 ms during 50k-topic floods and 5,000 msg/s streams, including with a decoder and a decoded plot active. | Keep measuring as features land. |
 | Multiple tiled panels | Split view shows two tabs side by side (stacked when narrow) with a resizable, keyboard-accessible divider and a persisted layout. Panels stay mounted once and are only placed by CSS, so no simulator or recording is duplicated or restarted. The second pane can be pinned to a connection and topic, which the topic cache protects like the main selection. | The same tab in both panes and more than two panes, which need panel state moved out of the components first. |
 | Protobuf / Sparkplug B | User-provided `.proto` decoders mapped to MQTT topic filters, compiled and applied in a main-process worker (the renderer CSP forbids generated code), with a Decoded payload view, 1 MiB input/output limits and exact 64-bit integers. | Decoded fields also plot and are searchable (decoded in the history worker), and decoders compile from several `.proto` files that import each other. Sparkplug B stays optional. |
 | Password visibility and credentials | Shared show/hide controls; passwords, TLS keys and passphrases encrypted with `safeStorage` in main, migrated from localStorage. | WebSocket header and MQTT 5 authentication secrets once those settings exist. |
@@ -256,9 +257,8 @@ Done on 2026-10-25, in order: durable recordings, the load harness, credential s
 Next, in order:
 
 1. Installer/upgrade checks and other brokers (Mosquitto checks are in place). The installer changes the system, so it runs only as an agreed release step.
-2. Load measurements with decoders, decoded plots and a pinned pane active.
-3. Custom time ranges for content search.
-4. Lazy-loaded panel modules.
+2. Custom time ranges for content search.
+3. Lazy-loaded panel modules.
 
 Original order: start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
 
