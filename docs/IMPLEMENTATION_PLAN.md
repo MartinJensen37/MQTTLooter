@@ -10,6 +10,30 @@ Phase 5 now includes the planned publish timeline: aligned opportunity ticks, of
 
 UI cleanup (2026-10-25): Display now switches between message cards, plain log and plotting in the same area below topic metadata. Plot mode hides message-only sorting, scrolling, export and pagination controls. Long storage/plot/search/simulator explanations live in documentation rather than the interface. Topic search uses its native clear control and Escape; plot field entry combines suggestions and manual paths. Actionable errors and concise incomplete-data indicators remain.
 
+## Review findings (2026-10-25)
+
+Audited through `b705d91`. Baseline: 164 tests, typecheck, lint and the built Electron smoke pass.
+
+| Finding | Impact | Action |
+| --- | --- | --- |
+| Recording capture runs in the renderer behind the lossy delivery queue. | Any delivery gap, automatic reconnect or switching the selected connection stops the capture. Captures are capped at 10,000 messages / 2 MB, drop MQTT 5 properties and protocol version, and every save rewrites the whole JSON library. | Next slice: main-owned capture into a disk SQLite recording store (below). |
+| `mqtt-get-connections` returned each connection's full config. | Passwords, private keys and passphrases crossed IPC on every status refresh. | Fixed: status omits the config. Required before secrets move to main. |
+| `ConnectionProfileService` was unused. | Dead code with public-broker defaults. | Removed. |
+| History `clear()` deletes a whole connection in one transaction under the 10 s worker watchdog. | A very large clear can time out and disable history until restart. | Chunk clears; measure in the load harness. |
+| History uses `secure_delete=ON`. | Retention deletes overwrite freed pages, roughly doubling write I/O once the cap is reached. | Measure in the load harness before keeping or dropping it. |
+| Every successful CONNACK shows "Connected to broker". | Flapping connections produce notification bursts. | Notify only for user-initiated connects. |
+| Recording export builds the whole JSON document in renderer memory. | Large recordings can exhaust renderer memory. | Stream exports from main. |
+| `tests/` is outside `tsconfig.json`. | Test type errors are not caught by `npm run typecheck`. | Add a test tsconfig in a cleanup slice. |
+
+### Durable recordings slice
+
+- A separate always-persistent `recordings.sqlite` is owned by its own worker and bounded queue. History and recording failures are independent.
+- Main starts and stops captures per connection. Messages are written before renderer delivery, so renderer reloads, delivery gaps and selecting another connection do not stop a capture. Explicit disconnect, delete and quit stop it.
+- Each batch commits in a transaction, so committed messages survive a crash. On startup, captures left active are marked interrupted at their last committed message.
+- Queue overflow, storage errors and automatic reconnects are stored as gap records; the recording is marked incomplete rather than claiming lossless capture.
+- The library lists metadata only. Playback and topic filters read pages; export streams chunks to a file chosen in main.
+- The legacy `recordings.json` library and any localStorage copy are imported idempotently. The JSON file is kept as `recordings.json.migrated` once its counts are verified.
+
 ## Current implementation status (2026-10-25)
 
 | Request | Current status | Remaining work |
@@ -28,7 +52,7 @@ UI cleanup (2026-10-25): Display now switches between message cards, plain log a
 | Plain simulator payloads | Raw UTF-8 scalar output, device defaults/per-signal overrides, exact text/hex previews and versioned legacy migration. | Composable typed fields and schema-driven payload construction. |
 | MQTT 5 properties | Live/disk inspection and exports preserve metadata. Publisher supports response topic, correlation bytes, content type, expiry, payload format and repeated user properties with main-process validation. | Broker-negotiated alias lifecycle and broader real-broker interoperability tests. |
 | Memory and throttling | Acknowledged transport batches, per-connection/shared budgets, protected topic metadata and worker-owned disk history. | Sustained input-latency/RSS benchmarks, durable gap records and streaming recordings. |
-| Recordings in a database | Not implemented. Saved recordings use an atomic JSON disk library. | Streaming capture, durable checkpoints, lazy loading and migration. |
+| Recordings in a database | In progress (see durable recordings slice). Saved recordings currently use an atomic JSON disk library. | Streaming capture, durable checkpoints, lazy loading and migration. |
 | Responsive disconnect control | MQTT clients already run in main; sidebar is in the shared renderer. | Bound work in both processes, move storage/decoding to workers, measure disconnect responsiveness. |
 | Multiple tiled panels | Not implemented; current tabs preserve mounted workspaces. | Dockable layout with explicit panel lifecycle and persistence. |
 | Protobuf / Sparkplug B | Not implemented. | Schema-selected decoding first; Sparkplug B remains an optional later feature. |
@@ -201,6 +225,8 @@ Every phase includes targeted regression tests, typecheck/lint/build where relev
 
 ## Delivery order
 
-Start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
+Current order (2026-10-25): durable SQLite recordings, then the local-broker load harness from phase 8, then credential storage, then the remaining phase 4/6 items.
+
+Original order: start with compact signal rows, then selected-topic protection and measured budgets. Establish the storage/query contract before expanding incoming plots; finish disk history and recording migration in small slices. Timing visualization can follow the compact rows without waiting for storage. Complete construction/inspection features next, then tiled workspaces and optional decoders.
 
 Each commit should contain one reviewable change with a short simple message and no co-author trailer. Do not mark the larger storage, plotting or timing work complete based only on scaffolding or a static preview.
