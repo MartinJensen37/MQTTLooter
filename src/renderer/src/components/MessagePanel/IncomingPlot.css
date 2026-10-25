@@ -9,8 +9,7 @@
 }
 .incoming-plot-toolbar,
 .incoming-plot-fields,
-.incoming-plot-readout,
-.incoming-plot-cursor {
+.incoming-plot-readout {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -40,13 +39,46 @@
   align-items: center;
   gap: 4px;
 }
-.incoming-plot-cursor {
-  width: 100%;
+/* Hovering shows a line and dots at the nearest samples, then a card after a short rest. */
+.incoming-plot-chart {
+  position: relative;
+  margin-bottom: 6px;
+  border-radius: var(--radius-md);
+  outline: none;
 }
-.incoming-plot-cursor input {
-  flex: 1;
-  min-width: 80px;
-  accent-color: var(--primary);
+.incoming-plot-chart:focus-visible {
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+.incoming-plot-card {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 140px;
+  max-width: 280px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+  font-size: 12px;
+  pointer-events: none;
+}
+.incoming-plot-card time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.incoming-plot-card small {
+  color: var(--text-muted);
+}
+.incoming-plot-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
 }
 .incoming-plot p {
   margin: 6px 0;

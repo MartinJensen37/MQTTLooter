@@ -93,11 +93,27 @@ module.exports = async ({ evaluate, waitFor, field, send }) => {
     const rect = svg.getBoundingClientRect();
     svg.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: rect.left, clientY: rect.top + 30 }));
   })()`);
+  // Hovering marks the nearest samples at once and shows their card after a short rest.
   await waitFor(
-    () => evaluate("document.querySelector('[aria-label=\"Plot time cursor\"]').value === '0'"),
-    'hover sample cursor',
+    () => evaluate("!!document.querySelector('.incoming-plot .line-plot-marker circle')"),
+    'hover sample marker',
   );
-  await field('[aria-label="Plot time cursor"]', '1');
+  await waitFor(
+    () =>
+      evaluate(
+        "!!document.querySelector('.incoming-plot-card')?.textContent.includes('/temperature')",
+      ),
+    'hover sample card',
+  );
+  // React derives pointer leave from pointerout.
+  await evaluate(
+    "document.querySelector('.incoming-plot svg').dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body }))",
+  );
+  await waitFor(
+    () =>
+      evaluate("!document.querySelector('.incoming-plot .line-plot-marker, .incoming-plot-card')"),
+    'hover ends',
+  );
   assert.equal(
     (
       await evaluate(

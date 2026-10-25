@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import LinePlot from '../Charts/LinePlot';
+import LinePlot, { PLOT_FRAME } from '../Charts/LinePlot';
 import { matchDecoder } from '../../../../shared/decoders';
 import { useDecoders } from '../../services/DecoderRegistry';
 import {
@@ -36,7 +36,12 @@ export default function IncomingPlot({
   const [result, setResult] = useState<NumericResult>();
   const [error, setError] = useState('');
   const [fieldError, setFieldError] = useState('');
-  const [cursor, setCursor] = useState(1);
+  // Pointer or keyboard inspection: a fraction of the time axis and where to show the card.
+  const [hover, setHover] = useState<{ fraction: number; left: number; top: number } | null>(null);
+  const [cardShown, setCardShown] = useState(false);
+  const dwell = useRef<ReturnType<typeof setTimeout>>();
+  const chart = useRef<HTMLDivElement>(null);
+  useEffect(() => () => clearTimeout(dwell.current), []);
   const [automaticField, setAutomaticField] = useState(true);
   const [independent, setIndependent] = useState(false);
   const [timeField, setTimeField] = useState('');
@@ -122,7 +127,41 @@ export default function IncomingPlot({
   const { min, max } = range(plots.flatMap((plot) => plot.points.map((point) => point.y)));
   const from = result?.from ?? Date.now() - duration;
   const span = result ? result.to - result.from : duration;
-  const cursorTime = from + cursor * span;
+  const cursorTime = from + (hover?.fraction ?? 1) * span;
+  const nearest = (result?.series ?? []).map((series) =>
+    series.points.reduce<(typeof series.points)[number] | undefined>(
+      (best, point) =>
+        !best || Math.abs(point.x - cursorTime) <= Math.abs(best.x - cursorTime) ? point : best,
+      undefined,
+    ),
+  );
+  const stamp = (value: number) =>
+    `${time(value)}.${String(Math.floor(value % 1000)).padStart(3, '0')}`;
+  const inspect = (fraction: number, left: number, top: number, immediate = false) => {
+    setHover({ fraction, left, top });
+    // The card appears once the pointer has rested on the plot for a moment.
+    if (immediate) setCardShown(true);
+    else if (!cardShown && !dwell.current)
+      dwell.current = setTimeout(() => {
+        dwell.current = undefined;
+        setCardShown(true);
+      }, 800);
+  };
+  const leave = () => {
+    clearTimeout(dwell.current);
+    dwell.current = undefined;
+    setHover(null);
+    setCardShown(false);
+  };
+  /** Keyboard inspection places the card above the plot at the cursor's position. */
+  const inspectByKey = (fraction: number) => {
+    const box = chart.current?.getBoundingClientRect();
+    const width = box?.width ?? 0;
+    const x =
+      ((PLOT_FRAME.left + fraction * (PLOT_FRAME.right - PLOT_FRAME.left)) / PLOT_FRAME.width) *
+      width;
+    inspect(Math.min(1, Math.max(0, fraction)), x, 24, true);
+  };
   const addField = () => {
     try {
       const pointer = fieldPointer(pointerPath(candidate));
@@ -300,43 +339,89 @@ export default function IncomingPlot({
       {decoder && <p className="incoming-plot-decoder">Decoded with {decoder.name}</p>}
       {fieldError && <p role="alert">{fieldError}</p>}
       {error && <p role="alert">{error}</p>}
-      <LinePlot
-        plotHeight={300}
-        series={plots}
-        min={min}
-        max={max}
-        duration={span}
-        label="Incoming numeric values"
-        onInspect={setCursor}
-        formatX={(offset) => time(from + offset)}
-      />
-      <label className="incoming-plot-cursor">
-        Inspect time
-        <input
-          type="range"
-          aria-label="Plot time cursor"
-          min="0"
-          max="1"
-          step="0.001"
-          value={cursor}
-          onChange={(event) => setCursor(Number(event.target.value))}
+      <div
+        ref={chart}
+        className="incoming-plot-chart"
+        tabIndex={0}
+        aria-label="Plot. Hover or use the arrow keys to inspect samples."
+        onKeyDown={(event) => {
+          const step = event.shiftKey ? 0.1 : 0.01;
+          const current = hover?.fraction ?? 1;
+          const next =
+            event.key === 'ArrowLeft'
+              ? current - step
+              : event.key === 'ArrowRight'
+                ? current + step
+                : event.key === 'Home'
+                  ? 0
+                  : event.key === 'End'
+                    ? 1
+                    : null;
+          if (event.key === 'Escape') leave();
+          if (next === null) return;
+          event.preventDefault();
+          inspectByKey(next);
+        }}
+        onBlur={leave}
+      >
+        <LinePlot
+          plotHeight={300}
+          series={plots}
+          min={min}
+          max={max}
+          duration={span}
+          label="Incoming numeric values"
+          marker={
+            hover && result
+              ? {
+                  x: cursorTime - from,
+                  points: nearest.flatMap((point, index) =>
+                    point && plots[index]
+                      ? [{ id: plots[index].id, x: point.x - from, y: point.y }]
+                      : [],
+                  ),
+                }
+              : undefined
+          }
+          onInspect={(fraction, event) => {
+            const box = chart.current!.getBoundingClientRect();
+            inspect(fraction, event.clientX - box.left, event.clientY - box.top);
+          }}
+          onLeave={leave}
+          formatX={(offset) => time(from + offset)}
         />
-      </label>
+        {hover && cardShown && result && (
+          <div
+            className="incoming-plot-card"
+            role="status"
+            style={{
+              // Keep the card inside the plot: flip it to the left of the cursor near the edge.
+              left: hover.left,
+              top: hover.top,
+              transform: `translate(${hover.left > (chart.current?.clientWidth ?? 0) / 2 ? 'calc(-100% - 12px)' : '12px'}, ${hover.top > (chart.current?.clientHeight ?? 0) / 2 ? 'calc(-100% - 12px)' : '12px'})`,
+            }}
+          >
+            <time>{stamp(cursorTime)}</time>
+            {result.series.map((series, index) => (
+              <div key={fieldPointer(series.path)}>
+                <span className="incoming-plot-swatch" style={{ background: COLORS[index] }} />
+                {name(fieldPointer(series.path))}{' '}
+                <strong>{nearest[index] ? nearest[index]!.y : '—'}</strong>
+                {nearest[index] && nearest[index]!.x !== cursorTime && (
+                  <small> at {stamp(nearest[index]!.x)}</small>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="incoming-plot-readout" aria-label="Plot sample values">
         {result?.series.map((series, index) => {
-          const point = series.points.reduce<(typeof series.points)[number] | undefined>(
-            (nearest, point) =>
-              !nearest || Math.abs(point.x - cursorTime) <= Math.abs(nearest.x - cursorTime)
-                ? point
-                : nearest,
-            undefined,
-          );
+          const point = nearest[index];
           return (
             <span key={fieldPointer(series.path)} style={{ borderColor: COLORS[index] }}>
               {name(fieldPointer(series.path))}:{' '}
-              {point
-                ? `${point.y} at ${time(point.x)}.${String(Math.floor(point.x % 1000)).padStart(3, '0')}`
-                : 'No numeric samples'}
+              {point ? `${point.y} at ${stamp(point.x)}` : 'No numeric samples'}
               {independent && plots[index]?.points.length
                 ? ` (range ${plots[index].min} to ${plots[index].max})`
                 : ''}

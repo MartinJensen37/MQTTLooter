@@ -1,3 +1,4 @@
+import type { PointerEvent } from 'react';
 import './LinePlot.css';
 
 export interface PlotPoint {
@@ -5,6 +6,13 @@ export interface PlotPoint {
   y: number;
   breakBefore?: boolean;
 }
+/** A line at `x` with a dot on each listed series sample; x values use the plot's time units. */
+export interface PlotMarker {
+  x: number;
+  points: { id: string; x: number; y: number }[];
+}
+/** Horizontal layout of a full-size plot in its viewBox, for placing overlays next to it. */
+export const PLOT_FRAME = { width: 680, left: 72, right: 662 };
 const axisNumber = (value: number) => {
   const rounded = Number(value.toPrecision(4));
   return Number.isFinite(rounded) ? rounded.toString() : value.toExponential(3);
@@ -22,7 +30,9 @@ export default function LinePlot({
   stepped = false,
   plotHeight = 152,
   formatX,
+  marker,
   onInspect,
+  onLeave,
 }: {
   points?: PlotPoint[];
   /** A series with its own min/max uses an independent scale; shared labels are then hidden. */
@@ -35,12 +45,16 @@ export default function LinePlot({
   stepped?: boolean;
   plotHeight?: number;
   formatX?: (value: number) => string;
-  onInspect?: (fraction: number) => void;
+  marker?: PlotMarker;
+  /** Pointer position as a fraction of the time axis. */
+  onInspect?: (fraction: number, event: PointerEvent<SVGSVGElement>) => void;
+  onLeave?: () => void;
 }) {
-  const width = compact ? 100 : 680;
+  const width = compact ? 100 : PLOT_FRAME.width;
   const height = compact ? 24 : plotHeight;
-  const left = compact ? 2 : 72;
-  const right = width - (compact ? 2 : 18);
+  const left = compact ? 2 : PLOT_FRAME.left;
+  const right = compact ? width - 2 : PLOT_FRAME.right;
+  const toX = (x: number) => left + (x / (duration || 1)) * (right - left);
   const top = compact ? 3 : 12;
   const bottom = compact ? 21 : height - 34;
   const independent = series?.some((item) => item.min !== undefined) ?? false;
@@ -50,12 +64,13 @@ export default function LinePlot({
     // Scale before subtraction so finite values near +/- Number.MAX_VALUE stay drawable.
     const scale = Math.max(Math.abs(low), Math.abs(high), 1);
     const range = high / scale - low / scale;
+    const toY = (y: number) =>
+      range === 0
+        ? (top + bottom) / 2
+        : bottom - ((y / scale - low / scale) / range) * (bottom - top);
     const coordinates = item.points.map(({ x, y, breakBefore }) => ({
-      x: left + (x / (duration || 1)) * (right - left),
-      y:
-        range === 0
-          ? (top + bottom) / 2
-          : bottom - ((y / scale - low / scale) / range) * (bottom - top),
+      x: toX(x),
+      y: toY(y),
       breakBefore,
     }));
     const path = coordinates
@@ -67,7 +82,7 @@ export default function LinePlot({
             : `L${point.x},${point.y}`,
       )
       .join(' ');
-    return { ...item, coordinates, path };
+    return { ...item, coordinates, path, toY };
   });
   return (
     <svg
@@ -89,10 +104,12 @@ export default function LinePlot({
                   0,
                   Math.min(1, (point.matrixTransform(matrix.inverse()).x - left) / (right - left)),
                 ),
+                event,
               );
             }
           : undefined
       }
+      onPointerLeave={onLeave}
     >
       {!compact && (
         <>
@@ -151,6 +168,23 @@ export default function LinePlot({
           )}
         </g>
       ))}
+      {marker && (
+        <g className="line-plot-marker">
+          <line x1={toX(marker.x)} x2={toX(marker.x)} y1={top} y2={bottom} />
+          {marker.points.map((point) => {
+            const plot = plots.find((item) => item.id === point.id);
+            return plot ? (
+              <circle
+                key={point.id}
+                cx={toX(point.x)}
+                cy={plot.toY(point.y)}
+                r={4.5}
+                fill={plot.color}
+              />
+            ) : null;
+          })}
+        </g>
+      )}
     </svg>
   );
 }
