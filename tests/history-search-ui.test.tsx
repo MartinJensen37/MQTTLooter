@@ -84,12 +84,16 @@ it('searches a custom receive-time range and rejects reversed or expired ranges'
   expect((container.querySelector('[aria-label="Search from"]') as HTMLInputElement).value).toBe(
     '2026-10-14T11:00',
   );
+  // The end input holds whole seconds; messages later in that second are still included.
+  vi.setSystemTime(new Date(2026, 9, 14, 12, 0, 0, 400));
+  await click('Search history');
+  expect(search.mock.calls[0][0].to).toBe(Date.now());
   await set('Search from', '2026-10-14T09:30:00');
   await set('Search to', '2026-10-14T09:45:30');
   await click('Search history');
-  expect(search.mock.calls[0][0]).toMatchObject({
+  expect(search.mock.calls[1][0]).toMatchObject({
     from: new Date(2026, 9, 14, 9, 30, 0).getTime(),
-    to: new Date(2026, 9, 14, 9, 45, 30).getTime(),
+    to: new Date(2026, 9, 14, 9, 45, 30, 999).getTime(),
   });
 
   await set('Search from', '2026-10-14T10:00:00');
@@ -102,8 +106,8 @@ it('searches a custom receive-time range and rejects reversed or expired ranges'
   // A range reaching past retention is trimmed to the retained 24 hours.
   await set('Search to', '2026-10-14T08:00:00');
   await click('Search history');
-  expect(search).toHaveBeenCalledTimes(2);
-  expect(search.mock.calls[1][0].from).toBe(Date.now() - 86400000);
+  expect(search).toHaveBeenCalledTimes(3);
+  expect(search.mock.calls[2][0].from).toBe(Date.now() - 86400000);
 });
 
 it('scans past empty chunks, preserves snapshot cursors and stops at a result page', async () => {

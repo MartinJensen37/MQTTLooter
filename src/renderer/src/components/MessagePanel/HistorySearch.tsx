@@ -20,9 +20,10 @@ function searchRange(
   now: number,
 ): { from: number; to: number } | string {
   if (windowMs !== 'custom') return { from: now - windowMs, to: now };
-  // Without an offset, datetime-local text parses as local time.
+  // Without an offset, datetime-local text parses as local time. The inputs hold whole
+  // seconds, so the end second is included: otherwise the newest messages would be missed.
   const from = new Date(custom.from).getTime();
-  const to = Math.min(new Date(custom.to).getTime(), now);
+  const to = Math.min(new Date(custom.to).getTime() + 999, now);
   if (!Number.isFinite(from) || !Number.isFinite(to)) return 'Enter a start and end time.';
   if (from >= to) return 'Choose a start time before the end time.';
   if (to < now - DAY) return 'That range is older than the 24 hours of retained history.';
