@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
 import { SplitPane, Pane } from 'react-split-pane';
 import MQTTService from '../../services/MQTTService';
 import TopicTreeService from '../../services/TopicTreeService';
@@ -6,13 +6,17 @@ import { ConnectionNotices } from '../../services/ConnectionNotices';
 import ConnectionSidebar from '../ConnectionSidebar/ConnectionSidebar';
 import TopicTreeComponent from '../TopicTree/TopicTreeComponent';
 import MessagePanel from '../MessagePanel/MessageWorkspace';
-import PublishingPanel from '../PublishingPanel/PublishingPanel';
 import RecordingPanel from '../RecordingPanel/RecordingPanel';
-import SimulationPanel from '../SimulationPanel/SimulationPanel';
 import { useConnections } from '../../hooks/useConnections';
 import { useMessages } from '../../hooks/useMessages';
 import { useUIState } from '../../hooks/useUIState';
 import './App.css';
+
+// Loaded when first shown; afterwards they stay mounted like the other panels. Recording stays
+// eager so captures that main stops after a reload are still reported.
+const PublishingPanel = lazy(() => import('../PublishingPanel/PublishingPanel'));
+const SimulationPanel = lazy(() => import('../SimulationPanel/SimulationPanel'));
+const panelLoading = <p className="panel-loading">Loading…</p>;
 
 const TAB_LIST = [
   { id: 'logging', icon: 'fa-list', label: 'Logging', key: 'F1' },
@@ -121,6 +125,10 @@ function App() {
   const placement = (tab) =>
     tab === activeTab ? 'active' : tab === splitTab ? 'secondary' : 'hidden';
   const visible = (tab) => tab === activeTab || tab === splitTab;
+  // Tabs shown at least once; only grows, so recording it during render is harmless.
+  const opened = useRef(new Set());
+  opened.current.add(activeTab);
+  if (splitTab) opened.current.add(splitTab);
   const startSplitDrag = (event) => {
     event.preventDefault();
     const rect = tabContainerRef.current.getBoundingClientRect();
@@ -273,19 +281,23 @@ function App() {
       </div>
       <div className={`tab-content ${placement('publishing')}`}>
         {pinLabel('publishing')}
-        <PublishingPanel
-          protocolVersion={
-            connectedPane(publishing)
-              ? MQTTService.getProtocolVersion(publishing.connectionId)
-              : (connectionView(publishing.connectionId)?.config?.protocolVersion ?? 4)
-          }
-          key={publishing.connectionId}
-          connectionId={publishing.connectionId}
-          onPublishMessage={publishing.onPublishMessage}
-          isConnected={connectedPane(publishing)}
-          selectedTopic={publishing.selectedTopic}
-          showFeedback={showFeedback}
-        />
+        {opened.current.has('publishing') && (
+          <Suspense fallback={panelLoading}>
+            <PublishingPanel
+              protocolVersion={
+                connectedPane(publishing)
+                  ? MQTTService.getProtocolVersion(publishing.connectionId)
+                  : (connectionView(publishing.connectionId)?.config?.protocolVersion ?? 4)
+              }
+              key={publishing.connectionId}
+              connectionId={publishing.connectionId}
+              onPublishMessage={publishing.onPublishMessage}
+              isConnected={connectedPane(publishing)}
+              selectedTopic={publishing.selectedTopic}
+              showFeedback={showFeedback}
+            />
+          </Suspense>
+        )}
       </div>
       <div className={`tab-content ${placement('recording')}`}>
         {pinLabel('recording')}
@@ -300,14 +312,18 @@ function App() {
       </div>
       <div className={`tab-content ${placement('simulation')}`}>
         {pinLabel('simulation')}
-        <SimulationPanel
-          key={simulation.connectionId}
-          connectionId={simulation.connectionId}
-          onPublishMessage={simulation.onPublishMessage}
-          isConnected={connectedPane(simulation)}
-          selectedTopic={simulation.selectedTopic}
-          showFeedback={showFeedback}
-        />
+        {opened.current.has('simulation') && (
+          <Suspense fallback={panelLoading}>
+            <SimulationPanel
+              key={simulation.connectionId}
+              connectionId={simulation.connectionId}
+              onPublishMessage={simulation.onPublishMessage}
+              isConnected={connectedPane(simulation)}
+              selectedTopic={simulation.selectedTopic}
+              showFeedback={showFeedback}
+            />
+          </Suspense>
+        )}
       </div>
       {splitTab && (
         <div

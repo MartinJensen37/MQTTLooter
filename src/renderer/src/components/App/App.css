@@ -261,6 +261,11 @@
   display: none;
 }
 
+.panel-loading {
+  margin: var(--spacing-lg);
+  color: var(--text-muted);
+}
+
 /* A pinned second pane names the connection and topic it stays on. */
 .pane-pin {
   display: flex;
