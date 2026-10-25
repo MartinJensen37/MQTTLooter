@@ -25,7 +25,9 @@ User review of the running app. Work through these before the remaining backlog 
 - [x] Plot inspection: replace the time slider with a dot and line that follow the pointer, and a card with the sample after a short hover.
 - [x] Message templates become message schemas, with two clean examples.
 
-Follow-ups: the simulator's publish timeline still uses an "Inspect bin" slider and could adopt the plot's hover card; the connection editor keeps its own checkbox styles, which could move to the shared toggle.
+Second round, also done: the simulator timeline uses the same hover cursor and card as the plot; hint lines became small "i" markers that explain on hover or focus; dropdown rows no longer show a tick; clicked tabs keep no focus ring after F-key switches; an open recording's arrow points down; message cards drop their per-card view menu for one **View** per topic, which formats JSON automatically. Tests build into `out-test/`, so they never change a running app's `out/`.
+
+Follow-up: the connection editor keeps its own checkbox styles, which could move to the shared toggle.
 
 ## Review findings (2026-10-25)
 
