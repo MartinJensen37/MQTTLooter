@@ -1,0 +1,71 @@
+.decoder-dialog {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.decoder-dialog-body {
+  padding: var(--spacing-lg) var(--spacing-xxl);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  color: var(--text-body);
+  font-size: 13px;
+}
+
+.decoder-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: decoder;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+/* Numbered because the first matching decoder is used. */
+.decoder-list li {
+  counter-increment: decoder;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.decoder-list li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.decoder-list li > div::before {
+  content: counter(decoder) '. ';
+  color: var(--text-muted);
+}
+
+.decoder-list p {
+  margin: var(--spacing-xs) 0 0;
+}
+
+.decoder-type {
+  color: var(--text-muted);
+}
+
+.decoder-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-md);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+}
+
+.decoder-form label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  font-weight: 500;
+}
+
+.decoder-form p {
+  grid-column: 1 / -1;
+  margin: 0;
+}

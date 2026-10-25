@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import MessagePanel from './MessagePanel';
 import IncomingPlot from './IncomingPlot';
 import HistorySearch from './HistorySearch';
+import DecoderSettings from './DecoderSettings';
+import { useDecoders } from '../../services/DecoderRegistry';
 import type { HistoryPage, HistoryQuery, HistoryStatus } from '../../../../shared/history';
 import TopicTreeService from '../../services/TopicTreeService';
 import './MessageWorkspace.css';
@@ -23,6 +25,8 @@ function Workspace(props: any) {
   const [topicOverride, setTopicOverride] = useState<string>();
   const [search, setSearch] = useState('');
   const [topics, setTopics] = useState<{ path: string }[]>([]);
+  const [decodersOpen, setDecodersOpen] = useState(false);
+  const { decoders } = useDecoders();
   const selectedPath = props.selectedTopic?.topicPath;
   const topic = topicOverride ?? selectedPath;
   const connectionId = props.connectionId;
@@ -149,6 +153,7 @@ function Workspace(props: any) {
 
   return (
     <div className="message-workspace">
+      {decodersOpen && <DecoderSettings onClose={() => setDecodersOpen(false)} />}
       <div className="message-history-toolbar">
         {stored && (
           <button
@@ -180,6 +185,9 @@ function Workspace(props: any) {
             <option value="stored">Disk history</option>
           </select>
         </label>
+        <button className="btn btn-sm btn-secondary" onClick={() => setDecodersOpen(true)}>
+          Decoders{decoders.length ? ` (${decoders.length})` : ''}
+        </button>
         <details className="message-storage-settings">
           <summary>Disk history settings</summary>
           <label>
