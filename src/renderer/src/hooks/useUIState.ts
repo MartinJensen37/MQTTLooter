@@ -5,6 +5,11 @@ export type Tab = (typeof TABS)[number];
 const isTab = (value: unknown): value is Tab => TABS.includes(value as Tab);
 export const SPLIT_LIMITS = { min: 0.25, max: 0.75 };
 const clampRatio = (value: number) => Math.min(SPLIT_LIMITS.max, Math.max(SPLIT_LIMITS.min, value));
+/** A pinned second pane keeps this connection and topic instead of following the sidebar. */
+export interface PanePin {
+  connectionId: string;
+  topic: { topicPath: string; connectionId: string } | null;
+}
 
 export function useUIState(selectedConnection: string | null) {
   const [initialState] = useState(() => {
@@ -30,6 +35,8 @@ export function useUIState(selectedConnection: string | null) {
   const [splitRatio, setSplitRatioState] = useState(
     Number.isFinite(initialState.splitRatio) ? clampRatio(initialState.splitRatio) : 0.5,
   );
+  // Not persisted: the pinned connection may not be connected after a restart.
+  const [panePin, setPanePin] = useState<PanePin | null>(null);
 
   // Persist UI state.
   useEffect(() => {
@@ -43,11 +50,14 @@ export function useUIState(selectedConnection: string | null) {
     }
   }, [sidebarCollapsed, topicTreeWidth, splitTab, splitRatio]);
 
-  /** Choosing the tab shown in the second pane swaps the two panes. */
+  /** Choosing the tab shown in the second pane swaps the two panes and ends its pin. */
   const setActiveTab = useCallback(
     (tab: string) => {
       if (!isTab(tab)) return;
-      if (tab === splitTab) setSplitTabState(activeTab);
+      if (tab === splitTab) {
+        setSplitTabState(activeTab);
+        setPanePin(null);
+      }
       setActiveTabState(tab);
     },
     [splitTab, activeTab],
@@ -55,7 +65,10 @@ export function useUIState(selectedConnection: string | null) {
 
   const setSplitTab = useCallback(
     (tab: string | null) => {
-      if (tab === null) return setSplitTabState(null);
+      if (tab === null) {
+        setPanePin(null);
+        return setSplitTabState(null);
+      }
       if (isTab(tab) && tab !== activeTab) setSplitTabState(tab);
     },
     [activeTab],
@@ -93,6 +106,8 @@ export function useUIState(selectedConnection: string | null) {
     setSplitTab,
     splitRatio,
     setSplitRatio,
+    panePin,
+    setPanePin,
     handleToggleSidebarCollapse,
   };
 }

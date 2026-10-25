@@ -21,6 +21,19 @@ const TAB_LIST = [
   { id: 'simulation', icon: 'fa-microchip', label: 'Simulation', key: 'F4' },
 ];
 
+async function publishTo(connectionId, messageData) {
+  if (!connectionId) throw new Error('No connection selected');
+  if (!MQTTService.isConnected(connectionId)) throw new Error('Selected connection is not active');
+  await MQTTService.publish(connectionId, {
+    topic: messageData.topic,
+    message: messageData.payload,
+    encoding: messageData.encoding,
+    qos: messageData.qos,
+    retain: messageData.retain,
+    properties: messageData.properties,
+  });
+}
+
 function App() {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -79,8 +92,21 @@ function App() {
     setSplitTab,
     splitRatio,
     setSplitRatio,
+    panePin,
+    setPanePin,
     handleToggleSidebarCollapse,
   } = useUIState(selectedConnection);
+  const pinned = useMessages(
+    panePin?.connectionId ?? null,
+    panePin?.topic ?? null,
+    showFeedback,
+    'pane',
+  );
+  // A deleted connection cannot stay pinned.
+  useEffect(() => {
+    if (panePin && !connections.some((connection) => connection.id === panePin.connectionId))
+      setPanePin(null);
+  }, [connections, panePin, setPanePin]);
   const tabContainerRef = useRef(null);
   // Below 560 px of content width the panes stack instead of sitting side by side.
   const [stacked, setStacked] = useState(false);
@@ -147,6 +173,9 @@ function App() {
     };
     const handleTreeCleared = ({ connectionId }) => {
       setSelectedTopic((previous) => (previous?.connectionId === connectionId ? null : previous));
+      setPanePin((previous) =>
+        previous?.connectionId === connectionId ? { ...previous, topic: null } : previous,
+      );
       setLastSelectedTopics((previous) => {
         const next = { ...previous };
         delete next[connectionId];
@@ -165,7 +194,7 @@ function App() {
       Object.entries(handlers).forEach(([event, handler]) => MQTTService.off('*', event, handler));
       TopicTreeService.off('treeCleared', handleTreeCleared);
     };
-  }, [setConnections, setTopicTreeReady, setLastSelectedTopics, showFeedback]);
+  }, [setConnections, setTopicTreeReady, setLastSelectedTopics, setPanePin, showFeedback]);
 
   // ── Small handlers ───────────────────────────────────────────────────────
   const handleTopicSelect = (topicPath) => {
@@ -176,27 +205,53 @@ function App() {
   };
 
   const handlePublishMessage = useCallback(
-    async (messageData) => {
-      if (!selectedConnection) throw new Error('No connection selected');
-      if (!MQTTService.isConnected(selectedConnection))
-        throw new Error('Selected connection is not active');
-      await MQTTService.publish(selectedConnection, {
-        topic: messageData.topic,
-        message: messageData.payload,
-        encoding: messageData.encoding,
-        qos: messageData.qos,
-        retain: messageData.retain,
-        properties: messageData.properties,
-      });
-    },
+    (messageData) => publishTo(selectedConnection, messageData),
     [selectedConnection],
   );
+  const pinnedConnection = panePin?.connectionId ?? null;
+  const handlePinnedPublish = useCallback(
+    (messageData) => publishTo(pinnedConnection, messageData),
+    [pinnedConnection],
+  );
 
-  const getConnectionName = () =>
-    connections.find((c) => c.id === selectedConnection)?.config?.name || 'Unknown Connection';
+  const connectionView = (id) => connections.find((c) => c.id === id);
+  const getConnectionName = (id = selectedConnection) =>
+    connectionView(id)?.config?.name || 'Unknown Connection';
 
   // ── Render helpers ───────────────────────────────────────────────────────
-  const isConnected = connections.find((c) => c.id === selectedConnection)?.isConnected || false;
+  // Every panel follows the sidebar, except the one in a pinned second pane.
+  const paneFor = (tab) => {
+    if (!panePin || tab !== splitTab)
+      return {
+        connectionId: selectedConnection,
+        messages: connectionMessages,
+        selectedTopic: liveSelectedTopic,
+        onClearMessages: handleClearMessages,
+        onPublishMessage: handlePublishMessage,
+      };
+    return {
+      connectionId: panePin.connectionId,
+      messages: pinned.connectionMessages,
+      selectedTopic: pinned.liveSelectedTopic,
+      onClearMessages: pinned.handleClearMessages,
+      onPublishMessage: handlePinnedPublish,
+    };
+  };
+  const connectedPane = (pane) => connectionView(pane.connectionId)?.isConnected || false;
+  const pinLabel = (tab) =>
+    panePin && tab === splitTab ? (
+      <div className="pane-pin">
+        <i className="fas fa-thumbtack" aria-hidden="true"></i>
+        <span>
+          Pinned to <strong>{getConnectionName(panePin.connectionId)}</strong>
+          {panePin.topic && <code>{panePin.topic.topicPath}</code>}
+        </span>
+      </div>
+    ) : null;
+  const logging = paneFor('logging');
+  const publishing = paneFor('publishing');
+  const recording = paneFor('recording');
+  const simulation = paneFor('simulation');
 
   const renderTabContent = () => (
     <div
@@ -205,49 +260,52 @@ function App() {
       style={splitTab ? { '--split': `${splitRatio * 100}%` } : undefined}
     >
       <div className={`tab-content ${placement('logging')}`}>
+        {pinLabel('logging')}
         <MessagePanel
           active={visible('logging')}
-          connectionId={selectedConnection}
-          messages={connectionMessages}
-          selectedTopic={liveSelectedTopic}
-          connectionName={getConnectionName()}
-          onClearMessages={handleClearMessages}
+          connectionId={logging.connectionId}
+          messages={logging.messages}
+          selectedTopic={logging.selectedTopic}
+          connectionName={getConnectionName(logging.connectionId)}
+          onClearMessages={logging.onClearMessages}
           showFeedback={showFeedback}
         />
       </div>
       <div className={`tab-content ${placement('publishing')}`}>
+        {pinLabel('publishing')}
         <PublishingPanel
           protocolVersion={
-            isConnected
-              ? MQTTService.getProtocolVersion(selectedConnection)
-              : (connections.find((connection) => connection.id === selectedConnection)?.config
-                  ?.protocolVersion ?? 4)
+            connectedPane(publishing)
+              ? MQTTService.getProtocolVersion(publishing.connectionId)
+              : (connectionView(publishing.connectionId)?.config?.protocolVersion ?? 4)
           }
-          key={selectedConnection}
-          connectionId={selectedConnection}
-          onPublishMessage={handlePublishMessage}
-          isConnected={isConnected}
-          selectedTopic={liveSelectedTopic}
+          key={publishing.connectionId}
+          connectionId={publishing.connectionId}
+          onPublishMessage={publishing.onPublishMessage}
+          isConnected={connectedPane(publishing)}
+          selectedTopic={publishing.selectedTopic}
           showFeedback={showFeedback}
         />
       </div>
       <div className={`tab-content ${placement('recording')}`}>
+        {pinLabel('recording')}
         <RecordingPanel
-          connectionName={getConnectionName()}
-          selectedTopic={liveSelectedTopic}
-          onPublishMessage={handlePublishMessage}
-          isConnected={isConnected}
-          activeConnectionId={selectedConnection}
+          connectionName={getConnectionName(recording.connectionId)}
+          selectedTopic={recording.selectedTopic}
+          onPublishMessage={recording.onPublishMessage}
+          isConnected={connectedPane(recording)}
+          activeConnectionId={recording.connectionId}
           showFeedback={showFeedback}
         />
       </div>
       <div className={`tab-content ${placement('simulation')}`}>
+        {pinLabel('simulation')}
         <SimulationPanel
-          key={selectedConnection}
-          connectionId={selectedConnection}
-          onPublishMessage={handlePublishMessage}
-          isConnected={isConnected}
-          selectedTopic={liveSelectedTopic}
+          key={simulation.connectionId}
+          connectionId={simulation.connectionId}
+          onPublishMessage={simulation.onPublishMessage}
+          isConnected={connectedPane(simulation)}
+          selectedTopic={simulation.selectedTopic}
           showFeedback={showFeedback}
         />
       </div>
@@ -403,15 +461,43 @@ function App() {
                       ))}
                     </select>
                   )}
+                  {splitTab && (
+                    <button
+                      className={`btn btn-sm ${panePin ? 'btn-primary' : 'btn-secondary'}`}
+                      aria-pressed={Boolean(panePin)}
+                      aria-label="Pin second pane"
+                      title={
+                        panePin
+                          ? 'Let the second pane follow the sidebar again'
+                          : 'Keep the second pane on this connection and topic'
+                      }
+                      onClick={() =>
+                        setPanePin(
+                          panePin
+                            ? null
+                            : {
+                                connectionId: selectedConnection,
+                                topic:
+                                  selectedTopic?.connectionId === selectedConnection
+                                    ? selectedTopic
+                                    : null,
+                              },
+                        )
+                      }
+                    >
+                      <i className="fas fa-thumbtack"></i> <span className="split-label">Pin</span>
+                    </button>
+                  )}
                   <button
                     className={`btn btn-sm ${splitTab ? 'btn-primary' : 'btn-secondary'}`}
                     aria-pressed={Boolean(splitTab)}
+                    aria-label="Split view"
                     title={splitTab ? 'Close split view' : 'Show a second tab beside this one'}
                     onClick={() =>
                       setSplitTab(splitTab ? null : TAB_LIST.find((tab) => tab.id !== activeTab).id)
                     }
                   >
-                    <i className="fas fa-columns"></i> Split
+                    <i className="fas fa-columns"></i> <span className="split-label">Split</span>
                   </button>
                 </div>
               </div>

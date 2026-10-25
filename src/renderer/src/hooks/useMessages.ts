@@ -17,13 +17,19 @@ export function useMessages(
   selectedConnection: string | null,
   selectedTopic: SelectedTopic | null,
   showFeedback: ShowFeedback,
+  owner = 'main',
 ) {
   // Counter bump to re-render when the tree updates.
   const [updateTick, setUpdateTick] = useState(0);
   const selectedPath = selectedTopic?.topicPath ?? null;
   useEffect(() => {
-    if (selectedConnection) TopicTreeService.selectTopic(selectedConnection, selectedPath);
-  }, [selectedConnection, selectedPath]);
+    if (!selectedConnection) return;
+    TopicTreeService.selectTopic(selectedConnection, selectedPath, owner);
+    // A pinned pane stops protecting its topic once it is unpinned.
+    return owner === 'main'
+      ? undefined
+      : () => TopicTreeService.selectTopic(selectedConnection, null, owner);
+  }, [selectedConnection, selectedPath, owner]);
 
   // Re-render only when the SELECTED topic received messages.
   useEffect(() => {
