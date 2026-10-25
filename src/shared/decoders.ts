@@ -55,3 +55,14 @@ export function matchDecoder<T extends Pick<DecoderDefinition, 'topicFilter'>>(
 ): T | undefined {
   return decoders.find((decoder) => topicMatches(decoder.topicFilter, topic));
 }
+
+export type DecoderRequest =
+  | { action: 'configure'; decoders: DecoderDefinition[] }
+  | { action: 'types'; proto: string }
+  | {
+      action: 'decode';
+      decoderId: string;
+      message: string;
+      encoding: import('./payload').PayloadEncoding;
+    }
+  | { action: 'close' };

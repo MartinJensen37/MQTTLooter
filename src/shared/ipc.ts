@@ -70,6 +70,23 @@ export interface ElectronAPI {
       connectionName: string,
     ): Promise<IpcResult<{ saved: boolean; path?: string; count?: number }>>;
   };
+  decoders: {
+    list(): Promise<
+      IpcResult<{
+        decoders: import('./decoders').DecoderDefinition[];
+        errors: Record<string, string>;
+      }>
+    >;
+    save(
+      decoders: import('./decoders').DecoderDefinition[],
+    ): Promise<IpcResult<import('./decoders').DecoderDefinition[]>>;
+    types(proto: string): Promise<IpcResult<string[]>>;
+    decode(
+      decoderId: string,
+      message: string,
+      encoding: import('./payload').PayloadEncoding,
+    ): Promise<IpcResult<string>>;
+  };
   credentials: {
     status(): Promise<IpcResult<import('./credentials').CredentialStatus>>;
     get(connectionId: string): Promise<IpcResult<import('./credentials').ConnectionSecrets | null>>;

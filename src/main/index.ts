@@ -3,6 +3,8 @@ import { join } from 'path';
 import { MQTTConnectionManager } from './mqtt-connection-manager';
 import { RecordingService } from './recording-service';
 import { CredentialStore } from './credential-store';
+import { DecoderService } from './decoder-service';
+import { DECODER_LIMITS } from '../shared/decoders';
 import { mergeSecrets, validateSecrets } from '../shared/credentials';
 import { HistoryService } from './history-service';
 import { validateSearch, type HistorySearchQuery } from '../shared/history-search';
@@ -25,6 +27,9 @@ const historyService = primaryInstance
   ? new HistoryService(join(app.getPath('userData'), 'history'))
   : null;
 const recordingService = primaryInstance ? new RecordingService(app.getPath('userData')) : null;
+const decoderService = primaryInstance
+  ? new DecoderService(join(app.getPath('userData'), 'decoders.json'))
+  : null;
 // Linux without a keyring falls back to a fixed key; treat that as unavailable.
 const credentialStore = new CredentialStore(join(app.getPath('userData'), 'credentials.json'), {
   available: async () =>
@@ -383,6 +388,35 @@ for (const [channel, handler] of Object.entries({
   });
 }
 
+for (const [channel, handler] of Object.entries({
+  'decoders-list': () => decoderService!.list(),
+  'decoders-save': (decoders: unknown) => decoderService!.save(decoders),
+  'decoders-types': (proto: unknown) => {
+    if (typeof proto !== 'string' || proto.length > DECODER_LIMITS.maxProtoChars)
+      throw new Error('Invalid .proto source');
+    return decoderService!.types(proto);
+  },
+  'decoders-decode': (decoderId: unknown, message: unknown, encoding: unknown) => {
+    if (
+      typeof decoderId !== 'string' ||
+      decoderId.length > 128 ||
+      typeof message !== 'string' ||
+      message.length > DECODER_LIMITS.maxPayloadBytes * 2 ||
+      (encoding !== 'utf8' && encoding !== 'base64')
+    )
+      throw new Error('Invalid decode request');
+    return decoderService!.decode(decoderId, message, encoding);
+  },
+})) {
+  handleIPC(channel, async (_event, ...args) => {
+    try {
+      return { success: true, data: await (handler as (...args: any[]) => unknown)(...args) };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  });
+}
+
 const validRecordingId = (value: unknown): value is number =>
   Number.isSafeInteger(value) && (value as number) > 0;
 const validTopics = (value: unknown): value is string[] | undefined =>
@@ -481,6 +515,7 @@ app.on('before-quit', (event) => {
   void Promise.allSettled([
     mqttManager.disconnectAll().then(() => recordingService?.close()),
     historyService?.close(),
+    decoderService?.close(),
   ]).then(() => {
     finishingQuit = true;
     app.quit();

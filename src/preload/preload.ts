@@ -55,6 +55,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     export: (connectionId: string, topic: string, format: string, connectionName: string) =>
       ipcRenderer.invoke('history-export', connectionId, topic, format, connectionName),
   },
+  decoders: {
+    list: () => ipcRenderer.invoke('decoders-list'),
+    save: (decoders: unknown[]) => ipcRenderer.invoke('decoders-save', decoders),
+    types: (proto: string) => ipcRenderer.invoke('decoders-types', proto),
+    decode: (decoderId: string, message: string, encoding: string) =>
+      ipcRenderer.invoke('decoders-decode', decoderId, message, encoding),
+  },
   credentials: {
     status: () => ipcRenderer.invoke('credentials-status'),
     get: (connectionId: string) => ipcRenderer.invoke('credentials-get', connectionId),
