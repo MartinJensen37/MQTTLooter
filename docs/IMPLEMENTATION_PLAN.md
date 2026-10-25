@@ -10,6 +10,21 @@ Phase 5 now includes the planned publish timeline: aligned opportunity ticks, of
 
 UI cleanup (2026-10-25): Display now switches between message cards, plain log and plotting in the same area below topic metadata. Plot mode hides message-only sorting, scrolling, export and pagination controls. Long storage/plot/search/simulator explanations live in documentation rather than the interface. Topic search uses its native clear control and Escape; plot field entry combines suggestions and manual paths. Actionable errors and concise incomplete-data indicators remain.
 
+## UI feedback (2026-10-25)
+
+User review of the running app. Work through these before the remaining backlog items below.
+
+- [ ] Hide internal connection ids: message cards, the header next to the connection name and the Publishing status.
+- [ ] Publishing payload: one status line, "Valid JSON" with a Format button beside it in the same color.
+- [ ] Dropdowns: one theme for every select, matching the QoS menu (open list, hover and selected rows), and slimmer, about the height of the small toolbar buttons.
+- [ ] Collapsible sections (MQTT 5 publish properties, card properties and similar) use the connection editor's toggle style, like "Enable Last Will Message".
+- [ ] Search fields: one style everywhere (topic tree, stored topics, recordings, plot fields, content search), with a light-gray clear button that shows a pointer.
+- [ ] Hints and placeholders: short, accurate, to the point.
+- [ ] Resize handles: a visible grip on the topic tree divider, the split divider and a new resizable connection sidebar; dragging the sidebar fully in collapses it like the logo button.
+- [ ] Tools > Advanced settings in the app menu: holds rarely changed options (cache size, disk history, delivery details, payload encoding, protobuf decoders). The topic tree loses History & pins and always uses the larger cache unless changed there.
+- [ ] Plot inspection: replace the time slider with a dot and line that follow the pointer, and a card with the sample after a short hover.
+- [ ] Message templates become message schemas, with two clean examples.
+
 ## Review findings (2026-10-25)
 
 Audited through `b705d91`. Baseline: 164 tests, typecheck, lint and the built Electron smoke pass.
@@ -256,6 +271,7 @@ Done on 2026-10-25, in order: durable recordings, the load harness, credential s
 
 Next, in order:
 
+0. The UI feedback list above.
 1. Installer/upgrade checks and other brokers (Mosquitto checks are in place). The installer changes the system, so it runs only as an agreed release step.
 2. Oversized-payload search and on-demand large payloads.
 3. Cross-recording search.
