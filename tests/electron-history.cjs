@@ -74,6 +74,8 @@ module.exports = async ({ evaluate, waitFor, field, send, captureSearch, saveTo 
     "[...document.querySelectorAll('.message-history-toolbar button')].find(button=>button.textContent==='Search message contents').click()",
   );
   await field('[aria-label="Search message contents"]', '123');
+  // A custom range starts as the last hour.
+  await field('[aria-label="Content search time range"]', 'custom');
   await evaluate("document.querySelector('.history-search form').requestSubmit()");
   await waitFor(
     () =>
@@ -97,6 +99,19 @@ module.exports = async ({ evaluate, waitFor, field, send, captureSearch, saveTo 
   const rows = fs.readFileSync(searchExport, 'utf8').split('\n');
   assert.equal(rows.length, 2);
   assert.ok(rows[1].includes('"123"'), rows[1]);
+  // A past range is reached through the time index without scanning newer records.
+  const local = (ms) =>
+    new Date(ms - new Date(ms).getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+  await field('[aria-label="Search from"]', local(Date.now() - 7200000));
+  await field('[aria-label="Search to"]', local(Date.now() - 3600000));
+  await evaluate("document.querySelector('.history-search form').requestSubmit()");
+  await waitFor(
+    () =>
+      evaluate(
+        "document.querySelector('.history-search [role=status]')?.textContent.includes('Reached the end of this retained snapshot. 0 records scanned; 0 matches.')",
+      ),
+    'empty past range',
+  );
   assert.equal(
     (
       await evaluate(
