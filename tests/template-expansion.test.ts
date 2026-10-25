@@ -5,19 +5,41 @@ import MessageTemplateService from '../src/renderer/src/services/MessageTemplate
 
 beforeEach(() => localStorage.clear());
 
-it('repairs missing stock identifiers without changing custom templates or saved source', () => {
-  const stock = new MessageTemplateService().getDefaultTemplates();
-  delete (stock['device-status'] as any).variables;
-  delete (stock['gps-location'] as any).variables;
-  stock['gps-location'].payload = '{"custom":true}';
-  const saved = JSON.stringify(stock);
-  localStorage.setItem('mqtt-message-templates', saved);
-  const service = new MessageTemplateService();
-  expect(service.processTemplate(service.getTemplate('device-status')).topic).toBe(
-    'devices/device-001/status',
+it('replaces unchanged old examples with the two schemas, keeping edited and custom entries', () => {
+  const legacy = (id: string, topic: string, payload: object) => ({
+    id,
+    topic,
+    payload: JSON.stringify(payload, null, 2),
+  });
+  localStorage.setItem(
+    'mqtt-message-templates',
+    JSON.stringify({
+      'temperature-sensor': legacy('temperature-sensor', 'sensors/temperature/{{sensorId}}', {
+        temperature: '{{randomFloat(15, 35, 1)}}',
+        humidity: '{{randomFloat(30, 80, 1)}}',
+        timestamp: '{{timestamp}}',
+        sensorId: '{{sensorId}}',
+      }),
+      // Edited by the user, so it stays.
+      'gps-location': {
+        id: 'gps-location',
+        topic: 'tracking/{{vehicleId}}/location',
+        payload: '{"custom":true}',
+      },
+      mine: { id: 'mine', name: 'Mine', topic: 'a/b', payload: '{}' },
+    }),
   );
-  expect(service.getTemplate('gps-location').variables).toBeUndefined();
-  expect(localStorage.getItem('mqtt-message-templates')).toBe(saved);
+  const service = new MessageTemplateService();
+  expect(service.getAllTemplates().map((item) => item.id)).toEqual([
+    'gps-location',
+    'mine',
+    'sensor-reading',
+    'device-status',
+  ]);
+  expect(localStorage.getItem('mqtt-message-templates-version')).toBe('2');
+  // A deleted example is not added back on the next start.
+  service.deleteTemplate('device-status');
+  expect(new MessageTemplateService().getTemplate('device-status')).toBeUndefined();
 });
 
 it('expands all shipped templates into payloads that satisfy their existing schemas', () => {
@@ -202,7 +224,7 @@ it('imports a standalone schema as a template whose applications pass validation
   const file = { text: async () => JSON.stringify(schema) };
   await service.importTemplates(file);
   const template = service.getAllTemplates().find((item) => item.name === 'Pump Reading')!;
-  expect(template.category).toBe('Imported Schemas');
+  expect(template.category).toBe('Imported');
   for (let run = 0; run < 10; run++) {
     const { payload } = service.processTemplate(template);
     expect(service.validatePayload(template.id, payload)).toEqual({ valid: true, errors: [] });

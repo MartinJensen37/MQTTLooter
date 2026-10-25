@@ -2,6 +2,104 @@ import { validateJson } from '../../../shared/json-schema';
 import { templateFromSchema } from '../../../shared/schema-template';
 import { expandTemplate } from '../../../shared/template-expansion';
 
+const SCHEMA = 'https://json-schema.org/draft/2020-12/schema';
+const VERSION_KEY = 'mqtt-message-templates-version';
+const VERSION = 2;
+
+/**
+ * Example message schemas. Each is a JSON Schema plus a topic; the payload is generated from
+ * the schema, so every Fill payload produces a message that matches it. Properties named like
+ * a variable take that variable's value.
+ */
+const EXAMPLES = [
+  {
+    id: 'sensor-reading',
+    name: 'Sensor reading',
+    description: 'A climate sensor reporting temperature and humidity.',
+    topic: 'sensors/{{sensorId}}/reading',
+    qos: 0,
+    retain: false,
+    variables: {
+      sensorId: { type: 'text', default: 'sensor-01', description: 'Sensor name' },
+    },
+    schema: {
+      $schema: SCHEMA,
+      title: 'Sensor reading',
+      type: 'object',
+      required: ['sensorId', 'temperature', 'humidity', 'time'],
+      additionalProperties: false,
+      properties: {
+        sensorId: { type: 'string', minLength: 1 },
+        temperature: { type: 'number', minimum: -40, maximum: 85, description: 'Degrees Celsius' },
+        humidity: {
+          type: 'number',
+          minimum: 0,
+          maximum: 100,
+          description: 'Relative humidity in %',
+        },
+        time: { type: 'string', format: 'date-time' },
+      },
+    },
+  },
+  {
+    id: 'device-status',
+    name: 'Device status',
+    description: 'A retained status message for a connected device.',
+    topic: 'devices/{{deviceId}}/status',
+    qos: 1,
+    retain: true,
+    variables: {
+      deviceId: { type: 'text', default: 'device-01', description: 'Device name' },
+    },
+    schema: {
+      $schema: SCHEMA,
+      title: 'Device status',
+      type: 'object',
+      required: ['deviceId', 'state', 'battery', 'firmware'],
+      additionalProperties: false,
+      properties: {
+        deviceId: { type: 'string', minLength: 1 },
+        state: { enum: ['online', 'offline', 'maintenance'] },
+        battery: { type: 'integer', minimum: 0, maximum: 100, description: 'Charge in %' },
+        firmware: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+$', examples: ['1.4.2'] },
+      },
+    },
+  },
+];
+
+/** Topic and payload of the examples shipped before message schemas, to replace them unchanged. */
+const LEGACY_EXAMPLES = {
+  'temperature-sensor': {
+    topic: 'sensors/temperature/{{sensorId}}',
+    payload: {
+      temperature: '{{randomFloat(15, 35, 1)}}',
+      humidity: '{{randomFloat(30, 80, 1)}}',
+      timestamp: '{{timestamp}}',
+      sensorId: '{{sensorId}}',
+    },
+  },
+  'device-status': {
+    topic: 'devices/{{deviceId}}/status',
+    payload: {
+      status: '{{randomChoice("online", "offline", "maintenance")}}',
+      lastSeen: '{{timestamp}}',
+      batteryLevel: '{{randomInt(0, 100)}}',
+      firmwareVersion: '1.2.3',
+    },
+  },
+  'gps-location': {
+    topic: 'tracking/{{vehicleId}}/location',
+    payload: {
+      latitude: '{{randomFloat(-90, 90, 6)}}',
+      longitude: '{{randomFloat(-180, 180, 6)}}',
+      speed: '{{randomFloat(0, 120, 1)}}',
+      heading: '{{randomInt(0, 360)}}',
+      timestamp: '{{timestamp}}',
+    },
+  },
+};
+
+/** Message schemas for Publishing: a JSON Schema, a topic and a payload template generated from it. */
 class MessageTemplateService {
   constructor() {
     this.templates = this.loadTemplates();
@@ -10,128 +108,56 @@ class MessageTemplateService {
   loadTemplates() {
     try {
       const saved = localStorage.getItem('mqtt-message-templates');
-      const defaults = this.getDefaultTemplates();
-      if (!saved) return defaults;
+      if (!saved) return this.getDefaultTemplates();
       const templates = JSON.parse(saved);
-      for (const [id, stock] of Object.entries(defaults)) {
-        const template = templates[id];
-        if (
-          template &&
-          !template.variables &&
-          template.topic === stock.topic &&
-          template.payload === stock.payload
-        )
-          template.variables = stock.variables;
+      if (Number(localStorage.getItem(VERSION_KEY)) < VERSION) {
+        this.templates = this.migrate(templates);
+        this.saveTemplates();
+        localStorage.setItem(VERSION_KEY, String(VERSION));
+        return this.templates;
       }
       return templates;
     } catch (error) {
-      console.error('Failed to load message templates:', error);
+      console.error('Failed to load message schemas:', error);
       return this.getDefaultTemplates();
     }
   }
 
+  /** Replace unchanged old examples with the current ones; edited and custom entries stay. */
+  migrate(templates) {
+    const result = { ...templates };
+    for (const [id, legacy] of Object.entries(LEGACY_EXAMPLES)) {
+      const saved = result[id];
+      if (
+        saved &&
+        saved.topic === legacy.topic &&
+        saved.payload === JSON.stringify(legacy.payload, null, 2)
+      )
+        delete result[id];
+    }
+    for (const [id, example] of Object.entries(this.getDefaultTemplates()))
+      if (!result[id]) result[id] = example;
+    return result;
+  }
+
   saveTemplates() {
     localStorage.setItem('mqtt-message-templates', JSON.stringify(this.templates));
+    localStorage.setItem(VERSION_KEY, String(VERSION));
   }
 
   getDefaultTemplates() {
-    return {
-      'temperature-sensor': {
-        id: 'temperature-sensor',
-        name: 'Temperature Sensor',
-        topic: 'sensors/temperature/{{sensorId}}',
-        payload: JSON.stringify(
-          {
-            temperature: '{{randomFloat(15, 35, 1)}}',
-            humidity: '{{randomFloat(30, 80, 1)}}',
-            timestamp: '{{timestamp}}',
-            sensorId: '{{sensorId}}',
-          },
-          null,
-          2,
-        ),
-        qos: 0,
-        retain: false,
-        category: 'IoT Sensors',
-        variables: {
-          sensorId: { type: 'text', default: 'temp-001', description: 'Sensor identifier' },
+    return Object.fromEntries(
+      EXAMPLES.map((example) => [
+        example.id,
+        {
+          ...example,
+          category: 'Examples',
+          payload: templateFromSchema(example.schema, {
+            variables: Object.keys(example.variables),
+          }),
         },
-        schema: {
-          type: 'object',
-          properties: {
-            temperature: { type: 'number', minimum: -50, maximum: 100 },
-            humidity: { type: 'number', minimum: 0, maximum: 100 },
-            timestamp: { type: 'number' },
-            sensorId: { type: 'string', minLength: 1 },
-          },
-          required: ['temperature', 'humidity', 'timestamp', 'sensorId'],
-        },
-      },
-      'device-status': {
-        id: 'device-status',
-        name: 'Device Status',
-        topic: 'devices/{{deviceId}}/status',
-        payload: JSON.stringify(
-          {
-            status: '{{randomChoice("online", "offline", "maintenance")}}',
-            lastSeen: '{{timestamp}}',
-            batteryLevel: '{{randomInt(0, 100)}}',
-            firmwareVersion: '1.2.3',
-          },
-          null,
-          2,
-        ),
-        qos: 1,
-        retain: true,
-        category: 'Device Management',
-        variables: {
-          deviceId: { type: 'text', default: 'device-001' },
-        },
-        schema: {
-          type: 'object',
-          properties: {
-            status: { type: 'string', enum: ['online', 'offline', 'maintenance'] },
-            lastSeen: { type: 'number' },
-            batteryLevel: { type: 'integer', minimum: 0, maximum: 100 },
-            firmwareVersion: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+$' },
-          },
-          required: ['status', 'lastSeen'],
-        },
-      },
-      'gps-location': {
-        id: 'gps-location',
-        name: 'GPS Location',
-        topic: 'tracking/{{vehicleId}}/location',
-        payload: JSON.stringify(
-          {
-            latitude: '{{randomFloat(-90, 90, 6)}}',
-            longitude: '{{randomFloat(-180, 180, 6)}}',
-            speed: '{{randomFloat(0, 120, 1)}}',
-            heading: '{{randomInt(0, 360)}}',
-            timestamp: '{{timestamp}}',
-          },
-          null,
-          2,
-        ),
-        qos: 0,
-        retain: false,
-        category: 'Location Services',
-        variables: {
-          vehicleId: { type: 'text', default: 'vehicle-001' },
-        },
-        schema: {
-          type: 'object',
-          properties: {
-            latitude: { type: 'number', minimum: -90, maximum: 90 },
-            longitude: { type: 'number', minimum: -180, maximum: 180 },
-            speed: { type: 'number', minimum: 0 },
-            heading: { type: 'integer', minimum: 0, maximum: 360 },
-            timestamp: { type: 'number' },
-          },
-          required: ['latitude', 'longitude', 'timestamp'],
-        },
-      },
-    };
+      ]),
+    );
   }
 
   getAllTemplates() {
@@ -199,9 +225,9 @@ class MessageTemplateService {
       payload: payload,
       qos: 0,
       retain: false,
-      category: 'Imported Schemas',
+      category: 'Imported',
       schema: schema,
-      description: schema.description || `Template created from imported ${title} schema`,
+      description: schema.description || `Imported from the ${title} schema`,
     };
   }
 
@@ -339,9 +365,7 @@ class MessageTemplateService {
         }
       } else {
         console.log('File format not recognized. Data structure:', Object.keys(importData));
-        throw new Error(
-          'Invalid file format. Expected either a JSON Schema or a template collection with { templates: [...] }',
-        );
+        throw new Error('Choose a JSON Schema, or a file exported from Message schemas.');
       }
 
       if (imported.length > 0) {
@@ -354,8 +378,7 @@ class MessageTemplateService {
         templates: imported,
       };
     } catch (error) {
-      console.error('Import error:', error.message);
-      throw new Error(`Failed to import templates: ${error.message}`);
+      throw new Error(error.message);
     }
   }
 
