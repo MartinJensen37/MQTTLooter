@@ -1,23 +1,13 @@
-import { Worker } from 'node:worker_threads';
 import { join } from 'node:path';
 import { MessageDelivery } from './message-delivery';
+import { WorkerClient } from './worker-client';
 import type { IncomingPublish } from '../shared/traffic';
 import type { HistoryRequest, HistoryStatus, HistoryStoreStatus } from '../shared/history';
 
 /** Bounded writes and requests keep database work away from main's connection controls. */
 export class HistoryService {
-  private worker: Worker;
-  private pending = new Map<
-    number,
-    {
-      resolve: (data: any) => void;
-      reject: (error: Error) => void;
-      timer: ReturnType<typeof setTimeout>;
-    }
-  >();
-  private nextId = 0;
+  private worker: WorkerClient<HistoryRequest>;
   private error?: string;
-  private workerFailed = false;
   private closing = false;
   private store?: HistoryStoreStatus;
   private flushWaiters: { checkpoint: number; resolve: () => void }[] = [];
@@ -32,19 +22,16 @@ export class HistoryService {
   });
 
   constructor(directory: string, workerPath = join(__dirname, 'history-worker.js')) {
-    this.worker = new Worker(workerPath, { workerData: { directory } });
-    this.worker.on('message', ({ requestId, data, error }) => {
-      const pending = this.pending.get(requestId);
-      if (!pending) return;
-      this.pending.delete(requestId);
-      clearTimeout(pending.timer);
-      if (error) pending.reject(new Error(error));
-      else pending.resolve(data);
-    });
-    this.worker.on('error', (error) => this.failWorker(error.message));
-    this.worker.on('exit', (code) => {
-      if (!this.closing) this.failWorker(`History worker exited (${code})`);
-    });
+    this.worker = new WorkerClient(
+      workerPath,
+      { directory },
+      {
+        name: 'History',
+        maxPending: (request) =>
+          request.action === 'append' || request.action === 'close' ? 16 : 8,
+        onFailure: (message) => this.failCapture(message),
+      },
+    );
     void this.request({ action: 'status' })
       .then((status) => {
         this.store = status;
@@ -69,29 +56,8 @@ export class HistoryService {
     this.finishFlush();
   }
 
-  private failWorker(message: string): void {
-    this.workerFailed = true;
-    this.failCapture(message);
-    for (const pending of this.pending.values()) {
-      clearTimeout(pending.timer);
-      pending.reject(new Error(message));
-    }
-    this.pending.clear();
-  }
-
   request(request: HistoryRequest): Promise<any> {
-    if (this.workerFailed) return Promise.reject(new Error(this.error ?? 'History unavailable'));
-    if (this.pending.size >= (request.action === 'append' || request.action === 'close' ? 16 : 8))
-      return Promise.reject(new Error('Too many history requests. Try again.'));
-    const requestId = ++this.nextId;
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.failWorker('History worker timed out. Capture stopped; restart the app to retry.');
-        void this.worker.terminate();
-      }, 10_000);
-      this.pending.set(requestId, { resolve, reject, timer });
-      this.worker.postMessage({ requestId, request });
-    });
+    return this.worker.request(request);
   }
 
   status(): HistoryStatus {
@@ -99,7 +65,7 @@ export class HistoryService {
   }
 
   async refreshStatus(): Promise<HistoryStatus> {
-    if (!this.workerFailed) this.store = await this.request({ action: 'status' });
+    if (!this.worker.failure) this.store = await this.request({ action: 'status' });
     return this.status();
   }
 
@@ -132,10 +98,6 @@ export class HistoryService {
   async close(): Promise<void> {
     this.closing = true;
     await this.flush();
-    try {
-      if (!this.workerFailed) await this.request({ action: 'close' });
-    } finally {
-      await this.worker.terminate();
-    }
+    await this.worker.close({ action: 'close' });
   }
 }
