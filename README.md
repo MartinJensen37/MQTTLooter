@@ -26,6 +26,8 @@ npm run pack             # Unpacked Windows application in dist-builder/win-unpa
 npm run dist             # Windows NSIS installer in dist-builder/
 ```
 
+`npm test` also runs `tests/mosquitto.test.ts` against a private Mosquitto instance on a free loopback port when Mosquitto is installed (set `MOSQUITTO` to its path if needed), and skips it otherwise.
+
 The load test drives retained floods and a sustained stream with history and a recording active, from a loopback broker in a separate process. It writes `.tmp/load-report-<profile>.json` with memory, event-loop delay, input round trips, queue peaks, disconnect time and per-connection accounting, and removes its isolated app data afterwards (`LOAD_KEEP=1` keeps it). Performance targets are reported; `LOAD_STRICT=1` also fails the run when one is missed. Never point it at a public broker.
 
 The Electron smoke test uses hidden windows, isolated storage under `.tmp/`, and a loopback broker. It does not connect to saved user brokers or modify the user's app data. Screenshots are written to `.tmp/electron-smoke.png`, `.tmp/electron-simulator.png`, `.tmp/electron-simulator-small.png`, and `.tmp/electron-signal-editor.png`.

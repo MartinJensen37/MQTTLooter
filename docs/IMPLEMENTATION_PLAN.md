@@ -83,7 +83,7 @@ Broker passwords, TLS private keys and passphrases are encrypted with `safeStora
 | CSS cleanup and refactoring | Shared tokens/controls and simulator scoping exist; older globals and broad JS types remain. | Incremental cleanup in touched features, scoped styles, typed service boundaries. |
 | Lazy loading | Virtual topic/signal rows, paged history and lazily mounted property details. | Panel modules, recording metadata/payload pages and decoder assets. |
 | Documentation | README, simulator guide and review notes exist. | Update with each feature and add usage examples for storage, plots and timing. |
-| TLS / WebSocket verification | `tests/transport-matrix.test.ts` runs the real connection manager and MQTT.js against loopback TLS, mutual-TLS, WebSocket and secure WebSocket servers: CA trust, host name mismatch, disabled verification, client certificates and passphrases, WebSocket paths, rejected credentials and QoS 1/2. It found that the TLS server name was not applied to secure WebSockets (fixed). | Third-party broker interoperability, session expiry and persistent-session reconnects; installer/upgrade checks. |
+| TLS / WebSocket verification | `tests/transport-matrix.test.ts` runs the real connection manager and MQTT.js against loopback TLS, mutual-TLS, WebSocket and secure WebSocket servers: CA trust, host name mismatch, disabled verification, client certificates and passphrases, WebSocket paths, rejected credentials and QoS 1/2. It found that the TLS server name was not applied to secure WebSockets (fixed). | Installer/upgrade checks and more brokers (EMQX, HiveMQ). `tests/mosquitto.test.ts` covers Mosquitto 2.0 when installed: credential rejection, persistent sessions and expiry, negotiated aliases, retained QoS 2 with binary payloads and properties. |
 
 Keep the completed saved profiles, clear-history action, sidebar collapse, notifications, dropdown controls and template import. Retained-message removal currently prioritizes the selected topic over the publishing form; preserve that behavior. Do not rebuild these features solely because they appear in the old backlog.
 
@@ -254,7 +254,7 @@ Done on 2026-10-25, in order: durable recordings, the load harness, credential s
 
 Next, in order:
 
-1. Third-party broker checks (Mosquitto, EMQX or HiveMQ CE locally) for session expiry, persistent sessions and alias limits, plus an installer/upgrade check.
+1. Installer/upgrade checks and other brokers (Mosquitto checks are in place).
 2. Building simulator payload templates from an imported schema (publishing templates already do).
 3. Full-result export for content search; streaming recording import above 10 MiB.
 4. Tiled workspaces, then decoding (protobuf descriptors first; decoding must run where the renderer CSP allows it).
