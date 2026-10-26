@@ -38,7 +38,7 @@ MQTT 3.1.1 and 5 over TCP, TLS and WebSockets, with client certificates, last wi
 
 The topic tree keeps topics in a stable order, shows message counts, rates, retained flags and the latest payload, and can be searched. Selecting a topic shows its messages as cards (JSON is indented automatically, binary payloads as hex) or as a plain log. The newest messages appear at once and the rest of the topic's disk history loads in the background. **Show** keeps the newest 300, 1,000 or 10,000 messages, or all of them (up to 100,000); new messages are added at the top and the oldest drop off. The search field finds text, hex bytes or decoded values anywhere in the topic's stored history. Messages and search results export to JSON or CSV.
 
-Every topic keeps its newest 300 messages in memory (100 to 2,000 in Settings), so they show without waiting. All messages are also written to a disk history for the session, kept for up to 24 hours; turn on **Keep disk history after closing the app** to retain it.
+Every topic keeps its newest 300 messages in memory (100 to 2,000 in Settings), so they show without waiting. All messages are also written to a disk history, which keeps 24 hours and 256 MiB of payload by default. **Settings > Messages & storage** can keep 1 hour to 7 days and up to 4 GiB, and keep it after the app closes.
 
 ### Plotting
 
@@ -99,7 +99,7 @@ Turn on **Protobuf decoders** in Settings, then add `.proto` files and a topic f
 
 - Live cache: 300 messages per topic by default, 2 MiB of payload per topic, 20,000 topics and 64 MiB per connection (Compact: 5,000 topics, 32 MiB). Pin up to eight topics to protect them.
 - Message delivery to the window is batched and bounded; under overload each topic keeps its newest message and drops are counted in Settings.
-- Disk history: 24 hours, about 256 MiB of payload, kept for the session unless set to persist.
+- Disk history: 24 hours and 256 MiB of payload by default, up to 7 days and 4 GiB; kept for the session unless set to persist.
 - Recordings: a 2 GiB database; individual imported messages up to 1 MiB.
 - Decoding: payloads and decoded output up to 1 MiB each.
 
