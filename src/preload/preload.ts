@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     search: (query: unknown) => ipcRenderer.invoke('history-search', query),
     series: (query: unknown) => ipcRenderer.invoke('history-series', query),
     page: (query: unknown) => ipcRenderer.invoke('history-page', query),
+    payload: (rowId: number) => ipcRenderer.invoke('history-payload', rowId),
     clear: (connectionId: string, topic?: string) =>
       ipcRenderer.invoke('history-clear', connectionId, topic),
     persist: (enabled: boolean) => ipcRenderer.invoke('history-persist', enabled),

@@ -8,10 +8,8 @@ export const TOPIC_VIEW = {
   maxChars: 64 * 1024 * 1024,
 };
 
-export interface TopicMessage extends DisplayMessage {
-  /** Disk history row, the cursor for loading older messages. */
-  rowId?: number;
-}
+/** A message of the selected topic; disk history rows are the cursor for older messages. */
+export type TopicMessage = DisplayMessage;
 
 export interface TopicMessages {
   messages: TopicMessage[];
@@ -36,6 +34,8 @@ export const fromHistory = (message: HistoryMessage): TopicMessage => ({
   qos: message.qos,
   retain: message.retain,
   timestamp: message.timestamp,
+  byteLength: message.byteLength,
+  ...(message.truncated && { truncated: true }),
 });
 
 /** Newest first; messages of one session in the same millisecond keep receive order. */

@@ -84,6 +84,14 @@ export interface ElectronAPI {
     page(
       query: import('./history').HistoryQuery,
     ): Promise<IpcResult<import('./history').HistoryPage>>;
+    /** The full payload of a message shown as a preview. */
+    payload(rowId: number): Promise<
+      IpcResult<{
+        message: string;
+        encoding: import('./payload').PayloadEncoding;
+        byteLength: number;
+      }>
+    >;
     clear(connectionId: string, topic?: string): Promise<IpcResult>;
     persist(enabled: boolean): Promise<IpcResult>;
     /** How long and how much disk history keeps. */

@@ -6,6 +6,8 @@ export const DISK_HISTORY = {
   maxAgeMs: 24 * 60 * 60 * 1000,
   pageMessages: 300,
   pageBytes: 2 * 1024 * 1024,
+  /** Larger payloads are sent as a preview of this size; the full payload loads on request. */
+  previewBytes: 256 * 1024,
 };
 
 /** How long and how much disk history keeps, chosen in Settings. */
@@ -78,6 +80,8 @@ export interface HistoryExportChunk {
 
 export interface HistoryMessage extends IncomingPublish {
   rowId: number;
+  /** `message` holds the first `previewBytes`; `byteLength` is the full size. */
+  truncated?: boolean;
 }
 
 export interface HistoryPage {
@@ -110,6 +114,7 @@ export interface HistoryStatus {
 export type HistoryRequest =
   | { action: 'append'; messages: IncomingPublish[]; drops?: HistoryDrop[] }
   | { action: 'page'; query: HistoryQuery }
+  | { action: 'payload'; rowId: number }
   | { action: 'search'; query: import('./history-search').HistorySearchQuery }
   | { action: 'series'; query: import('./numeric-series').NumericQuery }
   | { action: 'export-chunk'; query: HistoryExportQuery }

@@ -32,6 +32,10 @@ export interface DisplayMessage {
   qos: number;
   retain: boolean;
   timestamp: number;
+  /** From disk history: the stored row, and whether `message` is only a preview. */
+  rowId?: number;
+  truncated?: boolean;
+  byteLength?: number;
 }
 
 export class TopicTreeService {

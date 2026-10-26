@@ -239,6 +239,10 @@ for (const [channel, handler] of Object.entries({
       throw new Error('Invalid history query');
     return historyService!.request({ action: 'page', query });
   },
+  'history-payload': (rowId: unknown) => {
+    if (!Number.isSafeInteger(rowId) || (rowId as number) < 1) throw new Error('Invalid message');
+    return historyService!.request({ action: 'payload', rowId: rowId as number });
+  },
   'history-series': (query: any) => {
     if (
       !query ||

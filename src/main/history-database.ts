@@ -16,9 +16,25 @@ import {
   type HistoryMessage,
   type HistoryQuery,
 } from '../shared/history';
-import { encodePayload, payloadBytes } from '../shared/payload';
+import { encodePayload, payloadBytes, type PayloadEncoding } from '../shared/payload';
 import { csvRow, exportRow } from '../shared/message-export';
 import type { IncomingPublish } from '../shared/traffic';
+
+/** Message columns with at most `?` payload bytes, and the full payload length. */
+const PREVIEW_COLUMNS = `m.id, m.session_id, m.sequence, m.timestamp, m.qos, m.retain, m.protocol,
+  m.properties, m.storage_bytes, substr(m.payload, 1, ?) payload, length(m.payload) payload_length`;
+
+/** A preview cut short of a split UTF-8 character, so text stays text. */
+function utf8Prefix(bytes: Uint8Array): Uint8Array {
+  let end = bytes.length;
+  // Step back over continuation bytes and the lead byte of an incomplete character.
+  let back = 0;
+  while (back < 3 && end - back > 0 && (bytes[end - back - 1] & 0xc0) === 0x80) back++;
+  const lead = bytes[end - back - 1];
+  const size = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1;
+  if (back > 0 || size > 1) end -= size > back + 1 ? back + 1 : 0;
+  return bytes.subarray(0, end);
+}
 
 /** Synchronous SQLite is confined to the storage worker. */
 export class HistoryDatabase {
@@ -202,11 +218,12 @@ export class HistoryDatabase {
       Number(this.db.prepare('SELECT coalesce(max(id),0) id FROM messages').get()!.id);
     const rows = this.db
       .prepare(
-        `SELECT m.*, t.path, t.connection_id FROM messages m
+        `SELECT ${PREVIEW_COLUMNS}, t.path, t.connection_id FROM messages m
       JOIN topics t ON t.id=m.topic_id WHERE t.connection_id=? AND t.path=?
       AND m.id<=? AND m.id<? AND m.timestamp>=? ORDER BY m.id DESC LIMIT ?`,
       )
       .iterate(
+        this.limits.previewBytes,
         query.connectionId,
         query.topic,
         snapshot,
@@ -226,18 +243,33 @@ export class HistoryDatabase {
       if (
         result.messages.length &&
         (result.messages.length >= this.limits.pageMessages ||
-          bytes + Number(row.storage_bytes) > this.limits.pageBytes)
+          bytes + this.shownBytes(row) > this.limits.pageBytes)
       ) {
         result.nextBefore = result.messages.at(-1)!.rowId;
         break;
       }
-      bytes += Number(row.storage_bytes);
+      bytes += this.shownBytes(row);
       result.messages.push(this.decodeMessage(row));
     }
     return result;
   }
 
+  /** Bytes a row takes in a page: large payloads count as their preview. */
+  private shownBytes(row: Record<string, unknown>): number {
+    return Math.min(Number(row.storage_bytes), this.limits.previewBytes + 1024);
+  }
+
+  /** One stored payload in full, for a message shown as a preview. */
+  payload(rowId: number): { message: string; encoding: PayloadEncoding; byteLength: number } {
+    const row = this.db.prepare('SELECT payload FROM messages WHERE id=?').get(rowId);
+    if (!row) throw new Error('This message is no longer in disk history.');
+    return encodePayload(row.payload as Uint8Array);
+  }
+
   private decodeMessage(row: Record<string, unknown>): HistoryMessage {
+    const bytes = row.payload as Uint8Array;
+    const length = row.payload_length === undefined ? bytes.byteLength : Number(row.payload_length);
+    const truncated = length > bytes.byteLength;
     return {
       rowId: Number(row.id),
       id: String(row.connection_id),
@@ -248,7 +280,9 @@ export class HistoryDatabase {
       qos: Number(row.qos),
       retain: Boolean(row.retain),
       protocolVersion: Number(row.protocol),
-      ...encodePayload(row.payload as Uint8Array),
+      ...encodePayload(truncated ? utf8Prefix(bytes) : bytes),
+      byteLength: length,
+      ...(truncated && { truncated: true }),
       properties: row.properties ? JSON.parse(String(row.properties)) : undefined,
     };
   }
@@ -318,8 +352,8 @@ export class HistoryDatabase {
     };
     const rows = this.db
       .prepare(
-        `SELECT m.id, m.timestamp, m.storage_bytes, t.path,
-      CASE WHEN length(m.payload)<=? AND m.storage_bytes<=? THEN m.payload ELSE NULL END payload
+        `SELECT m.id, m.timestamp, m.storage_bytes, t.path, length(m.payload) payload_length,
+      CASE WHEN length(m.payload)<=? THEN m.payload ELSE NULL END payload
       FROM messages m
       JOIN topics t ON t.id=m.topic_id
       WHERE t.connection_id=? AND t.path=?
@@ -328,7 +362,6 @@ export class HistoryDatabase {
       )
       .iterate(
         SEARCH_LIMITS.payloadBytes,
-        SEARCH_LIMITS.resultBytes,
         query.connectionId,
         query.topic,
         Math.max(query.from, now - this.limits.maxAgeMs),
@@ -338,8 +371,32 @@ export class HistoryDatabase {
         SEARCH_LIMITS.rows + 1,
       );
     const getMatch = this.db.prepare(
-      'SELECT m.*, t.path, t.connection_id FROM messages m JOIN topics t ON t.id=m.topic_id WHERE m.id=?',
+      `SELECT ${PREVIEW_COLUMNS}, t.path, t.connection_id FROM messages m
+      JOIN topics t ON t.id=m.topic_id WHERE m.id=?`,
     );
+    const readPart = this.db.prepare('SELECT substr(payload, ?, ?) part FROM messages WHERE id=?');
+    // A payload too large to read at once is searched in chunks that overlap by the term's
+    // length, so a match across a chunk boundary is found. Text mode also checks it is UTF-8.
+    const streamed = (rowId: number, length: number): 'match' | 'none' | 'binary' => {
+      const term = needle ?? Buffer.from(query.term, 'utf8');
+      const utf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+      let tail = Buffer.alloc(0);
+      for (let offset = 0; offset < length; offset += SEARCH_LIMITS.chunkBytes) {
+        const part = Buffer.from(
+          readPart.get(offset + 1, SEARCH_LIMITS.chunkBytes, rowId)!.part as Uint8Array,
+        );
+        if (!needle)
+          try {
+            utf8.decode(part, { stream: offset + SEARCH_LIMITS.chunkBytes < length });
+          } catch {
+            return 'binary';
+          }
+        const window = Buffer.concat([tail, part]);
+        if (window.includes(term)) return 'match';
+        tail = window.subarray(Math.max(0, window.length - term.length + 1));
+      }
+      return 'none';
+    };
     const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
     const needle = query.mode === 'hex' ? Buffer.from(query.term.replace(/\s/g, ''), 'hex') : null;
     const started = performance.now();
@@ -353,10 +410,14 @@ export class HistoryDatabase {
     };
     for (const row of rows) {
       const payload = row.payload as Uint8Array | null;
+      const length = Number(row.payload_length);
+      const stream =
+        payload === null && query.mode !== 'decoded' && length <= SEARCH_LIMITS.streamBytes;
       if (
         result.scanned &&
         (result.scanned >= SEARCH_LIMITS.rows ||
-          scannedBytes + (payload?.byteLength ?? 0) > SEARCH_LIMITS.scanBytes ||
+          scannedBytes + (payload?.byteLength ?? (stream ? length : 0)) >
+            SEARCH_LIMITS.scanBytes ||
           performance.now() - started >= SEARCH_LIMITS.workMs ||
           result.messages.length >= SEARCH_LIMITS.matches)
       ) {
@@ -381,20 +442,24 @@ export class HistoryDatabase {
             binary = true;
           }
         }
+      } else if (stream) {
+        const found = streamed(Number(row.id), length);
+        matches = found === 'match';
+        binary = found === 'binary';
       }
-      if (matches && resultBytes + Number(row.storage_bytes) > SEARCH_LIMITS.resultBytes) {
+      if (matches && resultBytes + this.shownBytes(row) > SEARCH_LIMITS.resultBytes) {
         resume();
         break;
       }
       result.scanned++;
-      scannedBytes += payload?.byteLength ?? 0;
+      scannedBytes += payload?.byteLength ?? (stream ? length : 0);
       lastRow = Number(row.id);
       lastTime = Number(row.timestamp);
-      if (payload === null) result.skippedLarge++;
+      if (payload === null && !stream) result.skippedLarge++;
       if (binary) result.skippedBinary++;
       if (!matches) continue;
-      resultBytes += Number(row.storage_bytes);
-      const match = getMatch.get(row.id)!;
+      resultBytes += this.shownBytes(row);
+      const match = getMatch.get(this.limits.previewBytes, row.id)!;
       result.messages.push(this.decodeMessage(match));
     }
     return result;

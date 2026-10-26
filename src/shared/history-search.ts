@@ -5,6 +5,9 @@ export const SEARCH_LIMITS = {
   scanBytes: 8 * 1024 * 1024,
   workMs: 25,
   payloadBytes: 256 * 1024,
+  /** Larger payloads are searched in chunks, up to this size. */
+  streamBytes: 64 * 1024 * 1024,
+  chunkBytes: 1024 * 1024,
   resultBytes: 1024 * 1024,
   matches: 100,
   termLength: 1024,

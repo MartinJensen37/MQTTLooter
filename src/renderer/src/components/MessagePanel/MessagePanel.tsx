@@ -14,6 +14,8 @@ import { parseSparkplugTopic } from '../../../../shared/sparkplug';
 import type { SearchMode } from '../../hooks/useTopicSearch';
 import SparkplugBadge from '../Controls/SparkplugBadge';
 import SparkplugDetails from './SparkplugDetails';
+import { formatBytes } from '../RecordingPanel/recordingPanel/recordingHelpers';
+import type { PayloadEncoding } from '../../../../shared/payload';
 
 type Feedback = (message: string, type?: string) => void;
 type Shown = Settings['messagesShown'];
@@ -170,9 +172,44 @@ function MessagePanel({
     return () => document.removeEventListener('mousedown', close);
   }, [exportMenu]);
 
+  // Full payloads loaded on request for messages shown from disk history as a preview.
+  const [full, setFull] = useState<Record<string, { message: string; encoding: PayloadEncoding }>>(
+    {},
+  );
+  useEffect(() => setFull({}), [connectionId, topicPath]);
+  const complete = (message: DisplayMessage): DisplayMessage =>
+    full[message.id] ? { ...message, ...full[message.id], truncated: false } : message;
+  const loadFull = async (message: DisplayMessage): Promise<DisplayMessage> => {
+    if (!message.truncated || full[message.id] || message.rowId === undefined)
+      return complete(message);
+    const result = await window.electronAPI.history.payload(message.rowId);
+    if (!result.success || !result.data)
+      throw new Error(result.error ?? 'The full payload could not be loaded.');
+    const payload = { message: result.data.message, encoding: result.data.encoding };
+    setFull((previous) => ({ ...previous, [message.id]: payload }));
+    return { ...message, ...payload, truncated: false };
+  };
+  const copyPayload = async (message: DisplayMessage) => {
+    try {
+      copy((await loadFull(message)).message, 'Payload copied!');
+    } catch (error) {
+      showFeedback?.((error as Error).message, 'error');
+    }
+  };
+
   const exportShown = useCallback(
-    (format: 'json' | 'csv') => {
+    async (format: 'json' | 'csv') => {
       if (topicPath === undefined || processed.length === 0) return;
+      setExportMenu(false);
+      // Previews are exported in full.
+      let shown: DisplayMessage[];
+      try {
+        shown = [];
+        for (const message of processed) shown.push(await loadFull(message));
+      } catch (error) {
+        showFeedback?.((error as Error).message, 'error');
+        return;
+      }
       const name = `mqtt-topic-${topicPath.replace(/[/\\:*?"<>|]/g, '_')}-${new Date().toISOString().slice(0, 19)}.${format}`;
       if (format === 'json')
         download(
@@ -181,8 +218,8 @@ function MessagePanel({
               exportDate: new Date().toISOString(),
               connectionName: connectionName || 'Unknown',
               topic: topicPath,
-              messageCount: processed.length,
-              messages: processed.map(exportMessage),
+              messageCount: shown.length,
+              messages: shown.map(exportMessage),
             },
             null,
             2,
@@ -190,11 +227,12 @@ function MessagePanel({
           'application/json',
           name,
         );
-      else download(exportMessageCSV(processed), 'text/csv', name);
-      setExportMenu(false);
+      else download(exportMessageCSV(shown), 'text/csv', name);
       showFeedback?.(`Topic exported as ${format.toUpperCase()}!`, 'success');
     },
-    [topicPath, processed, connectionName, showFeedback],
+    // loadFull reads the loaded payloads, which it also updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [topicPath, processed, connectionName, showFeedback, full],
   );
 
   const copy = (text: string, feedback: string) => {
@@ -520,12 +558,12 @@ function MessagePanel({
                       {row.text}
                     </pre>
                   ))
-                : rendered.map((msg) => (
+                : rendered.map(complete).map((msg) => (
                     <div
                       key={msg.id}
                       data-scroll-key={msg.id}
                       className="message-item"
-                      onDoubleClick={() => copy(msg.message, 'Payload copied!')}
+                      onDoubleClick={() => void copyPayload(msg)}
                       title={
                         msg.encoding === 'base64'
                           ? 'Double-click to copy base64 payload'
@@ -556,7 +594,7 @@ function MessagePanel({
                             className="copy-btn message-copy-btn"
                             onClick={(event) => {
                               event.stopPropagation();
-                              copy(msg.message, 'Payload copied!');
+                              void copyPayload(msg);
                             }}
                             title={
                               msg.encoding === 'base64' ? 'Copy base64 payload' : 'Copy payload'
@@ -574,6 +612,22 @@ function MessagePanel({
                           topic={msg.topic}
                           view={payloadView}
                         />
+                        {msg.truncated && (
+                          <p className="message-preview-note">
+                            Preview of a {formatBytes(msg.byteLength ?? 0)} payload.{' '}
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void loadFull(msg).catch((error: Error) =>
+                                  showFeedback?.(error.message, 'error'),
+                                );
+                              }}
+                            >
+                              Load full payload
+                            </button>
+                          </p>
+                        )}
                         <MessageProperties
                           protocolVersion={msg.protocolVersion}
                           properties={msg.properties}

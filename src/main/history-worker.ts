@@ -134,6 +134,9 @@ parentPort!.on(
         case 'page':
           data = database.page(request.query);
           break;
+        case 'payload':
+          data = database.payload(request.rowId);
+          break;
         case 'search':
           data = database.search(request.query, Date.now(), decodeText);
           break;
