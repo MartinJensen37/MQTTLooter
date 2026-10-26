@@ -17,7 +17,8 @@
   gap: 6px;
 }
 .publish-timeline-controls .form-range {
-  width: min(240px, 40vw);
+  /* Sized from the simulation panel, which shares the window with the topic tree. */
+  width: min(240px, 40cqi);
 }
 .publish-timeline-controls output {
   min-width: 3.5em;
@@ -160,7 +161,7 @@
 .publish-timeline details summary {
   cursor: pointer;
 }
-@media (max-width: 900px) {
+@container (max-width: 600px) {
   .publish-timeline-row,
   .publish-timeline-total {
     grid-template-columns: 100px minmax(0, 1fr) 44px;

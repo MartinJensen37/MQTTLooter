@@ -610,7 +610,11 @@ async function run() {
     const panel = document.querySelector('.simulation-panel');
     return { width: panel.clientWidth, scroll: panel.scrollWidth, editor: document.querySelector('.device-config-panel').getBoundingClientRect().width };
   })()`);
-  assert.ok(layout.scroll <= layout.width + 2 && layout.editor > 450, JSON.stringify(layout));
+  // The topic tree stays beside the simulator; the editor still fills the panel without overflow.
+  assert.ok(
+    layout.scroll <= layout.width + 2 && layout.editor >= layout.width - 12,
+    JSON.stringify(layout),
+  );
   const signalRows = await evaluate(`(() => {
     const rows = [...document.querySelectorAll('.signal-overview-row')];
     return rows.map(row => {
