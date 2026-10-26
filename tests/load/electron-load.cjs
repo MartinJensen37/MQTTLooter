@@ -21,7 +21,7 @@ const PROFILES = {
 const profileName = process.env.LOAD_PROFILE || 'quick';
 const profile = PROFILES[profileName];
 if (!profile) throw new Error(`Unknown LOAD_PROFILE ${profileName}`);
-const TARGETS = { inputP95Ms: 100, disconnectMs: 500 };
+const TARGETS = { inputP95Ms: 100, disconnectMs: 500, heapPeakMiB: 256 };
 // Part of the stream is protobuf, decoded in main and plotted from disk history.
 const PROTO = {
   source:
@@ -441,6 +441,10 @@ async function run() {
   }
   check('stream input p95 ms', report.stream.inputRoundTripMs.p95, TARGETS.inputP95Ms);
   check('stream disconnect ms', report.stream.disconnectMs, TARGETS.disconnectMs);
+  // JavaScript heaps, which hold the caches; process totals also count Chromium itself.
+  const memory = report.stream.memoryMiB;
+  check('stream main heap MiB', memory?.mainHeapPeak ?? null, TARGETS.heapPeakMiB);
+  check('stream renderer heap MiB', memory?.rendererHeapPeak ?? null, TARGETS.heapPeakMiB);
   report.targetMisses = misses;
   const file = path.join(workspace, '.tmp', `load-report-${profileName}.json`);
   fs.writeFileSync(file, JSON.stringify(report, null, 2));

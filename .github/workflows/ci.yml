@@ -36,6 +36,18 @@ jobs:
         run: npm run test:electron
         env:
           SMOKE_TIMEOUT_MS: 180000
+      # Fails when input latency, disconnect time or heap size miss their targets under load.
+      - name: Load test
+        run: npm run test:load
+        env:
+          LOAD_STRICT: 1
+      - name: Upload load report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: load-report
+          path: .tmp/load-report-*.json
+          if-no-files-found: ignore
       - name: Upload Electron screenshots
         if: failure()
         uses: actions/upload-artifact@v5
