@@ -1,0 +1,5 @@
+# LF in every checkout, as Prettier expects; Windows tools handle LF.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.exe binary
