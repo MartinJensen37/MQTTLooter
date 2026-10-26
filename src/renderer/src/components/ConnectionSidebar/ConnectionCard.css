@@ -157,31 +157,6 @@
 }
 .card-actions.hidden { opacity: 0; transform: translateX(8px); pointer-events: none; }
 
-.action-btn {
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  transition: all var(--transition-fast);
-  background: var(--bg-glass);
-  border: 1px solid var(--hairline);
-  backdrop-filter: blur(4px);
-}
-.action-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
-
-.toggle-btn.connect    { background: color-mix(in srgb, var(--primary) 10%, var(--bg-surface)); border-color: var(--primary); color: var(--primary); }
-.toggle-btn.connect:hover { background: var(--primary); color: white; }
-.toggle-btn.disconnect    { background: color-mix(in srgb, var(--warning) 20%, var(--bg-surface)); border-color: var(--warning); color: var(--warning-text); }
-.toggle-btn.disconnect:hover { background: var(--warning); color: var(--gray-900); }
-.edit-btn    { background: var(--gray-200); border-color: var(--gray-500); color: var(--gray-600); }
-.edit-btn:hover    { background: var(--neutral); color: white; }
-.delete-btn  { background: color-mix(in srgb, var(--danger) 20%, var(--bg-surface)); border-color: var(--danger); color: var(--danger); }
-.delete-btn:hover  { background: var(--danger); color: white; }
-
 /* ── MQTT version bubble ── */
 .mqtt-version-bubble {
   font-size: 9px;

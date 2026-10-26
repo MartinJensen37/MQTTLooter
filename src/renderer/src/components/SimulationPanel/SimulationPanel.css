@@ -97,9 +97,11 @@
   color: var(--text-muted);
   overflow-wrap: anywhere;
 }
+/* Stacked like the connection cards' buttons. */
 .simulation-panel .device-actions {
   display: flex;
-  gap: var(--spacing-xs);
+  flex-direction: column;
+  gap: 2px;
 }
 .simulation-panel .device-config-panel {
   flex: 1;
@@ -126,11 +128,14 @@
   overflow-wrap: anywhere;
 }
 .simulation-status {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
   border-radius: var(--radius-pill);
   background: var(--bg-muted);
   color: var(--text-muted);
   font-size: 11px;
-  padding: 5px 10px;
 }
 .simulation-status.running {
   background: var(--success-light);

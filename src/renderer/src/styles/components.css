@@ -17,9 +17,11 @@
   white-space: nowrap;
 }
 
-.btn-sm  { padding: 5px 12px;  font-size: 12px; }
-.btn-md  { padding: 8px 16px;  font-size: 13px; }
-.btn-lg  { padding: 10px 20px; font-size: 14px; }
+/* Three pill sizes. Small for most buttons, medium for a panel's main actions; heights are
+   fixed so buttons with and without borders line up. Status pills are 22 px. */
+.btn-sm  { height: 26px; padding: 0 12px; font-size: 12px; }
+.btn-md  { height: 32px; padding: 0 16px; font-size: 13px; }
+.btn-lg  { height: 36px; padding: 0 20px; font-size: 14px; }
 
 .btn-primary { background: var(--primary); color: white; }
 .btn-primary:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); box-shadow: var(--shadow-md); }
@@ -74,6 +76,32 @@
   cursor: pointer;
   transition: all var(--transition-fast);
 }
+
+/* ── Card action buttons: small square buttons on connection and device cards ── */
+.action-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: all var(--transition-fast);
+  background: var(--bg-glass);
+  border: 1px solid var(--hairline);
+  backdrop-filter: blur(4px);
+}
+.action-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+
+.toggle-btn.connect    { background: color-mix(in srgb, var(--primary) 10%, var(--bg-surface)); border-color: var(--primary); color: var(--primary); }
+.toggle-btn.connect:hover { background: var(--primary); color: white; }
+.toggle-btn.disconnect    { background: color-mix(in srgb, var(--warning) 20%, var(--bg-surface)); border-color: var(--warning); color: var(--warning-text); }
+.toggle-btn.disconnect:hover { background: var(--warning); color: var(--on-warning); }
+.edit-btn    { background: var(--gray-200); border-color: var(--gray-500); color: var(--gray-600); }
+.edit-btn:hover    { background: var(--neutral); color: white; }
+.delete-btn  { background: color-mix(in srgb, var(--danger) 20%, var(--bg-surface)); border-color: var(--danger); color: var(--danger); }
+.delete-btn:hover  { background: var(--danger); color: white; }
 
 /* ── Panels ── */
 .panel {
@@ -633,17 +661,20 @@ select option::checkmark { display: none; }
 .copy-btn.pin-btn.pinned { background: var(--primary); color: white; }
 
 /* ── Connection status pill ── */
-.connection-indicator {
+.connection-indicator,
+.status-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 10px;
+  height: 22px;
+  padding: 0 10px;
   border-radius: var(--radius-pill);
   font-size: 11px;
   font-weight: 500;
   border: 1px solid;
 }
-.connection-indicator i { font-size: 9px; }
+.connection-indicator i,
+.status-pill i { font-size: 9px; }
 .connection-indicator.connected    { background: var(--success-light); color: var(--success-text); border-color: rgba(40,167,69,.3); }
 .connection-indicator.disconnected { background: var(--warning-light); color: var(--warning-text); border-color: var(--warning); }
 

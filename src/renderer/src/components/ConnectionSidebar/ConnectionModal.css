@@ -261,7 +261,8 @@
   background: var(--success);
   color: white;
   border: none;
-  padding: 6px 12px;
+  height: 26px;
+  padding: 0 12px;
   border-radius: var(--radius-pill);
   font-size: 12px;
   font-weight: 500;
@@ -301,7 +302,8 @@
 
 .mqtt-cancel-btn,
 .mqtt-save-btn {
-  padding: 8px 18px;
+  height: 32px;
+  padding: 0 16px;
   border-radius: var(--radius-pill);
   font-size: 13px;
   font-weight: 500;

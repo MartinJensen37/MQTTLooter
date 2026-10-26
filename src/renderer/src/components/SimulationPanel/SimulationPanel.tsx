@@ -306,7 +306,7 @@ function SimulationWorkspace({
                         e.stopPropagation();
                         togglePublishing(device.id);
                       }}
-                      className={`btn btn-sm ${device.isPublishing ? 'btn-secondary' : 'btn-success'}`}
+                      className={`action-btn toggle-btn ${device.isPublishing ? 'disconnect' : 'connect'}`}
                       disabled={
                         !device.isPublishing && (!isConnected || validateDevice(device).length > 0)
                       }
@@ -318,7 +318,6 @@ function SimulationWorkspace({
                             ? 'Connect to start'
                             : (validateDevice(device)[0] ?? 'Start loop')
                       }
-                      style={{ borderRadius: 'var(--radius-pill)' }}
                     >
                       <i className={`fas fa-${device.isPublishing ? 'stop' : 'play'}`}></i>
                     </button>
@@ -327,9 +326,8 @@ function SimulationWorkspace({
                         e.stopPropagation();
                         deleteDevice(device.id);
                       }}
-                      className="btn btn-sm btn-danger"
+                      className="action-btn delete-btn"
                       title="Delete device"
-                      style={{ borderRadius: 'var(--radius-pill)' }}
                     >
                       <i className="fas fa-trash"></i>
                     </button>
