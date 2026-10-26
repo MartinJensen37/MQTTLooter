@@ -72,7 +72,7 @@ class DecoderRegistry {
         decoder.id,
         message,
         encoding,
-        sparkplug ? topic : undefined,
+        ...(sparkplug && topic !== undefined ? [topic] : []),
       );
       if (!response.success || response.data === undefined)
         throw new Error(response.error || 'Decoding failed');
