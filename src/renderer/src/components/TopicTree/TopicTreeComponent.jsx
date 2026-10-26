@@ -3,10 +3,12 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import StableScrollViewport from '../StableScrollViewport';
 import TopicTreeNode from './TopicTreeNode';
 import TrafficStatus from './TrafficStatus';
+import { useSettings } from '../../services/Settings';
 import './TopicTree.css';
 
 function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTreeService }) {
   const [nodes, setNodes] = useState([]);
+  const { sparkplug } = useSettings();
   const [search, setSearch] = useState('');
   const searchRef = useRef('');
   searchRef.current = search;
@@ -252,6 +254,7 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
                   node={node}
                   onClick={handleNodeClick}
                   isSelected={selectedPath === node.fullPath}
+                  sparkplug={sparkplug}
                 />
               </div>
             );

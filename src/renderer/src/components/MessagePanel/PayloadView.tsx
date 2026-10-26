@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { formatPayloadBytes, type PayloadEncoding } from '../../../../shared/payload';
 import { matchDecoder } from '../../../../shared/decoders';
 import { prettyPayload } from '../../utils/payloadPresentation';
-import { decoderRegistry, useDecoders } from '../../services/DecoderRegistry';
+import { decoderRegistry, useTopicDecoders } from '../../services/DecoderRegistry';
 import CheckToggle from '../Controls/CheckToggle';
 
 /** Chosen once per topic above the cards. Auto picks per message. */
@@ -36,7 +36,7 @@ function PayloadView({
   topic?: string;
   view?: PayloadViewMode;
 }) {
-  const { decoders } = useDecoders();
+  const decoders = useTopicDecoders();
   const decoder = topic === undefined ? undefined : matchDecoder(decoders, topic);
   // Auto: decoded when a decoder matches, hex for binary, indented JSON objects/arrays, else text.
   // The JSON check only parses payloads that start like an object or array.
@@ -62,13 +62,13 @@ function PayloadView({
     let cancelled = false;
     setDecoded({});
     decoderRegistry
-      .decode(decoder, value, encoding)
+      .decode(decoder, value, encoding, topic)
       .then((text) => !cancelled && setDecoded({ text }))
       .catch((error: Error) => !cancelled && setDecoded({ error: error.message }));
     return () => {
       cancelled = true;
     };
-  }, [shown, decoder, value, encoding]);
+  }, [shown, decoder, value, encoding, topic]);
   const text =
     shown === 'decoded'
       ? (decoded.text ?? (decoded.error ? '' : 'Decoding…'))

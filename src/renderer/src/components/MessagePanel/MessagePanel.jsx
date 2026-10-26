@@ -7,9 +7,11 @@ import TopicTreeService from '../../services/TopicTreeService';
 import { exportMessage, exportMessageCSV } from '../../utils/messageExport';
 import { plainLog } from '../../utils/payloadPresentation';
 import { matchDecoder } from '../../../../shared/decoders';
-import { useDecoders } from '../../services/DecoderRegistry';
+import { useTopicDecoders } from '../../services/DecoderRegistry';
 import { useSettings } from '../../services/Settings';
 import { clockTime, dateTime } from '../../utils/time';
+import { parseSparkplugTopic } from '../../../../shared/sparkplug';
+import SparkplugBadge from '../Controls/SparkplugBadge';
 
 /**
  * @param {{
@@ -46,10 +48,10 @@ function MessagePanel({
   const [previewBytes, setPreviewBytes] = useState(100);
   const [displayMode, setDisplayMode] = useState('cards');
   // One payload view for every card of the topic; it starts from the Settings default.
-  const { payloadView: defaultView } = useSettings();
+  const { payloadView: defaultView, sparkplug } = useSettings();
   const [payloadView, setPayloadView] = useState(defaultView);
   useEffect(() => setPayloadView(defaultView), [defaultView]);
-  const { decoders } = useDecoders();
+  const decoders = useTopicDecoders();
   const topicDecoder = selectedTopic && matchDecoder(decoders, selectedTopic.topicPath);
   // Pinned live topics keep their cached messages under memory pressure.
   const [, setPinVersion] = useState(0);
@@ -449,6 +451,7 @@ function MessagePanel({
                             <i className="fas fa-tag"></i> {msg.topic}
                           </span>
                           <span className={`badge badge-qos-${msg.qos}`}>QoS {msg.qos}</span>
+                          {sparkplug && parseSparkplugTopic(msg.topic) && <SparkplugBadge />}
                           {msg.encoding === 'base64' && (
                             <span className="badge">Binary (base64 export)</span>
                           )}

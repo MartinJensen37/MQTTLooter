@@ -1,6 +1,8 @@
 import React from 'react';
+import SparkplugBadge from '../Controls/SparkplugBadge';
+import { parseSparkplugTopic, SPARKPLUG_NAMESPACE } from '../../../../shared/sparkplug';
 
-function TopicTreeNode({ node, onClick, isSelected }) {
+function TopicTreeNode({ node, onClick, isSelected, sparkplug = false }) {
   const indentStyle = { paddingLeft: `${node.depth * 20 + 10}px` };
 
   const formatRate = (rate) => {
@@ -29,6 +31,10 @@ function TopicTreeNode({ node, onClick, isSelected }) {
   const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
   const hasRetainedMessage = node.lastMessage?.retain;
   const subtopicCount = node.hasChildren ? node.childCount || 0 : 0;
+  // The namespace and each edge node or device topic, when Sparkplug B is turned on.
+  const sparkplugNode =
+    sparkplug &&
+    (node.fullPath === SPARKPLUG_NAMESPACE || Boolean(parseSparkplugTopic(node.fullPath || '')));
 
   return (
     <div
@@ -51,6 +57,7 @@ function TopicTreeNode({ node, onClick, isSelected }) {
           <span className="node-expand-icon">{getExpandIcon()}</span>
           <span className="node-name">{node.name || '(empty)'}</span>
           <div className="node-bubbles">
+            {sparkplugNode && <SparkplugBadge />}
             {node.pinned && (
               <span title="Pinned topic">
                 <i className="fas fa-thumbtack" aria-label="Pinned" />

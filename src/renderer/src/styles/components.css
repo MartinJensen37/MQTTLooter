@@ -402,6 +402,20 @@ select option::checkmark { display: none; }
   pointer-events: none;
 }
 
+/* ── Sparkplug B marker: solid yellow in both themes ── */
+.spb-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--warning);
+  color: var(--on-warning);
+  font: 700 9px/1.4 var(--font-family);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 /* ── Badges ── */
 .badge {
   display: inline-flex;

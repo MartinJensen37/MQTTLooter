@@ -5,7 +5,7 @@ import {
   type HistorySearchQuery,
   type HistorySearchPage,
 } from '../../../../shared/history-search';
-import { useDecoders } from '../../services/DecoderRegistry';
+import { useTopicDecoders } from '../../services/DecoderRegistry';
 import './HistorySearch.css';
 
 const DAY = 86400000;
@@ -45,7 +45,7 @@ export default function HistorySearch({
 }) {
   const [term, setTerm] = useState('');
   const [mode, setMode] = useState<'text' | 'hex' | 'decoded'>('text');
-  const { decoders } = useDecoders();
+  const decoders = useTopicDecoders();
   const [windowMs, setWindowMs] = useState<number | 'custom'>(DAY);
   const [custom, setCustom] = useState({ from: '', to: '' });
   const [scope, setScope] = useState<'topic' | 'filter'>('topic');

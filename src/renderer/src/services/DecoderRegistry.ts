@@ -1,6 +1,8 @@
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { matchDecoder, type DecoderDefinition } from '../../../shared/decoders';
 import type { PayloadEncoding } from '../../../shared/payload';
+import { SPARKPLUG_DECODER, SPARKPLUG_DECODER_ID } from '../../../shared/sparkplug';
+import { useSettings } from './Settings';
 
 interface State {
   decoders: DecoderDefinition[];
@@ -54,19 +56,35 @@ class DecoderRegistry {
     return matchDecoder(this.state.decoders, topic);
   }
 
-  decode(decoder: DecoderDefinition, message: string, encoding: PayloadEncoding): Promise<string> {
-    const key = `${decoder.id}\u0000${encoding}\u0000${message}`;
+  /** `topic` lets Sparkplug B name aliased metrics from its edge node's births. */
+  decode(
+    decoder: DecoderDefinition,
+    message: string,
+    encoding: PayloadEncoding,
+    topic?: string,
+  ): Promise<string> {
+    const sparkplug = decoder.id === SPARKPLUG_DECODER_ID;
+    const key = `${decoder.id}\u0000${encoding}\u0000${sparkplug ? topic : ''}\u0000${message}`;
     const cached = this.cache.get(key);
     if (cached) return cached;
     const result = this.limited(async () => {
-      const response = await window.electronAPI.decoders.decode(decoder.id, message, encoding);
+      const response = await window.electronAPI.decoders.decode(
+        decoder.id,
+        message,
+        encoding,
+        sparkplug ? topic : undefined,
+      );
       if (!response.success || response.data === undefined)
         throw new Error(response.error || 'Decoding failed');
       return response.data;
     });
     if (message.length <= MAX_CACHED_MESSAGE) {
       this.cache.set(key, result);
-      result.catch(() => this.cache.delete(key));
+      // Metrics named only by alias get their names once a birth arrives, so decode again.
+      result.then(
+        (text) => sparkplug && /"Alias [^"]*": \{/.test(text) && this.cache.delete(key),
+        () => this.cache.delete(key),
+      );
       if (this.cache.size > MAX_CACHED) this.cache.delete(this.cache.keys().next().value!);
     }
     return result;
@@ -91,4 +109,14 @@ export const decoderRegistry = new DecoderRegistry();
 
 export function useDecoders(): State {
   return useSyncExternalStore(decoderRegistry.subscribe, decoderRegistry.snapshot);
+}
+
+/** What topics are matched against: saved decoders, then Sparkplug B when Settings turns it on. */
+export function useTopicDecoders(): DecoderDefinition[] {
+  const { decoders } = useDecoders();
+  const { sparkplug } = useSettings();
+  return useMemo(
+    () => (sparkplug ? [...decoders, SPARKPLUG_DECODER] : decoders),
+    [decoders, sparkplug],
+  );
 }

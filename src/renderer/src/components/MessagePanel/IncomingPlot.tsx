@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import LinePlot, { PLOT_FRAME } from '../Charts/LinePlot';
 import { clockTime } from '../../utils/time';
 import { matchDecoder } from '../../../../shared/decoders';
-import { useDecoders } from '../../services/DecoderRegistry';
+import { useTopicDecoders } from '../../services/DecoderRegistry';
 import {
   fieldPointer,
   pointerPath,
@@ -28,7 +28,7 @@ export default function IncomingPlot({
 }) {
   const fieldListId = useId();
   // A matching protobuf decoder turns stored bytes into fields before plotting.
-  const decoder = matchDecoder(useDecoders().decoders, topic);
+  const decoder = matchDecoder(useTopicDecoders(), topic);
   const decoderId = decoder?.id;
   const [duration, setDuration] = useState(60_000);
   const [end, setEnd] = useState<number | null>(null);
