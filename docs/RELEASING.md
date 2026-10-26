@@ -37,3 +37,17 @@ Unsigned installers make Windows SmartScreen warn about an unknown publisher. Th
 | `SIGNING_PUBLISHER` | The certificate's subject common name, usually your validated name |
 
 Setting it up takes an Azure subscription, a Trusted Signing account (a small monthly fee) and identity validation by Microsoft. Updates keep working across the switch: apps installed unsigned accept signed updates.
+
+## Saved data
+
+Upgrades must never lose data. Every saved format carries a version:
+
+| Data | Where | Version |
+| --- | --- | --- |
+| Settings, connections, Publishing drafts and history, simulated devices | Window storage | `STORAGE_VERSION` in `src/renderer/src/services/storageMigrations.ts` |
+| Message schemas | Window storage | `VERSION` in `MessageTemplateService.ts` |
+| Disk history | `history.sqlite` | `PRAGMA user_version` in `history-database.ts` |
+| Recordings | `recordings.sqlite` | `PRAGMA user_version` in `recording-database.ts` |
+| Decoders, credentials | JSON files in the app data folder | `version` field |
+
+When a format changes, raise its version and add a migration from the previous version with a test that loads data in the old format. An older build that finds data from a newer version leaves it untouched.
