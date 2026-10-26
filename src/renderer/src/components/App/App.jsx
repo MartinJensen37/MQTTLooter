@@ -333,10 +333,9 @@ function App() {
         {opened.current.has('simulation') && (
           <Suspense fallback={panelLoading}>
             <SimulationPanel
-              key={simulation.connectionId}
               connectionId={simulation.connectionId}
-              onPublishMessage={simulation.onPublishMessage}
-              isConnected={connectedPane(simulation)}
+              connections={connections}
+              publish={publishTo}
               selectedTopic={simulation.selectedTopic}
               showFeedback={showFeedback}
             />

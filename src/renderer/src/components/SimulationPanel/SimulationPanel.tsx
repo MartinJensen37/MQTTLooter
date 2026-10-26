@@ -9,12 +9,13 @@ import EditOutputModal from './simulationPanel/EditOutputModal';
 import { useSettings } from '../../services/Settings';
 import SparkplugBadge from '../Controls/SparkplugBadge';
 
-interface SimulationPanelProps {
-  connectionId?: string | null;
+interface WorkspaceProps {
+  connectionId: string;
   onPublishMessage: (data: any) => Promise<void> | void;
   showFeedback?: (message: string, type?: string) => void;
   isConnected: boolean;
   selectedTopic?: any;
+  hidden: boolean;
 }
 
 function SimulationWorkspace({
@@ -23,7 +24,8 @@ function SimulationWorkspace({
   isConnected,
   selectedTopic,
   showFeedback,
-}: SimulationPanelProps) {
+  hidden,
+}: WorkspaceProps) {
   const { sparkplug } = useSettings();
   const [loaded] = useState(() => {
     try {
@@ -237,7 +239,7 @@ function SimulationWorkspace({
   };
 
   return (
-    <div className="simulation-panel">
+    <div className="simulation-panel" hidden={hidden}>
       {loaded.error && <p role="alert">{loaded.error}</p>}
       <div className="simulation-content">
         {/* Device sidebar */}
@@ -414,6 +416,53 @@ function SimulationWorkspace({
   );
 }
 
-export default function SimulationPanel(props: SimulationPanelProps) {
-  return <SimulationWorkspace key={props.connectionId ?? 'none'} {...props} />;
+interface SimulationPanelProps {
+  /** The connection shown. */
+  connectionId?: string | null;
+  connections: { id: string; isConnected?: boolean }[];
+  publish: (connectionId: string, data: any) => Promise<void>;
+  showFeedback?: (message: string, type?: string) => void;
+  selectedTopic?: any;
+}
+
+/**
+ * One workspace per connection opened here. Workspaces of other connections stay mounted but
+ * hidden, so their devices keep publishing while another connection is selected.
+ */
+export default function SimulationPanel({
+  connectionId,
+  connections,
+  publish,
+  showFeedback,
+  selectedTopic,
+}: SimulationPanelProps) {
+  const [opened, setOpened] = useState<string[]>([]);
+  if (connectionId && !opened.includes(connectionId)) setOpened([...opened, connectionId]);
+  const states = new Map(connections.map((connection) => [connection.id, connection]));
+  const latestPublish = useRef(publish);
+  latestPublish.current = publish;
+  // One stable publish function per connection, so workspaces do not restart their engines.
+  const publishers = useRef(new Map<string, (data: any) => Promise<void>>());
+  const publisher = (id: string) => {
+    if (!publishers.current.has(id))
+      publishers.current.set(id, (data) => latestPublish.current(id, data));
+    return publishers.current.get(id)!;
+  };
+  // Deleted connections close their workspace.
+  const shown = opened.filter((id) => states.has(id));
+  return (
+    <>
+      {shown.map((id) => (
+        <SimulationWorkspace
+          key={id}
+          connectionId={id}
+          hidden={id !== connectionId}
+          isConnected={Boolean(states.get(id)?.isConnected)}
+          onPublishMessage={publisher(id)}
+          selectedTopic={id === connectionId ? selectedTopic : undefined}
+          showFeedback={showFeedback}
+        />
+      ))}
+    </>
+  );
 }

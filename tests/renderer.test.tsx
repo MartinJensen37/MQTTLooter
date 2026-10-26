@@ -251,7 +251,13 @@ describe('renderer state', () => {
     );
     const publish = vi.fn().mockResolvedValue(undefined);
     await act(async () =>
-      root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={publish} />),
+      root.render(
+        <SimulationPanel
+          connectionId="a"
+          connections={[{ id: 'a', isConnected: true }]}
+          publish={(_connection, data) => publish(data)}
+        />,
+      ),
     );
     await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
     await click('Toggle simulation');

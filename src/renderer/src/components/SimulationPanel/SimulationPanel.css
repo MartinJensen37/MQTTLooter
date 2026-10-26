@@ -8,6 +8,9 @@
   background: var(--bg-subtle);
   container-type: inline-size;
 }
+.simulation-panel[hidden] {
+  display: none;
+}
 .simulation-content {
   display: flex;
   height: 100%;

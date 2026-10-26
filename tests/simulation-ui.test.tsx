@@ -6,6 +6,15 @@ import SimulationPanel from '../src/renderer/src/components/SimulationPanel/Simu
 import EditOutputModal from '../src/renderer/src/components/SimulationPanel/simulationPanel/EditOutputModal';
 import { sampleSignalPreview } from '../src/renderer/src/components/SimulationPanel/simulationPanel/signalPreview';
 
+/** Props for a panel showing connection `id`, publishing through `publish(data)`. */
+const panel = (id: string, publish: (data: any) => unknown, isConnected = true) => ({
+  connectionId: id,
+  connections: [{ id, isConnected }],
+  publish: async (_connection: string, data: any) => {
+    await publish(data);
+  },
+});
+
 let root: Root;
 let container: HTMLDivElement;
 const click = async (name: string) => {
@@ -94,11 +103,7 @@ it('keeps random mini-patterns repeatable without consuming live randomness or s
 it('configures, previews, saves and publishes timed transition signals', async () => {
   seed('transitions');
   const publish = vi.fn().mockResolvedValue(undefined);
-  await act(async () =>
-    root.render(
-      <SimulationPanel connectionId="transitions" isConnected onPublishMessage={publish} />,
-    ),
-  );
+  await act(async () => root.render(<SimulationPanel {...panel('transitions', publish)} />));
   await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
   await click('Edit value');
   await input('Generator', 'ramp');
@@ -147,9 +152,7 @@ it('publishes raw strings, previews exact bytes and reopens non-JSON last public
   };
   localStorage.setItem('mqtt-simulation-devices-a', JSON.stringify(saved));
   const publish = vi.fn().mockResolvedValue(undefined);
-  await act(async () =>
-    root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={publish} />),
-  );
+  await act(async () => root.render(<SimulationPanel {...panel('a', publish)} />));
   await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
   await input('Payload format', 'raw');
   await click('Edit value');
@@ -181,17 +184,13 @@ it('keeps unsupported future device settings untouched', async () => {
   saved[0].schemaVersion = 2;
   const original = JSON.stringify(saved);
   localStorage.setItem('mqtt-simulation-devices-future', original);
-  await act(async () =>
-    root.render(<SimulationPanel connectionId="future" isConnected onPublishMessage={vi.fn()} />),
-  );
+  await act(async () => root.render(<SimulationPanel {...panel('future', vi.fn())} />));
   expect(container.textContent).toContain('Unsupported saved device schema version');
   expect(localStorage.getItem('mqtt-simulation-devices-future')).toBe(original);
 });
 
 it('constructs compact signal rows and keeps payload details inside the editor', async () => {
-  await act(async () =>
-    root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={vi.fn()} />),
-  );
+  await act(async () => root.render(<SimulationPanel {...panel('a', vi.fn())} />));
   await click('Add Simulated Device');
   await input('Start from', 'environment');
   await input('Device Name:', 'Room');
@@ -272,9 +271,7 @@ it('keeps zero precision and probability, rejects duplicate names and edits enum
 
 it('edits per-signal topics and schedules, previews three cycles, and publishes separate messages', async () => {
   const publish = vi.fn().mockResolvedValue(undefined);
-  await act(async () =>
-    root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={publish} />),
-  );
+  await act(async () => root.render(<SimulationPanel {...panel('a', publish)} />));
   await click('Add Simulated Device');
   await input('Start from', 'environment');
   await input('Device Name:', 'Room');
@@ -334,9 +331,7 @@ it('previews combined payloads without consuming live counter state and removes 
   saved[0].outputs.push({ ...saved[0].outputs[0], id: 2, name: 'second' });
   localStorage.setItem('mqtt-simulation-devices-a', JSON.stringify(saved));
   const publish = vi.fn().mockResolvedValue(undefined);
-  await act(async () =>
-    root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={publish} />),
-  );
+  await act(async () => root.render(<SimulationPanel {...panel('a', publish)} />));
   await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
   expect(container.querySelector('.signal-mode-pill')?.textContent).toBe('Combined');
   await click('Edit value');
@@ -364,7 +359,7 @@ it('does not persist live samples, stops on disconnect, and isolates connection 
   seed('a');
   seed('b');
   const publish = vi.fn().mockResolvedValue(undefined);
-  const props = { connectionId: 'a', isConnected: true, onPublishMessage: publish };
+  const props = panel('a', publish);
   await act(async () =>
     root.render(
       <StrictMode>
@@ -383,7 +378,7 @@ it('does not persist live samples, stops on disconnect, and isolates connection 
   await act(async () =>
     root.render(
       <StrictMode>
-        <SimulationPanel {...props} isConnected={false} />
+        <SimulationPanel {...panel('a', publish, false)} />
       </StrictMode>,
     ),
   );
@@ -399,7 +394,14 @@ it('does not persist live samples, stops on disconnect, and isolates connection 
   await act(async () =>
     root.render(
       <StrictMode>
-        <SimulationPanel {...props} connectionId="b" />
+        <SimulationPanel
+          {...props}
+          connectionId="b"
+          connections={[
+            { id: 'a', isConnected: true },
+            { id: 'b', isConnected: true },
+          ]}
+        />
       </StrictMode>,
     ),
   );
@@ -410,9 +412,7 @@ it('does not persist live samples, stops on disconnect, and isolates connection 
 it('builds combined payloads from a template and blocks publishing an invalid one', async () => {
   seed('a');
   const publish = vi.fn().mockResolvedValue(undefined);
-  await act(async () =>
-    root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={publish} />),
-  );
+  await act(async () => root.render(<SimulationPanel {...panel('a', publish)} />));
   await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
   await input('Payload structure', 'template');
   const area = () =>
@@ -450,9 +450,7 @@ it('builds combined payloads from a template and blocks publishing an invalid on
 it('builds a device template from a JSON Schema, using signals for matching properties', async () => {
   seed('a');
   const publish = vi.fn().mockResolvedValue(undefined);
-  await act(async () =>
-    root.render(<SimulationPanel connectionId="a" isConnected onPublishMessage={publish} />),
-  );
+  await act(async () => root.render(<SimulationPanel {...panel('a', publish)} />));
   await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
   await input('Payload structure', 'template');
   const choose = (text: string) =>
@@ -490,4 +488,42 @@ it('builds a device template from a JSON Schema, using signals for matching prop
   const sent = JSON.parse(publish.mock.calls[0][0].payload);
   expect(sent).toMatchObject({ site: 'plant-7', value: 0 });
   expect(sent.id).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+it('keeps publishing on a connection while another connection is selected', async () => {
+  seed('a');
+  seed('b');
+  const publish = vi.fn().mockResolvedValue(undefined);
+  const connections = [
+    { id: 'a', isConnected: true },
+    { id: 'b', isConnected: true },
+  ];
+  const props = { connections, publish };
+  await act(async () => root.render(<SimulationPanel {...props} connectionId="a" />));
+  await act(async () => (container.querySelector('.device-item') as HTMLElement).click());
+  await click('Start Loop');
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  const sent = publish.mock.calls.length;
+  expect(sent).toBeGreaterThan(0);
+  await act(async () => root.render(<SimulationPanel {...props} connectionId="b" />));
+  expect(container.querySelector('.simulation-panel:not([hidden])')?.textContent).toContain(
+    'Device b',
+  );
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  expect(publish.mock.calls.length).toBeGreaterThan(sent);
+  expect(publish.mock.calls.every(([connection]) => connection === 'a')).toBe(true);
+  // Back on the first connection, its device is still running.
+  await act(async () => root.render(<SimulationPanel {...props} connectionId="a" />));
+  expect(
+    container.querySelector('.simulation-panel:not([hidden]) .device-item')?.textContent,
+  ).toContain('Device a');
+  // Deleting a connection closes its workspace and stops its devices.
+  await act(async () =>
+    root.render(
+      <SimulationPanel connections={[connections[1]]} publish={publish} connectionId="b" />,
+    ),
+  );
+  const stopped = publish.mock.calls.length;
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  expect(publish.mock.calls.length).toBe(stopped);
 });
