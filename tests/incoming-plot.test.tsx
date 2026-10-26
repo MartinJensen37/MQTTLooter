@@ -269,3 +269,60 @@ it('pauses while the broker is disconnected and follows live data again on recon
   expect(pauseLabel()).toBe('Pause plot');
   expect(container.textContent).not.toContain('Paused while the broker is disconnected');
 });
+
+it('keeps lines at the extremes inside the frame and keeps its height when wide', async () => {
+  await act(async () =>
+    root.render(
+      <LinePlot
+        points={[
+          { x: 0, y: 0 },
+          { x: 500, y: 3, breakBefore: true },
+        ]}
+        min={0}
+        max={3}
+        duration={1000}
+        label="Test"
+        plotHeight={300}
+        plotWidth={1360}
+      />,
+    ),
+  );
+  const svg = container.querySelector('svg')!;
+  expect(svg.getAttribute('viewBox')).toBe('0 0 1360 300');
+  const ys = [...container.querySelectorAll('circle')].map((dot) => Number(dot.getAttribute('cy')));
+  // The frame runs from 12 to 266; the lowest and highest samples sit 10 units inside it.
+  expect(Math.max(...ys)).toBe(256);
+  expect(Math.min(...ys)).toBe(22);
+  // A wider plot gets more time labels rather than a taller chart.
+  const labels = [...container.querySelectorAll('text')].filter(
+    (node) => node.getAttribute('y') === '292',
+  );
+  expect(labels.length).toBeGreaterThan(4);
+});
+
+it('refreshes a live plot at most every 250 ms and backs off while queries are slow', async () => {
+  let delay = 0;
+  const series = vi.fn(async (query: any) => {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    return {
+      success: true,
+      data: {
+        from: query.from,
+        to: query.to,
+        scanned: 0,
+        truncated: false,
+        availablePaths: [],
+        series: query.paths.map((path: string[]) => ({ path, points: [], valid: 0, gaps: 0 })),
+      },
+    };
+  });
+  (window as any).electronAPI = { history: { series } };
+  await act(async () => root.render(<IncomingPlot connectionId="a" topic="t" />));
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(series.mock.calls.length).toBeLessThanOrEqual(5);
+  delay = 400;
+  const before = series.mock.calls.length;
+  await act(async () => vi.advanceTimersByTimeAsync(4000));
+  // Each 400 ms query is followed by an 800 ms pause: about one refresh every 1.2 s.
+  expect(series.mock.calls.length - before).toBeLessThanOrEqual(4);
+});

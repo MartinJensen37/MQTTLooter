@@ -13,6 +13,14 @@ export interface PlotMarker {
 }
 /** Horizontal layout of a full-size plot in its viewBox, for placing overlays next to it. */
 export const PLOT_FRAME = { width: 680, left: 72, right: 662 };
+/** The layout for a plot drawn `width` units wide; wider plots keep their height. */
+export const plotFrame = (width = PLOT_FRAME.width) => ({
+  width,
+  left: PLOT_FRAME.left,
+  right: width - (PLOT_FRAME.width - PLOT_FRAME.right),
+});
+/** Space between the data and the frame, so lines at the extremes are not cut by it. */
+const INSET = 10;
 const axisNumber = (value: number) => {
   const rounded = Number(value.toPrecision(4));
   return Number.isFinite(rounded) ? rounded.toString() : value.toExponential(3);
@@ -29,6 +37,7 @@ export default function LinePlot({
   compact = false,
   stepped = false,
   plotHeight = 152,
+  plotWidth = PLOT_FRAME.width,
   formatX,
   marker,
   onInspect,
@@ -44,19 +53,26 @@ export default function LinePlot({
   compact?: boolean;
   stepped?: boolean;
   plotHeight?: number;
+  /** Drawing width; set it to the rendered pixel width so a wide plot keeps its height. */
+  plotWidth?: number;
   formatX?: (value: number) => string;
   marker?: PlotMarker;
   /** Pointer position as a fraction of the time axis. */
   onInspect?: (fraction: number, event: PointerEvent<SVGSVGElement>) => void;
   onLeave?: () => void;
 }) {
-  const width = compact ? 100 : PLOT_FRAME.width;
+  const frame = plotFrame(plotWidth);
+  const width = compact ? 100 : frame.width;
   const height = compact ? 24 : plotHeight;
-  const left = compact ? 2 : PLOT_FRAME.left;
-  const right = compact ? width - 2 : PLOT_FRAME.right;
+  const left = compact ? 2 : frame.left;
+  const right = compact ? width - 2 : frame.right;
   const toX = (x: number) => left + (x / (duration || 1)) * (right - left);
   const top = compact ? 3 : 12;
   const bottom = compact ? 21 : height - 34;
+  // The value range is drawn inside the frame; value grid lines follow it.
+  const dataTop = compact ? top : top + INSET;
+  const dataBottom = compact ? bottom : bottom - INSET;
+  const columns = Math.max(3, Math.round((right - left) / 200));
   const independent = series?.some((item) => item.min !== undefined) ?? false;
   const plots = (series ?? [{ id: 'signal', color: 'currentColor', points }]).map((item) => {
     const low = (item as { min?: number }).min ?? min;
@@ -66,8 +82,8 @@ export default function LinePlot({
     const range = high / scale - low / scale;
     const toY = (y: number) =>
       range === 0
-        ? (top + bottom) / 2
-        : bottom - ((y / scale - low / scale) / range) * (bottom - top);
+        ? (dataTop + dataBottom) / 2
+        : dataBottom - ((y / scale - low / scale) / range) * (dataBottom - dataTop);
     const coordinates = item.points.map(({ x, y, breakBefore }) => ({
       x: toX(x),
       y: toY(y),
@@ -118,34 +134,38 @@ export default function LinePlot({
               <line
                 x1={left}
                 x2={right}
-                y1={top + (index * (bottom - top)) / 4}
-                y2={top + (index * (bottom - top)) / 4}
+                y1={dataTop + (index * (dataBottom - dataTop)) / 4}
+                y2={dataTop + (index * (dataBottom - dataTop)) / 4}
               />
-              <text x={left - 8} y={top + (index * (bottom - top)) / 4 + 4} textAnchor="end">
+              <text
+                x={left - 8}
+                y={dataTop + (index * (dataBottom - dataTop)) / 4 + 4}
+                textAnchor="end"
+              >
                 {independent
                   ? `${100 - index * 25}%`
                   : axisNumber(max * (1 - index / 4) + min * (index / 4))}
               </text>
             </g>
           ))}
-          {[0, 1, 2, 3].map((index) => (
+          {Array.from({ length: columns + 1 }, (_, index) => (
             <g key={index} className="line-plot-axis">
               <line
-                x1={left + (index * (right - left)) / 3}
-                x2={left + (index * (right - left)) / 3}
+                x1={left + (index * (right - left)) / columns}
+                x2={left + (index * (right - left)) / columns}
                 y1={top}
                 y2={bottom}
               />
               <text
-                x={left + (index * (right - left)) / 3}
+                x={left + (index * (right - left)) / columns}
                 y={height - 8}
                 textAnchor={
-                  formatX && index === 3 ? 'end' : formatX && index === 0 ? 'start' : 'middle'
+                  formatX && index === columns ? 'end' : formatX && index === 0 ? 'start' : 'middle'
                 }
               >
                 {formatX
-                  ? formatX((duration * index) / 3)
-                  : `${axisNumber((duration * index) / 3000)} s`}
+                  ? formatX((duration * index) / columns)
+                  : `${axisNumber((duration * index) / (columns * 1000))} s`}
               </text>
             </g>
           ))}

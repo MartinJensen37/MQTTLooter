@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import LinePlot, { PLOT_FRAME } from '../Charts/LinePlot';
+import LinePlot, { PLOT_FRAME, plotFrame } from '../Charts/LinePlot';
 import SuggestInput from '../Controls/SuggestInput';
 import { clockTime } from '../../utils/time';
 import { matchDecoder } from '../../../../shared/decoders';
@@ -13,6 +13,11 @@ import {
 import './IncomingPlot.css';
 
 const COLORS = ['var(--primary)', 'var(--success)', 'var(--warning)', 'var(--danger)'];
+/**
+ * Live plots redraw at most this often, however fast messages arrive: each refresh reads the
+ * window from disk history, so all messages since the last refresh are added at once.
+ */
+export const PLOT_REFRESH_MS = 250;
 const name = (pointer: string) => pointer || 'Whole payload';
 const time = clockTime;
 const range = (values: number[]) =>
@@ -75,12 +80,15 @@ export default function IncomingPlot({
   // About one aggregation bucket per two rendered pixels; buckets hold up to four points.
   const section = useRef<HTMLElement>(null);
   const [maxPoints, setMaxPoints] = useState(512);
+  // Drawn at its pixel width, so a wide window gives more detail rather than a taller plot.
+  const [plotWidth, setPlotWidth] = useState(PLOT_FRAME.width);
   useEffect(() => {
     const element = section.current;
     if (!element || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(([entry]) =>
-      setMaxPoints(Math.min(1024, Math.max(64, Math.round(entry.contentRect.width / 32) * 64))),
-    );
+    const observer = new ResizeObserver(([entry]) => {
+      setMaxPoints(Math.min(1024, Math.max(64, Math.round(entry.contentRect.width / 32) * 64)));
+      setPlotWidth(Math.max(PLOT_FRAME.width, Math.round(chart.current?.clientWidth ?? 0)));
+    });
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
@@ -91,6 +99,7 @@ export default function IncomingPlot({
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       const to = end ?? Date.now();
+      const started = performance.now();
       try {
         const response = await window.electronAPI.history.series({
           connectionId,
@@ -117,7 +126,9 @@ export default function IncomingPlot({
       } catch (reason) {
         if (!disposed) setError(reason instanceof Error ? reason.message : 'Plot query failed');
       } finally {
-        if (!disposed && end === null) timer = setTimeout(poll, 250);
+        // A slow query (a busy topic over a long window) waits longer before the next one.
+        if (!disposed && end === null)
+          timer = setTimeout(poll, Math.max(PLOT_REFRESH_MS, 2 * (performance.now() - started)));
       }
     };
     void poll();
@@ -182,9 +193,8 @@ export default function IncomingPlot({
   const inspectByKey = (fraction: number) => {
     const box = chart.current?.getBoundingClientRect();
     const width = box?.width ?? 0;
-    const x =
-      ((PLOT_FRAME.left + fraction * (PLOT_FRAME.right - PLOT_FRAME.left)) / PLOT_FRAME.width) *
-      width;
+    const frame = plotFrame(plotWidth);
+    const x = ((frame.left + fraction * (frame.right - frame.left)) / frame.width) * width;
     inspect(Math.min(1, Math.max(0, fraction)), x, 24, true);
   };
   // Fields found in the payloads, for the Field and Time suggestions.
@@ -411,6 +421,7 @@ export default function IncomingPlot({
       >
         <LinePlot
           plotHeight={300}
+          plotWidth={plotWidth}
           series={plots}
           min={min}
           max={max}
