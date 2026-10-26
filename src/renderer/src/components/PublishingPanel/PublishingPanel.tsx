@@ -53,9 +53,7 @@ function PublishingPanel({
   const formKey = `publish-form-state-${connectionId}`;
   const [initialForm] = useState(() => {
     try {
-      const saved = JSON.parse(
-        localStorage.getItem(formKey) || localStorage.getItem('publish-form-state') || '{}',
-      );
+      const saved = JSON.parse(localStorage.getItem(formKey) || '{}');
       return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
     } catch {
       return {};

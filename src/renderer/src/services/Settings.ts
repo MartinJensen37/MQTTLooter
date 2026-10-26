@@ -50,8 +50,6 @@ const DEFAULTS: Settings = {
   updateChannel: 'stable',
 };
 const KEY = 'mqtt-settings';
-/** Saved by earlier versions as "Advanced settings". */
-const LEGACY_KEY = 'mqtt-advanced-settings';
 
 class SettingsStore {
   private state: Settings = DEFAULTS;
@@ -59,10 +57,7 @@ class SettingsStore {
 
   constructor() {
     try {
-      const saved = {
-        ...JSON.parse(localStorage.getItem(LEGACY_KEY) ?? '{}'),
-        ...JSON.parse(localStorage.getItem(KEY) ?? '{}'),
-      };
+      const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}');
       for (const key of Object.keys(DEFAULTS) as (keyof Settings)[])
         if ((SETTING_CHOICES[key] as readonly unknown[]).includes(saved[key]))
           this.state = { ...this.state, [key]: saved[key] };

@@ -16,6 +16,8 @@ it('starts from defaults and keeps choices from the old advanced settings', asyn
   });
   localStorage.setItem('mqtt-advanced-settings', JSON.stringify({ protobufDecoders: true }));
   localStorage.setItem('mqtt-settings', JSON.stringify({ theme: 'dark', textSize: 999 }));
+  // The window upgrades saved data before any service reads it.
+  (await import('../src/renderer/src/services/storageMigrations')).migrateStorage();
   vi.resetModules();
   expect((await load()).snapshot()).toMatchObject({
     protobufDecoders: true,
