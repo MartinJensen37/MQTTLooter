@@ -1,0 +1,111 @@
+.spb-command .check-toggle-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spb-command-target {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: var(--spacing-sm);
+}
+
+.spb-command-target label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+.spb-command input.form-input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-body);
+  font: 13px var(--font-family);
+}
+
+.spb-command input.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.spb-command input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.spb-command-topic {
+  margin: var(--spacing-sm) 0;
+  font: 12px var(--font-mono);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.spb-command-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.spb-command-metric {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.5fr) 28px;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.spb-command-metric .form-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.spb-command-remove {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--gray-500);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.spb-command-remove:hover:not(:disabled) {
+  background: var(--bg-muted);
+  color: var(--danger);
+}
+
+.spb-command-remove:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.spb-command-error {
+  grid-column: 1 / -1;
+  color: var(--danger-text);
+  font-size: 12px;
+}
+
+.spb-command-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.spb-command-actions .btn-primary {
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .spb-command-target {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

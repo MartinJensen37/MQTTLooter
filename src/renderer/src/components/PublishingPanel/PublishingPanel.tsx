@@ -19,6 +19,7 @@ import { templateDefaults } from '../../../../shared/template-expansion';
 import QosRetainOptions from './publishingPanel/QosRetainOptions';
 import PublishHistory from './publishingPanel/PublishHistory';
 import TemplateDeleteDialog from './publishingPanel/TemplateDeleteDialog';
+import SparkplugCommand from './publishingPanel/SparkplugCommand';
 
 interface PublishingPanelProps {
   connectionId?: string | null;
@@ -601,6 +602,15 @@ function PublishingPanel({
               disabled={isPublishing}
               error={propertyValidation.error}
             />
+
+            {settings.sparkplug && (
+              <SparkplugCommand
+                connectionId={connectionId}
+                isConnected={isConnected}
+                selectedPath={selectedPath}
+                showFeedback={showFeedback}
+              />
+            )}
 
             <div className="form-actions">
               <button
