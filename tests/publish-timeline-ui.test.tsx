@@ -70,7 +70,7 @@ it('calculates only when open or settings change, preserves rare chances and rel
         Number(rect.getAttribute('height')),
       ),
     ),
-  ).toBe(38);
+  ).toBe(62);
   expect(container.querySelectorAll('.publish-timeline-lane line').length).toBeGreaterThan(1);
   await act(async () =>
     root.render(

@@ -83,7 +83,7 @@
 }
 .publish-timeline svg line {
   stroke: var(--series-color, var(--primary));
-  stroke-width: 2;
+  stroke-width: 3;
 }
 .publish-timeline svg .publish-timeline-cursor {
   stroke: var(--text-muted);
@@ -99,7 +99,7 @@
   scrollbar-gutter: stable;
 }
 .publish-timeline-total svg {
-  height: 40px;
+  height: 64px;
 }
 /* Estimates for randomized timing, under the exact bursts of fixed schedules. */
 .publish-timeline-total .publish-timeline-estimate {

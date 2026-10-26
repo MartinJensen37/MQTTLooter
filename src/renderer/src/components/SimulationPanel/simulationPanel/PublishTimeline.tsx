@@ -13,6 +13,9 @@ import CheckToggle from '../../Controls/CheckToggle';
 import InfoTip from '../../Controls/InfoTip';
 import './PublishTimeline.css';
 
+/** Height of the messages-at-once chart, and the width of its bars and the lanes' ticks. */
+const TOTAL_HEIGHT = 64;
+const MARK_WIDTH = 3;
 /** A signal's color by its position; signals past the eighth share the "other" color. */
 const seriesColor = (index: number) =>
   index < TIMELINE_SERIES ? `var(--series-${index + 1})` : 'var(--series-other)';
@@ -140,10 +143,10 @@ function Timeline({ device }: { device: SimulatedDevice }) {
   const stack = (parts: [number, number][]) => {
     let base = 0;
     return parts.map(([series, value], index) => {
-      const size = (value / (peak || 1)) * 38;
+      const size = (value / (peak || 1)) * (TOTAL_HEIGHT - 2);
       // The gap separates a segment from the one above it; the top segment keeps its height.
       const gap = index < parts.length - 1 && size > 2 ? 1 : 0;
-      const segment = { series, y: 40 - base - size + gap, height: size - gap };
+      const segment = { series, y: TOTAL_HEIGHT - base - size + gap, height: size - gap };
       base += size;
       return segment;
     });
@@ -356,7 +359,7 @@ function Timeline({ device }: { device: SimulatedDevice }) {
               )}
             </span>
             <svg
-              viewBox="0 0 640 40"
+              viewBox={`0 0 640 ${TOTAL_HEIGHT}`}
               preserveAspectRatio="none"
               role="img"
               aria-label="Messages due at the same moment over time"
@@ -391,15 +394,15 @@ function Timeline({ device }: { device: SimulatedDevice }) {
                 stack(parts).map(({ series, y, height }) => (
                   <rect
                     key={`${column}-${series}`}
-                    x={(column * 640) / TIMELINE_COLUMNS}
-                    width={1.5}
+                    x={(column * 640) / TIMELINE_COLUMNS - MARK_WIDTH / 2}
+                    width={MARK_WIDTH}
                     y={y}
                     height={height}
                     style={{ fill: seriesColor(series) }}
                   />
                 )),
               )}
-              {cursor(40)}
+              {cursor(TOTAL_HEIGHT)}
             </svg>
             <span>
               Peak
