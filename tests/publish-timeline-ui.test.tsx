@@ -54,7 +54,7 @@ const open = async () => {
   await act(async () =>
     container.querySelector<HTMLInputElement>('.publish-timeline input[type=checkbox]')!.click(),
   );
-  await act(async () => vi.advanceTimersByTimeAsync(120));
+  await act(async () => vi.advanceTimersByTimeAsync(250));
 };
 
 it('calculates only when open or settings change, preserves rare chances and releases the worker', async () => {
@@ -93,7 +93,15 @@ it('calculates only when open or settings change, preserves rare chances and rel
     );
     slider.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await act(async () => vi.advanceTimersByTimeAsync(120));
+  // While the window changes, every lane stays where it was, empty, until the slider rests.
+  const rows = container.querySelectorAll('.publish-timeline-row').length;
+  expect(rows).toBeGreaterThan(0);
+  await act(async () => vi.advanceTimersByTimeAsync(100));
+  expect(container.querySelectorAll('.publish-timeline-row').length).toBe(rows);
+  expect(container.querySelector('.publish-timeline-axis')!.textContent).toContain('Calculating');
+  expect(container.querySelector('.publish-timeline-axis')!.textContent).toContain('60 s');
+  expect(workers).toHaveLength(1);
+  await act(async () => vi.advanceTimersByTimeAsync(150));
   expect(workers).toHaveLength(2);
   expect(workers[1].postMessage.mock.calls[0][0].horizon).toBe(60000);
   await open(); // Collapse.
