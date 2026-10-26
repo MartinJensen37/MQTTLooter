@@ -115,3 +115,7 @@ docs/            Roadmap and screenshots
 ```
 
 Remaining work is listed in [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Releases and license
+
+Windows installers are attached to [GitHub Releases](https://github.com/MartinJensen37/MQTTLooter/releases), and changes are listed in [CHANGELOG.md](CHANGELOG.md). **Help > About** shows the installed version. Released under the [MIT License](LICENSE).

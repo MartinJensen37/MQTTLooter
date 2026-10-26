@@ -1,8 +1,18 @@
 {
   "name": "mqttlooter",
   "productName": "MQTTLooter",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "An MQTT client for exploring topics and messages.",
+  "license": "MIT",
+  "author": "MartinJensen37",
+  "homepage": "https://github.com/MartinJensen37/MQTTLooter",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MartinJensen37/MQTTLooter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MartinJensen37/MQTTLooter/issues"
+  },
   "main": "./out/main/index.js",
   "engines": {
     "node": ">=22.12.0"
@@ -23,7 +33,7 @@
   "build": {
     "appId": "com.martinjensen37.mqttlooter",
     "productName": "MQTTLooter",
-    "copyright": "Copyright © 2025 martinjensen37",
+    "copyright": "Copyright © 2025-2026 MartinJensen37",
     "directories": {
       "output": "dist-builder"
     },
