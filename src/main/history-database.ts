@@ -43,8 +43,7 @@ export class HistoryDatabase {
       this.db.close();
       throw new Error('History database uses a newer schema');
     }
-    const pageSize = Number(this.db.prepare('PRAGMA page_size').get()!.page_size);
-    this.db.exec(`PRAGMA max_page_count=${Math.floor(limits.maxDatabaseBytes / pageSize)}`);
+    this.applySizeLimit();
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS topics (
         id INTEGER PRIMARY KEY, connection_id TEXT NOT NULL, path TEXT NOT NULL,
@@ -69,6 +68,28 @@ export class HistoryDatabase {
       PRAGMA user_version=3;
     `);
     this.recount();
+  }
+
+  private applySizeLimit(): void {
+    const pageSize = Number(this.db.prepare('PRAGMA page_size').get()!.page_size);
+    this.db.exec(`PRAGMA max_page_count=${Math.floor(this.limits.maxDatabaseBytes / pageSize)}`);
+  }
+
+  /** New retention from Settings. A smaller size removes the oldest messages at once. */
+  setLimits(limits: typeof DISK_HISTORY, now = Date.now()): void {
+    this.limits = limits;
+    this.applySizeLimit();
+    this.append([], now);
+  }
+
+  /** Removes one bounded chunk of expired messages; true while more remain. */
+  expireStep(now = Date.now()): boolean {
+    this.append([], now);
+    return Boolean(
+      this.db
+        .prepare('SELECT 1 FROM messages WHERE timestamp < ? LIMIT 1')
+        .get(now - this.limits.maxAgeMs),
+    );
   }
 
   private recount(): void {

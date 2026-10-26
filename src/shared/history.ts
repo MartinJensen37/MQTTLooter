@@ -8,6 +8,34 @@ export const DISK_HISTORY = {
   pageBytes: 2 * 1024 * 1024,
 };
 
+/** How long and how much disk history keeps, chosen in Settings. */
+export interface HistoryRetention {
+  maxAgeMs: number;
+  maxPayloadBytes: number;
+}
+const HOUR = 3_600_000;
+const MIB = 1024 * 1024;
+export const HISTORY_RETENTION = {
+  ages: [HOUR, 6 * HOUR, 24 * HOUR, 7 * 24 * HOUR],
+  sizes: [256 * MIB, 1024 * MIB, 4096 * MIB],
+};
+/** The longest history any choice keeps, which bounds searches. */
+export const MAX_HISTORY_AGE_MS = Math.max(...HISTORY_RETENTION.ages);
+
+export const validRetention = (value: unknown): value is HistoryRetention =>
+  Boolean(value) &&
+  typeof value === 'object' &&
+  HISTORY_RETENTION.ages.includes((value as HistoryRetention).maxAgeMs) &&
+  HISTORY_RETENTION.sizes.includes((value as HistoryRetention).maxPayloadBytes);
+
+/** Database limits for a retention choice; the file may hold twice the payload in overhead. */
+export const retentionLimits = ({ maxAgeMs, maxPayloadBytes }: HistoryRetention) => ({
+  ...DISK_HISTORY,
+  maxAgeMs,
+  maxPayloadBytes,
+  maxDatabaseBytes: 2 * maxPayloadBytes,
+});
+
 /** Disk writes batch more than renderer delivery; nothing waits on display. */
 export const HISTORY_QUEUE = {
   maxMessages: 16_384,
@@ -67,6 +95,7 @@ export interface HistoryStoreStatus {
   expired: number;
   generation: number;
   persistent: boolean;
+  retention: HistoryRetention;
   limits: typeof DISK_HISTORY;
   /** Retained gap records per connection. */
   gaps: Record<string, { dropped: number; last: number }>;
@@ -87,6 +116,7 @@ export type HistoryRequest =
   | { action: 'clear'; connectionId: string; topic?: string }
   | { action: 'status' }
   | { action: 'persist'; enabled: boolean }
+  | { action: 'retention'; retention: HistoryRetention }
   | { action: 'decoders'; decoders: import('./decoders').DecoderDefinition[] }
   | { action: 'close' };
 

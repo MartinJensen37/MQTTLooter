@@ -75,6 +75,8 @@ export interface ElectronAPI {
     ): Promise<IpcResult<import('./history').HistoryPage>>;
     clear(connectionId: string, topic?: string): Promise<IpcResult>;
     persist(enabled: boolean): Promise<IpcResult>;
+    /** How long and how much disk history keeps. */
+    retention(retention: import('./history').HistoryRetention): Promise<IpcResult>;
     resume(): Promise<IpcResult>;
     exportSearch(
       query: import('./history-search').HistorySearchQuery,

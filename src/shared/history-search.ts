@@ -1,4 +1,4 @@
-import type { HistoryPage, HistoryQuery } from './history';
+import { MAX_HISTORY_AGE_MS, type HistoryPage, type HistoryQuery } from './history';
 
 export const SEARCH_LIMITS = {
   rows: 2000,
@@ -43,7 +43,7 @@ export function validateSearch(query: HistorySearchQuery): void {
     !Number.isSafeInteger(query.to) ||
     query.from < 0 ||
     query.to < query.from ||
-    query.to - query.from > 86400000 ||
+    query.to - query.from > MAX_HISTORY_AGE_MS ||
     (query.before === undefined) !== (query.beforeTime === undefined) ||
     ['before', 'beforeTime', 'snapshot', 'generation'].some((key) => {
       const value = query[key as keyof HistorySearchQuery];

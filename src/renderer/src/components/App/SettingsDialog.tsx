@@ -8,9 +8,15 @@ import { settings as store, useSettings, type Settings } from '../../services/Se
 import { useDecoders } from '../../services/DecoderRegistry';
 import { HISTORY_PROFILES, MESSAGE_HISTORY, type HistoryProfile } from '../../config';
 import type { TrafficStatus } from '../../../../shared/traffic';
+import { HISTORY_RETENTION, type HistoryRetention } from '../../../../shared/history';
 import './SettingsDialog.css';
 
 const mib = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MiB`;
+const size = (bytes: number) => (bytes >= 1024 ** 3 ? `${bytes / 1024 ** 3} GiB` : mib(bytes));
+const age = (ms: number) =>
+  ms >= 86_400_000
+    ? `${ms / 86_400_000} day${ms > 86_400_000 ? 's' : ''}`
+    : `${ms / 3_600_000} hour${ms > 3_600_000 ? 's' : ''}`;
 const profileLabel = (profile: HistoryProfile) =>
   `${profile === 'larger' ? 'Larger' : 'Compact'}: ${HISTORY_PROFILES[profile].maxNodes.toLocaleString()} topics, ${mib(HISTORY_PROFILES[profile].maxBytes)} per connection`;
 const SECTIONS = [
@@ -84,6 +90,7 @@ export default function SettingsDialog({
     () => TopicTreeService.getHistorySettings().messagesPerTopic,
   );
   const [persistent, setPersistent] = useState<boolean | null>(null);
+  const [retention, setRetention] = useState<HistoryRetention | null>(null);
   const [traffic, setTraffic] = useState<TrafficStatus>();
   const [error, setError] = useState('');
   const [section, setSection] = useState<string>('general');
@@ -91,7 +98,9 @@ export default function SettingsDialog({
 
   useEffect(() => {
     void window.electronAPI.history.status().then((result) => {
-      if (result.success) setPersistent(result.data?.store?.persistent ?? false);
+      if (!result.success) return;
+      setPersistent(result.data?.store?.persistent ?? false);
+      setRetention(result.data?.store?.retention ?? null);
     });
     let timer: ReturnType<typeof setTimeout>;
     let disposed = false;
@@ -283,7 +292,7 @@ export default function SettingsDialog({
               </label>
               <CheckToggle
                 label="Keep disk history after closing the app"
-                hint="When off, stored messages are deleted when the app closes. Up to 24 hours are kept."
+                hint="When off, stored messages are deleted when the app closes."
                 checked={persistent ?? false}
                 disabled={persistent === null}
                 onChange={async (enabled) => {
@@ -292,6 +301,37 @@ export default function SettingsDialog({
                   else setError(result.error ?? 'Could not save this setting.');
                 }}
               />
+              {retention &&
+                (
+                  [
+                    ['maxAgeMs', 'Keep disk history for', HISTORY_RETENTION.ages, age],
+                    ['maxPayloadBytes', 'Disk history size', HISTORY_RETENTION.sizes, size],
+                  ] as const
+                ).map(([key, label, choices, format]) => (
+                  <label className="settings-field" key={key}>
+                    <span>
+                      {label}
+                      <InfoTip text="Older messages are removed first. Shorter or smaller settings remove them right away." />
+                    </span>
+                    <select
+                      className="form-select"
+                      aria-label={label}
+                      value={retention[key]}
+                      onChange={async (event) => {
+                        const next = { ...retention, [key]: Number(event.target.value) };
+                        const result = await window.electronAPI.history.retention(next);
+                        if (result.success) setRetention(next);
+                        else setError(result.error ?? 'Could not save this setting.');
+                      }}
+                    >
+                      {choices.map((choice) => (
+                        <option key={choice} value={choice}>
+                          {format(choice)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
               <h4>Message delivery</h4>
               {counted.length ? (
                 <dl className="settings-delivery">

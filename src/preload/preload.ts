@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clear: (connectionId: string, topic?: string) =>
       ipcRenderer.invoke('history-clear', connectionId, topic),
     persist: (enabled: boolean) => ipcRenderer.invoke('history-persist', enabled),
+    retention: (retention: unknown) => ipcRenderer.invoke('history-retention', retention),
     resume: () => ipcRenderer.invoke('history-resume'),
     exportSearch: (query: unknown, format: string, connectionName: string) =>
       ipcRenderer.invoke('history-export-search', query, format, connectionName),

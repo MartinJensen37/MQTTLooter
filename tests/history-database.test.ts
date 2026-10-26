@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { HistoryDatabase } from '../src/main/history-database';
-import { DISK_HISTORY } from '../src/shared/history';
+import { DISK_HISTORY, retentionLimits, validRetention } from '../src/shared/history';
 import type { IncomingPublish } from '../src/shared/traffic';
 
 let directory: string;
@@ -298,4 +298,28 @@ it('exports a whole topic in bounded chunks from a fixed snapshot', () => {
   });
   const csv = run('csv');
   expect(csv.parts.join('\n').split('\n')).toHaveLength(4502);
+});
+
+it('applies a shorter or smaller retention from Settings to stored history', () => {
+  const hour = 3_600_000;
+  database.append(
+    Array.from({ length: 700 }, (_, i) => ({
+      ...message(i + 1),
+      // 600 messages two hours old and 100 recent ones.
+      timestamp: i < 600 ? now - 2 * hour : now,
+    })),
+    now,
+  );
+  expect(database.status(now).retainedMessages).toBe(700);
+  database.setLimits(retentionLimits({ maxAgeMs: hour, maxPayloadBytes: 256 * 1024 ** 2 }), now);
+  // Expiry runs in bounded steps of 300 until nothing older than the new age remains.
+  expect(database.status(now).retainedMessages).toBe(400);
+  while (database.expireStep(now));
+  expect(database.status(now).retainedMessages).toBe(100);
+  expect(database.status(now).limits.maxAgeMs).toBe(hour);
+  expect(validRetention({ maxAgeMs: hour, maxPayloadBytes: 256 * 1024 ** 2 })).toBe(true);
+  expect(validRetention({ maxAgeMs: 5, maxPayloadBytes: 256 * 1024 ** 2 })).toBe(false);
+  expect(retentionLimits({ maxAgeMs: hour, maxPayloadBytes: 1024 ** 3 }).maxDatabaseBytes).toBe(
+    2 * 1024 ** 3,
+  );
 });

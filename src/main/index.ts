@@ -14,6 +14,7 @@ import { DELIVERY_COALESCE, DELIVERY_LIMITS, type IncomingPublish } from '../sha
 import { RECORDING_LIMITS, type RecordingPageQuery } from '../shared/recording';
 import { APP_INFO } from '../shared/app-info';
 import { Updates } from './updates';
+import { validRetention } from '../shared/history';
 import { isSparkplugBirth, validateSparkplugPayload } from '../shared/sparkplug';
 
 let mainWindow: BrowserWindow | null = null;
@@ -268,6 +269,10 @@ for (const [channel, handler] of Object.entries({
   'history-persist': (enabled: unknown) => {
     if (typeof enabled !== 'boolean') throw new Error('Invalid persistence setting');
     return historyService!.request({ action: 'persist', enabled });
+  },
+  'history-retention': (retention: unknown) => {
+    if (!validRetention(retention)) throw new Error('Invalid history retention');
+    return historyService!.request({ action: 'retention', retention });
   },
   'history-resume': () => historyService!.resume(),
   'history-export-search': async (query: HistorySearchQuery, format: unknown, name: unknown) => {

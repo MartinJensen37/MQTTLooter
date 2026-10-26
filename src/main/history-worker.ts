@@ -6,18 +6,34 @@ import { ProtobufDecoders } from './protobuf-decoders';
 import { matchDecoder, type DecoderDefinition } from '../shared/decoders';
 import { isSparkplugBirth, SPARKPLUG_DECODER } from '../shared/sparkplug';
 import { payloadBytes } from '../shared/payload';
-import type { HistoryRequest } from '../shared/history';
+import {
+  DISK_HISTORY,
+  retentionLimits,
+  validRetention,
+  type HistoryRequest,
+  type HistoryRetention,
+} from '../shared/history';
 
 const directory: string = workerData.directory;
 mkdirSync(directory, { recursive: true });
 const settingsPath = join(directory, 'settings.json');
 const databasePath = join(directory, 'history.sqlite');
 let persistent = false;
+let retention: HistoryRetention = {
+  maxAgeMs: DISK_HISTORY.maxAgeMs,
+  maxPayloadBytes: DISK_HISTORY.maxPayloadBytes,
+};
 try {
-  persistent = JSON.parse(readFileSync(settingsPath, 'utf8')).persistent === true;
+  const saved = JSON.parse(readFileSync(settingsPath, 'utf8'));
+  persistent = saved.persistent === true;
+  if (validRetention(saved.retention)) retention = saved.retention;
 } catch (error) {
   if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
 }
+const saveSettings = () => {
+  writeFileSync(settingsPath + '.tmp', JSON.stringify({ persistent, retention }));
+  renameSync(settingsPath + '.tmp', settingsPath);
+};
 const cleanSession = () => {
   // Fixed, app-owned files only; includes rollback recovery left by a crashed session.
   for (const suffix of ['', '-journal', '-wal', '-shm'])
@@ -25,7 +41,7 @@ const cleanSession = () => {
 };
 // A worker restarted after a failure keeps this session's history.
 if (!persistent && workerData.restart !== true) cleanSession();
-const database = new HistoryDatabase(databasePath);
+const database = new HistoryDatabase(databasePath, retentionLimits(retention));
 // Plots of protobuf topics decode stored payloads here, next to the data.
 const decoders = new ProtobufDecoders();
 let decoderList: DecoderDefinition[] = [];
@@ -64,7 +80,25 @@ const purge = () => {
   setTimeout(step, 0);
 };
 purge();
-const status = () => ({ ...database.status(), persistent });
+// A shorter retention expires older messages in short steps, like purging.
+let expiring = false;
+const expire = () => {
+  if (expiring) return;
+  expiring = true;
+  const step = () => {
+    try {
+      if (database.expireStep()) {
+        setTimeout(step, 0);
+        return;
+      }
+    } catch {
+      /* The regular maintenance continues expiring. */
+    }
+    expiring = false;
+  };
+  setTimeout(step, 0);
+};
+const status = () => ({ ...database.status(), persistent, retention });
 parentPort!.on(
   'message',
   ({ requestId, request }: { requestId: number; request: HistoryRequest }) => {
@@ -115,9 +149,15 @@ parentPort!.on(
           data = status();
           break;
         case 'persist':
-          writeFileSync(settingsPath + '.tmp', JSON.stringify({ persistent: request.enabled }));
-          renameSync(settingsPath + '.tmp', settingsPath);
           persistent = request.enabled;
+          saveSettings();
+          data = status();
+          break;
+        case 'retention':
+          retention = request.retention;
+          saveSettings();
+          database.setLimits(retentionLimits(retention));
+          expire();
           data = status();
           break;
         case 'close':

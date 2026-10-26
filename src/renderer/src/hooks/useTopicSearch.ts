@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DISK_HISTORY } from '../../../shared/history';
+import { MAX_HISTORY_AGE_MS } from '../../../shared/history';
 import { validateSearch, type HistorySearchQuery } from '../../../shared/history-search';
 import { TOPIC_VIEW, fromHistory, type TopicMessage } from './useTopicMessages';
 
@@ -44,7 +44,8 @@ export function useTopicSearch(
       topic,
       term,
       mode,
-      from: now - DISK_HISTORY.maxAgeMs,
+      // The longest retention; disk history itself only holds what its setting keeps.
+      from: now - MAX_HISTORY_AGE_MS,
       to: now,
     };
     try {
