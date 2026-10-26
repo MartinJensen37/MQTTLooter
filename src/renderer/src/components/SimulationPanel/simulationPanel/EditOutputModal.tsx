@@ -152,119 +152,129 @@ export default function EditOutputModal({
             if (!errors.length) onSave({ ...form, name: form.name.trim() });
           }}
         >
-          <div className="signal-parameters">
-            <label>
-              Signal name
-              <input
-                className="form-input"
-                required
-                value={form.name}
-                onChange={(e) => update({ name: e.target.value })}
-              />
-            </label>
-            <label>
-              Data type
-              <select
-                className="custom-select-button form-select"
-                value={form.dataType}
-                onChange={(e) => changeType(e.target.value)}
-              >
-                {Object.entries(DATA_TYPE_CONFIGS).map(([key, value]) => (
-                  <option key={key} value={key}>
-                    {value.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Generator
-              <select
-                className="custom-select-button form-select"
-                value={form.generator}
-                onChange={(e) =>
-                  update({
-                    generator: e.target.value,
-                    config: defaultConfig(form.dataType, e.target.value),
-                  })
-                }
-              >
-                {DATA_TYPE_CONFIGS[form.dataType].generators.map((key) => (
-                  <option key={key} value={key}>
-                    {GENERATOR_CONFIGS[key].label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {form.dataType === 'number' && (
-              <>
-                <label>
-                  Unit
-                  <input
-                    className="form-input"
-                    value={form.unit ?? ''}
-                    disabled={mode === 'raw'}
-                    onChange={(e) => update({ unit: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Decimal places
-                  <input
-                    className="form-input"
-                    type="number"
-                    min="0"
-                    max="10"
-                    required
-                    value={Number.isFinite(form.decimalPrecision) ? form.decimalPrecision : ''}
-                    onChange={(e) => update({ decimalPrecision: e.target.valueAsNumber })}
-                  />
-                </label>
-              </>
-            )}
-          </div>
+          <section className="signal-section">
+            <h4 className="signal-section-title">Signal</h4>
+            <div className="signal-parameters">
+              <label>
+                Signal name
+                <input
+                  className="form-input"
+                  required
+                  value={form.name}
+                  onChange={(e) => update({ name: e.target.value })}
+                />
+              </label>
+              <label>
+                Data type
+                <select
+                  className="custom-select-button form-select"
+                  value={form.dataType}
+                  onChange={(e) => changeType(e.target.value)}
+                >
+                  {Object.entries(DATA_TYPE_CONFIGS).map(([key, value]) => (
+                    <option key={key} value={key}>
+                      {value.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Generator
+                <select
+                  className="custom-select-button form-select"
+                  value={form.generator}
+                  onChange={(e) =>
+                    update({
+                      generator: e.target.value,
+                      config: defaultConfig(form.dataType, e.target.value),
+                    })
+                  }
+                >
+                  {DATA_TYPE_CONFIGS[form.dataType].generators.map((key) => (
+                    <option key={key} value={key}>
+                      {GENERATOR_CONFIGS[key].label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {form.dataType === 'number' && (
+                <>
+                  <label>
+                    Unit
+                    <input
+                      className="form-input"
+                      value={form.unit ?? ''}
+                      disabled={mode === 'raw'}
+                      onChange={(e) => update({ unit: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Decimal places
+                    <input
+                      className="form-input"
+                      type="number"
+                      min="0"
+                      max="10"
+                      required
+                      value={Number.isFinite(form.decimalPrecision) ? form.decimalPrecision : ''}
+                      onChange={(e) => update({ decimalPrecision: e.target.valueAsNumber })}
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+          </section>
           {device?.publishMode === 'signals' && (
             <SignalTimingFields output={form} device={device} onChange={update} />
           )}
-          <h4 className="signal-section-title">Value generator</h4>
-          <DynamicConfigFields
-            dataType={form.dataType}
-            generator={form.generator}
-            config={form.config}
-            onConfigChange={(field, value) =>
-              update({ config: { ...form.config, [field]: value } })
-            }
-          />
-          <SignalWaveform output={form} />
-          {(!device || device.publishMode === 'signals') && (
-            <label>
-              Signal payload format
-              <select
-                className="custom-select-button form-select"
-                aria-label="Signal payload format"
-                value={form.payloadMode ?? 'inherit'}
-                onChange={(event) =>
-                  update({
-                    payloadMode:
-                      event.target.value === 'inherit'
-                        ? undefined
-                        : (event.target.value as 'json' | 'raw'),
-                  })
-                }
-              >
-                <option value="inherit">Device default ({device?.payloadMode ?? 'json'})</option>
-                <option value="json">JSON with metadata</option>
-                <option value="raw">Raw scalar (UTF-8)</option>
-              </select>
-            </label>
-          )}
-          <label>
-            <input
-              type="checkbox"
-              checked={form.includeTimestamp !== false}
+          <section className="signal-section">
+            <h4 className="signal-section-title">Value generator</h4>
+            <DynamicConfigFields
+              dataType={form.dataType}
+              generator={form.generator}
+              config={form.config}
+              onConfigChange={(field, value) =>
+                update({ config: { ...form.config, [field]: value } })
+              }
+            />
+            <SignalWaveform output={form} />
+          </section>
+          <section className="signal-section">
+            <h4 className="signal-section-title">Payload</h4>
+            {(!device || device.publishMode === 'signals') && (
+              <div className="signal-parameters">
+                <label>
+                  Signal payload format
+                  <select
+                    className="custom-select-button form-select"
+                    aria-label="Signal payload format"
+                    value={form.payloadMode ?? 'inherit'}
+                    onChange={(event) =>
+                      update({
+                        payloadMode:
+                          event.target.value === 'inherit'
+                            ? undefined
+                            : (event.target.value as 'json' | 'raw'),
+                      })
+                    }
+                  >
+                    <option value="inherit">
+                      Device default ({device?.payloadMode ?? 'json'})
+                    </option>
+                    <option value="json">JSON with metadata</option>
+                    <option value="raw">Raw scalar (UTF-8)</option>
+                  </select>
+                </label>
+              </div>
+            )}
+            <CheckToggle
+              label="Include timestamp"
+              hint="Adds the publish time to JSON payloads. Raw payloads carry only the value."
+              checked={form.includeTimestamp !== false && mode !== 'raw'}
               disabled={mode === 'raw'}
-              onChange={(e) => update({ includeTimestamp: e.target.checked })}
-            />{' '}
-            Include timestamp
-          </label>
+              onChange={(includeTimestamp) => update({ includeTimestamp })}
+            />
+          </section>
 
           {!!errors.length && (
             <ul role="alert">
@@ -273,8 +283,8 @@ export default function EditOutputModal({
               ))}
             </ul>
           )}
-          <div className="preview-section">
-            <h4>
+          <div className="preview-section signal-section">
+            <h4 className="signal-section-title">
               {device && device.publishMode !== 'signals'
                 ? 'Combined payload preview'
                 : 'Signal payload preview'}
