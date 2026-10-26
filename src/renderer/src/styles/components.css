@@ -514,6 +514,9 @@ select option::checkmark { display: none; }
 .badge-qos-2  { background: var(--danger-light); color: var(--danger-text); border: 1px solid rgba(220,53,69,.3); }
 .badge-retain { background: var(--warning-light); color: var(--warning-text); border: 1px solid rgba(255,193,7,.4); }
 .badge-retain i { font-size: 9px; }
+/* Extra small, for dense rows such as the topic tree: the size of its subtopic pills. */
+.badge.badge-xs { gap: 2px; padding: 1px 5px; border-radius: 8px; font-size: 9px; letter-spacing: 0; }
+.badge.badge-xs i { font-size: 8px; }
 
 /* ── Modals ── */
 .modal-overlay {

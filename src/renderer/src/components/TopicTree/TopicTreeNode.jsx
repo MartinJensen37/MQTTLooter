@@ -64,7 +64,7 @@ function TopicTreeNode({ node, onClick, isSelected, sparkplug = false }) {
               </span>
             )}
             {hasRetainedMessage && (
-              <span className="badge badge-retain" title="Has a retained message">
+              <span className="badge badge-xs badge-retain" title="Has a retained message">
                 <i className="fas fa-save"></i> Retain
               </span>
             )}
