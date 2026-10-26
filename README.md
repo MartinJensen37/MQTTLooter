@@ -111,11 +111,13 @@ src/preload/     Restricted bridge between main and the window
 src/shared/      Types and logic shared by main and the window
 src/renderer/    React interface: components, hooks, services, styles
 tests/           Unit, component and Electron tests
-docs/            Roadmap and screenshots
+scripts/         Release helpers
+docs/            Roadmap, release guide and screenshots
+.github/         CI and release workflows
 ```
 
 Remaining work is listed in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Releases and license
 
-Windows installers are attached to [GitHub Releases](https://github.com/MartinJensen37/MQTTLooter/releases), and changes are listed in [CHANGELOG.md](CHANGELOG.md). **Help > About** shows the installed version. Released under the [MIT License](LICENSE).
+Windows installers are attached to [GitHub Releases](https://github.com/MartinJensen37/MQTTLooter/releases), and changes are listed in [CHANGELOG.md](CHANGELOG.md). The app checks for new releases at startup and from **Help > Check for updates**, and asks before downloading; **Settings > General > Updates** can include beta releases. **Help > About** shows the installed version. How releases are made is described in [docs/RELEASING.md](docs/RELEASING.md). Released under the [MIT License](LICENSE).
