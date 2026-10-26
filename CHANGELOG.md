@@ -2,6 +2,10 @@
 
 Versions follow [Semantic Versioning](https://semver.org): major for breaking changes to saved data or behavior, minor for new features, patch for fixes.
 
+## Unreleased
+
+- Smaller, minified window code.
+
 ## 1.0.0 - 2026-10-26
 
 First release.
