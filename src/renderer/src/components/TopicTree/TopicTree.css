@@ -148,7 +148,6 @@
 }
 
 .node-expand-icon { width: 12px; text-align: center; color: var(--text-muted); font-size: 10px; flex-shrink: 0; }
-.node-type-icon   { font-size: 13px; flex-shrink: 0; }
 
 .node-name {
   font-weight: 500;
@@ -208,25 +207,7 @@
   flex-shrink: 1;
 }
 
-/* ── Node inline detail row ── */
-.node-details {
-  background: var(--bg-subtle);
-  border-top: 1px solid var(--border-light);
-  padding: var(--spacing-sm);
-  font-size: 11px;
-  color: var(--text-body);
-}
-
-.node-topic-path {
-  margin-bottom: 3px;
-  font-family: var(--font-mono);
-  word-break: break-all;
-}
-
-.node-message-info { display: flex; gap: 10px; align-items: center; }
 .qos-info      { color: var(--info);    font-weight: 500; }
-.retain-info   { color: var(--warning); font-weight: 500; }
-.timestamp-info { color: var(--text-muted); font-size: 10px; }
 
 /* ── Bubbles ── */
 .node-bubbles { display: inline-flex; gap: 3px; margin-left: var(--spacing-sm); align-items: center; }
@@ -241,7 +222,6 @@
   font-weight: 600;
   white-space: nowrap;
 }
-
 
 .subtopic-bubble {
   background: var(--success-light);

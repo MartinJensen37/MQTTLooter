@@ -377,7 +377,6 @@
   outline: none;
 }
 
-
 .tab-content-container.split.stacked > .tab-content.active {
   width: 100%;
   height: var(--split);
@@ -628,12 +627,6 @@
   background: var(--primary);
 }
 
-/* SplitPane pane overrides */
-.split-pane-pane {
-  overflow: hidden !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
 /* Keep panels mounted while giving the device editor the whole workspace. */
 .simulation-workspace > .topic-browser-pane { display: none !important; }
 @media (max-width: 1100px) {

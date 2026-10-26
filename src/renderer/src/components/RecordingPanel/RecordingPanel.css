@@ -27,27 +27,6 @@
   gap: var(--spacing-xl);
 }
 
-.recording-header-left h2 {
-  margin: 0;
-  color: var(--text-heading);
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.recording-header-left h2::before {
-  content: '\f03d';
-  font-family: 'Font Awesome 5 Free';
-  font-weight: 900;
-  color: var(--primary-blue);
-  font-size: 20px;
-  margin-right: var(--spacing-sm);
-}
-
-/* Connection Status */
-.recording-connection-status {
-  margin-left: var(--spacing-md);
-}
-
 /* Fixed Controls Section */
 .recording-fixed-controls {
   flex-shrink: 0;
@@ -155,34 +134,6 @@
   flex-shrink: 0;
 }
 
-.recording-start-btn {
-  background: var(--danger-red);
-  color: white;
-  border-radius: var(--radius-xl);
-  width: 120px;
-  box-shadow: var(--shadow-md);
-}
-
-.recording-start-btn:hover:not(:disabled) {
-  background: var(--danger-red-hover);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-
-.recording-stop-btn {
-  background: var(--neutral);
-  color: white;
-  border-radius: var(--radius-xl);
-  width: 120px;
-  box-shadow: var(--shadow-md);
-}
-
-.recording-stop-btn:hover {
-  background: var(--neutral-hover);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-
 /* Scrollable Content Area */
 .recording-scrollable-content {
   flex: 1;
@@ -257,17 +208,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-}
-
-/* Load Recording Button */
-.recording-load-btn {
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-}
-
-.recording-load-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-lg);
 }
 
 /* Recording Item */
@@ -366,18 +306,6 @@
   flex-shrink: 0;
 }
 
-.recording-edit-btn,
-.recording-save-btn,
-.recording-delete-btn {
-  border-radius: var(--radius-lg);
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-}
-
 /* Recording Item Summary */
 .recording-item-summary {
   padding: var(--spacing-lg) var(--spacing-xl);
@@ -443,23 +371,6 @@
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
   overflow: hidden;
-}
-
-.recording-filter-toggle-btn {
-  width: 100%;
-  background: var(--gray-100);
-  text-align: left;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--gray-700);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  border-radius: 0;
-}
-
-.recording-filter-toggle-btn:hover {
-  background: var(--gray-200);
 }
 
 .recording-topic-filter-panel {
@@ -569,52 +480,6 @@
   justify-content: center;
   align-items: center;
   gap: var(--spacing-md);
-}
-
-.recording-step-btn,
-.recording-reset-btn,
-.recording-play-btn,
-.recording-pause-btn {
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-}
-
-.recording-step-btn,
-.recording-reset-btn {
-  width: 40px;
-  height: 40px;
-  background: var(--neutral);
-  color: white;
-}
-
-.recording-step-btn:hover:not(:disabled),
-.recording-reset-btn:hover {
-  background: var(--neutral-hover);
-  transform: scale(1.1);
-}
-
-.recording-step-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.recording-main-play-btn,
-.recording-main-pause-btn {
-  width: 56px;
-  height: 56px;
-  font-size: 18px;
-}
-
-.recording-play-btn:hover {
-  transform: scale(1.1);
-}
-
-.recording-pause-btn:hover {
-  transform: scale(1.1);
 }
 
 /* Playback Settings */
@@ -733,18 +598,6 @@
     padding: var(--spacing-lg) var(--spacing-xl);
   }
 
-  .recording-header-left h2 {
-    font-size: 20px;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--spacing-sm);
-  }
-
-  .recording-connection-status {
-    margin-left: 0;
-    align-self: flex-start;
-  }
-
   .recording-fixed-controls {
     padding: var(--spacing-lg);
     gap: var(--spacing-lg);
@@ -757,12 +610,6 @@
 
   .recording-action-buttons {
     align-self: stretch;
-  }
-
-  .recording-start-btn,
-  .recording-stop-btn {
-    width: 100%;
-    justify-content: center;
   }
 
   .recording-scrollable-content {
@@ -799,20 +646,6 @@
 
   .recording-main-controls {
     gap: var(--spacing-sm);
-  }
-
-  .recording-step-btn,
-  .recording-reset-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 12px;
-  }
-
-  .recording-main-play-btn,
-  .recording-main-pause-btn {
-    width: 48px;
-    height: 48px;
-    font-size: 16px;
   }
 
   .recording-playback-settings {
@@ -863,14 +696,6 @@
     gap: 4px;
   }
 
-  .recording-edit-btn,
-  .recording-save-btn,
-  .recording-delete-btn {
-    width: 24px;
-    height: 24px;
-    font-size: 10px;
-  }
-
   .recording-item-summary {
     padding: 10px var(--spacing-md);
   }
@@ -911,8 +736,7 @@
 @container recording (max-width: 600px) {
   .recording-main-header,
   .recording-fixed-controls,
-  .recording-controls-section,
-  .recording-connection-warning {
+  .recording-controls-section {
     padding: var(--spacing-md);
   }
   .recording-main-header,
@@ -925,10 +749,6 @@
   .recording-controls-section {
     flex-direction: column;
     align-items: stretch;
-  }
-  .recording-warning-content i {
-    font-size: 24px;
-    margin: 0;
   }
   .recording-scrollable-content {
     padding: 0 var(--spacing-sm) var(--spacing-md);

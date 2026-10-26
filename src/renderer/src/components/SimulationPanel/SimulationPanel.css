@@ -301,7 +301,6 @@
   gap: var(--spacing-sm);
   margin-top: var(--spacing-xl);
 }
-.simulation-help,
 .signal-dialog .preview-section p,
 .device-dialog p {
   font-size: 12px;

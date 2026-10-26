@@ -40,11 +40,11 @@ function ConfirmationModal({ isOpen, title, message, onConfirm, onCancel }: Prop
           <p>{message}</p>
         </div>
         <div className="confirmation-footer">
-          <button className="cancel-btn" onClick={onCancel}>
+          <button className="btn btn-md btn-secondary cancel-btn" onClick={onCancel}>
             <i className="fas fa-times"></i>
             Cancel
           </button>
-          <button className="confirm-btn danger" onClick={onConfirm}>
+          <button className="btn btn-md btn-danger confirm-btn" onClick={onConfirm}>
             <i className="fas fa-trash"></i>
             Delete
           </button>

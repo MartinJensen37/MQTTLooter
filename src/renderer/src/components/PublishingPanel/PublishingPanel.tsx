@@ -615,7 +615,7 @@ function PublishingPanel({
             <div className="form-actions">
               <button
                 onClick={handlePublish}
-                className="publish-form-publish-btn"
+                className="btn btn-md btn-primary publish-form-publish-btn"
                 disabled={
                   !!(selectedTemplate && templateError) ||
                   !topic.trim() ||
@@ -643,7 +643,7 @@ function PublishingPanel({
               <button
                 type="button"
                 onClick={loadFromSelectedTopic}
-                className="publish-form-load-topic-btn"
+                className="btn btn-md btn-success publish-form-load-topic-btn"
                 disabled={isPublishing || !selectedTopic}
                 title={
                   selectedTopic ? `Load topic: ${selectedTopic.topicPath}` : 'No topic selected'
@@ -656,7 +656,7 @@ function PublishingPanel({
                 <button
                   type="button"
                   onClick={removeRetainedMessage}
-                  className="publish-form-remove-retained-btn"
+                  className="btn btn-md btn-warning publish-form-remove-retained-btn"
                   disabled={
                     isPublishing ||
                     (!selectedTopic?.topicPath && !selectedTopic?.topic && !topic.trim()) ||
@@ -674,7 +674,7 @@ function PublishingPanel({
               <button
                 type="button"
                 onClick={clearForm}
-                className="publish-form-clear-btn"
+                className="btn btn-md btn-secondary publish-form-clear-btn"
                 disabled={isPublishing}
               >
                 <i className="fas fa-eraser"></i> Clear

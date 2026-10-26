@@ -47,14 +47,6 @@
 }
 .logo-section:hover .app-logo { transform: scale(1.05); }
 
-.app-subtitle {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
 /* ── Connections section ── */
 .connections-section {
   flex: 1;

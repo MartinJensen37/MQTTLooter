@@ -81,59 +81,6 @@
   border-radius: 0 0 12px 12px;
 }
 
-.confirmation-footer button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  min-width: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.confirmation-footer button i {
-  font-size: 12px;
-}
-
-.cancel-btn {
-  background-color: var(--neutral);
-  color: white;
-  border: 1px solid var(--neutral);
-}
-
-.cancel-btn:hover {
-  background-color: var(--neutral-hover);
-  border-color: var(--neutral-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.cancel-btn:active {
-  transform: translateY(0);
-}
-
-.confirm-btn.danger {
-  background-color: var(--danger);
-  color: white;
-  border: 1px solid var(--danger);
-}
-
-.confirm-btn.danger:hover {
-  background-color: var(--danger-hover);
-  border-color: var(--danger-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
-}
-
-.confirm-btn.danger:active {
-  transform: translateY(0);
-}
-
 /* Responsive design */
 @media (max-width: 480px) {
   .confirmation-modal {
@@ -153,7 +100,4 @@
     flex-direction: column;
   }
   
-  .confirmation-footer button {
-    width: 100%;
-  }
 }

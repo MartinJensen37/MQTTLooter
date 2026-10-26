@@ -17,8 +17,6 @@
   flex-shrink: 0;
 }
 
-
-
 .topic-details-content {
   display: flex;
   flex-direction: column;
@@ -95,7 +93,6 @@
   min-height: 0;
   position: relative;
 }
-
 
 .no-messages {
   display: flex;
@@ -186,7 +183,6 @@
   white-space: nowrap;
 }
 
-
 .message-actions {
   display: flex;
   gap: 4px;
@@ -226,33 +222,6 @@
 
 .payload-full summary:hover {
   background: var(--gray-100);
-}
-
-/* ── Auto-scroll toggle ── */
-.auto-scroll-toggle {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border: 1px solid var(--gray-300);
-  border-radius: var(--radius-pill);
-  background: var(--bg-surface);
-  color: var(--text-muted);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all var(--transition-fast);
-}
-
-.auto-scroll-toggle.active {
-  border-color: var(--primary-blue);
-  color: var(--primary-blue);
-  background: var(--blue-50);
-}
-
-.auto-scroll-toggle:hover {
-  border-color: var(--primary-blue);
 }
 
 .payload-code {
