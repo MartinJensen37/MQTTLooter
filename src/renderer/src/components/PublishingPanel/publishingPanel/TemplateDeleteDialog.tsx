@@ -1,18 +1,13 @@
 import React from 'react';
 
 interface Props {
-  templateToDelete: string;
-  templateService: any;
+  /** The message schema to delete. */
+  name: string;
   cancelTemplateDelete: () => void;
   confirmTemplateDelete: () => void;
 }
 
-function TemplateDeleteDialog({
-  templateToDelete,
-  templateService,
-  cancelTemplateDelete,
-  confirmTemplateDelete,
-}: Props) {
+function TemplateDeleteDialog({ name, cancelTemplateDelete, confirmTemplateDelete }: Props) {
   return (
     <div className="modal-overlay template-delete-dialog">
       <div className="confirmation-modal">
@@ -21,8 +16,7 @@ function TemplateDeleteDialog({
         </div>
         <div className="modal-content">
           <p>
-            Delete <strong>"{templateService.getTemplate(templateToDelete)?.name}"</strong> from
-            your message schemas?
+            Delete <strong>"{name}"</strong> from your message schemas?
           </p>
           <p className="warning-text">This action cannot be undone.</p>
         </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { MessageTemplate, SchemaValidationResult } from './types';
+import type { MessageTemplate } from './types';
 import CheckToggle from '../../Controls/CheckToggle';
 
 interface Props {
@@ -11,10 +11,9 @@ interface Props {
   showTemplateDropdown: boolean;
   setShowTemplateDropdown: React.Dispatch<React.SetStateAction<boolean>>;
   isPublishing: boolean;
-  getSelectedTemplateName: () => string;
+  selectedTemplateName: string;
   selectedTemplate: string | null;
   setSelectedTemplate: React.Dispatch<React.SetStateAction<string | null>>;
-  setSchemaValidation: React.Dispatch<React.SetStateAction<SchemaValidationResult | null>>;
   handleTemplateSelect: (templateId: string) => void;
   handleTemplateDelete: (templateId: string) => void;
 }
@@ -28,10 +27,9 @@ function TemplatesSection({
   showTemplateDropdown,
   setShowTemplateDropdown,
   isPublishing,
-  getSelectedTemplateName,
+  selectedTemplateName,
   selectedTemplate,
   setSelectedTemplate,
-  setSchemaValidation,
   handleTemplateSelect,
   handleTemplateDelete,
 }: Props) {
@@ -76,7 +74,7 @@ function TemplatesSection({
             onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
             disabled={isPublishing}
           >
-            <span className="select-value">{getSelectedTemplateName()}</span>
+            <span className="select-value">{selectedTemplateName}</span>
             <i className={`fas fa-chevron-down ${showTemplateDropdown ? 'rotated' : ''}`}></i>
           </button>
 
@@ -87,7 +85,6 @@ function TemplatesSection({
                 className={`dropdown-option ${!selectedTemplate ? 'selected' : ''}`}
                 onClick={() => {
                   setSelectedTemplate(null);
-                  setSchemaValidation(null);
                   setShowTemplateDropdown(false);
                 }}
               >

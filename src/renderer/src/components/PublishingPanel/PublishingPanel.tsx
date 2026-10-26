@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import MessageTemplateService from '../../services/MessageTemplateService';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import './PublishingPanel.css';
 import { payloadBytes, type PayloadEncoding } from '../../../../shared/payload';
 import TopicTreeService from '../../services/TopicTreeService';
 import { useSettings } from '../../services/Settings';
-import type { PublishHistoryItem, SchemaValidationResult } from './publishingPanel/types';
+import type { PublishHistoryItem } from './publishingPanel/types';
 import PayloadEditor from './publishingPanel/PayloadEditor';
 import PublishPropertiesEditor from './publishingPanel/PublishPropertiesEditor';
 import {
@@ -20,6 +19,8 @@ import QosRetainOptions from './publishingPanel/QosRetainOptions';
 import PublishHistory from './publishingPanel/PublishHistory';
 import TemplateDeleteDialog from './publishingPanel/TemplateDeleteDialog';
 import SparkplugCommand from './publishingPanel/SparkplugCommand';
+import { usePublishHistory } from './publishingPanel/usePublishHistory';
+import { useMessageSchemas } from './publishingPanel/useMessageSchemas';
 
 interface PublishingPanelProps {
   connectionId?: string | null;
@@ -29,6 +30,16 @@ interface PublishingPanelProps {
   selectedTopic?: any;
   showFeedback?: (message: string, type?: string) => void;
 }
+
+const isValidJson = (text: string) => {
+  if (!text.trim()) return false;
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 function PublishingPanel({
   connectionId,
@@ -58,32 +69,14 @@ function PublishingPanel({
   const [encoding, setEncoding] = useState<PayloadEncoding>(initialForm.encoding ?? 'utf8');
   const [qos, setQos] = useState<number>(initialForm.qos || 0);
   const [retain, setRetain] = useState<boolean>(initialForm.retain || false);
-  const [publishHistory, setPublishHistory] = useState<PublishHistoryItem[]>(() => {
-    try {
-      const history = JSON.parse(localStorage.getItem(`publish-history-${connectionId}`) || '[]');
-      return Array.isArray(history)
-        ? history
-            .filter(
-              (item) => item && typeof item.topic === 'string' && typeof item.payload === 'string',
-            )
-            .slice(0, 10)
-        : [];
-    } catch {
-      return [];
-    }
-  });
+  const history = usePublishHistory(connectionId, showFeedback);
+  const schemas = useMessageSchemas(payload, encoding, showFeedback);
   const [isPublishing, setIsPublishing] = useState(false);
   const [showQosDropdown, setShowQosDropdown] = useState(false);
-  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
-  const [messageTemplates, setMessageTemplates] = useState<any[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
   const [templateError, setTemplateError] = useState('');
+  // The topic a schema filled in, replaced when another schema is applied.
   const generatedTopic = useRef<string | null>(null);
-  const [templateService] = useState(() => new MessageTemplateService());
-  const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
-  const [schemaValidation, setSchemaValidation] = useState<SchemaValidationResult | null>(null);
-  const [showTemplates, setShowTemplates] = useState(false);
   const [autoLoadSelectedTopic, setAutoLoadSelectedTopic] = useState(true);
   const [retainedMessageRemoved, setRetainedMessageRemoved] = useState(false);
   const selectedPath = selectedTopic?.topicPath ?? selectedTopic?.topic ?? null;
@@ -104,27 +97,6 @@ function PublishingPanel({
     }
   }, [propertyDraft, protocolVersion, payload, encoding]);
 
-  useEffect(() => {
-    setMessageTemplates(templateService.getAllTemplates());
-  }, [templateService]);
-
-  // Validate payload against the selected template schema.
-  useEffect(() => {
-    if (selectedTemplate && payload && encoding === 'utf8') {
-      setSchemaValidation(templateService.validatePayload(selectedTemplate, payload));
-    } else {
-      setSchemaValidation(null);
-    }
-  }, [selectedTemplate, payload, encoding, templateService]);
-
-  // Clear schema validation when templates are hidden.
-  useEffect(() => {
-    if (!showTemplates) {
-      setSchemaValidation(null);
-      setSelectedTemplate(null);
-    }
-  }, [showTemplates]);
-
   // Auto-load the selected topic into the form when enabled.
   useEffect(() => {
     if (autoLoadSelectedTopic && selectedPath !== null) {
@@ -142,10 +114,10 @@ function PublishingPanel({
   }, [selectedMessageId, selectedRetain, connectionId, isConnected]);
 
   const applyTemplate = (templateId: string, variables: Record<string, string>) => {
-    const template = templateService.getTemplate(templateId);
+    const template = schemas.service.getTemplate(templateId);
     if (!template) return;
     try {
-      const processed = templateService.processTemplate(template, variables);
+      const processed = schemas.service.processTemplate(template, variables);
       const properties = draftFromProperties(processed.properties);
       if (!topic.trim() || topic === generatedTopic.current) {
         setTopic(processed.topic);
@@ -163,10 +135,10 @@ function PublishingPanel({
   };
 
   const handleTemplateSelect = (templateId: string) => {
-    const template = templateService.getTemplate(templateId);
+    const template = schemas.service.getTemplate(templateId);
     if (!template) return;
-    setSelectedTemplate(templateId);
-    setShowTemplateDropdown(false);
+    schemas.setSelected(templateId);
+    schemas.setDropdown(false);
     try {
       const defaults = templateDefaults(template.variables);
       setTemplateVariables(defaults);
@@ -176,72 +148,6 @@ function PublishingPanel({
       setTemplateError((error as Error).message);
     }
   };
-
-  const handleTemplateImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const result = await templateService.importTemplates(file);
-      setMessageTemplates(templateService.getAllTemplates());
-
-      if (result.imported > 0) {
-        let message = `Imported ${result.imported} message schema${result.imported === 1 ? '' : 's'}`;
-        if (result.errors.length > 0) message += ` with ${result.errors.length} error(s)`;
-        showFeedback?.(message, 'success');
-      }
-      if (result.errors.length > 0 && result.imported === 0) {
-        showFeedback?.(`Import failed: ${result.errors[0]}`, 'error');
-      }
-    } catch (error: any) {
-      showFeedback?.(`Import failed: ${error.message}`, 'error');
-    }
-
-    event.target.value = '';
-  };
-
-  const handleTemplateExport = () => {
-    try {
-      const exportData = templateService.exportTemplates();
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `mqtt-message-schemas-${new Date().toISOString().slice(0, 19)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showFeedback?.('Message schemas exported', 'success');
-    } catch (error: any) {
-      showFeedback?.(`Export failed: ${error.message}`, 'error');
-    }
-  };
-
-  const handleTemplateDelete = (templateId: string) => {
-    setTemplateToDelete(templateId);
-  };
-
-  const confirmTemplateDelete = () => {
-    if (templateToDelete) {
-      const template = templateService.getTemplate(templateToDelete);
-      const success = templateService.deleteTemplate(templateToDelete);
-
-      if (success) {
-        setMessageTemplates(templateService.getAllTemplates());
-        if (selectedTemplate === templateToDelete) {
-          setSelectedTemplate(null);
-          setSchemaValidation(null);
-        }
-        showFeedback?.(`Deleted "${template?.name}"`, 'success');
-      } else {
-        showFeedback?.('The message schema could not be deleted', 'error');
-      }
-    }
-    setTemplateToDelete(null);
-  };
-
-  const cancelTemplateDelete = () => setTemplateToDelete(null);
 
   // Persist form state.
   useEffect(() => {
@@ -255,18 +161,8 @@ function PublishingPanel({
     }
   }, [formKey, topic, payload, encoding, qos, retain, propertyDraft, showFeedback]);
 
-  // Persist publish history per connection.
-  useEffect(() => {
-    if (!connectionId) return;
-    try {
-      localStorage.setItem(`publish-history-${connectionId}`, JSON.stringify(publishHistory));
-    } catch {
-      showFeedback?.('Publish history could not be saved locally.', 'error');
-    }
-  }, [publishHistory, connectionId, showFeedback]);
-
   const handlePublish = async () => {
-    if (selectedTemplate && templateError) {
+    if (schemas.selected && templateError) {
       showFeedback?.(templateError, 'error');
       return;
     }
@@ -289,33 +185,7 @@ function PublishingPanel({
       payloadBytes(messageData.payload, messageData.encoding);
       if (!onPublishMessage || !isConnected) throw new Error('Not connected');
       await onPublishMessage(messageData);
-
-      // Keep distinct property sets when de-duplicating successful publications.
-      setPublishHistory((prev) => {
-        const matches = (item: PublishHistoryItem) =>
-          item.topic === messageData.topic &&
-          item.payload === messageData.payload &&
-          (item.encoding ?? 'utf8') === messageData.encoding &&
-          item.qos === messageData.qos &&
-          item.retain === messageData.retain &&
-          JSON.stringify(item.properties ?? {}) === JSON.stringify(messageData.properties ?? {});
-
-        const isDuplicate = prev.some(matches);
-        if (!isDuplicate) return [messageData, ...prev.slice(0, 9)]; // keep last 10
-
-        const existingIndex = prev.findIndex(matches);
-        if (existingIndex > 0) {
-          const updatedItem = { ...prev[existingIndex], timestamp: messageData.timestamp };
-          return [updatedItem, ...prev.slice(0, existingIndex), ...prev.slice(existingIndex + 1)];
-        }
-        if (existingIndex === 0) {
-          const newHistory = [...prev];
-          newHistory[0] = { ...newHistory[0], timestamp: messageData.timestamp };
-          return newHistory;
-        }
-        return prev;
-      });
-
+      history.record(messageData);
       showFeedback?.('Message published successfully!', 'success');
     } catch (error) {
       console.error('Publish failed:', error);
@@ -358,19 +228,20 @@ function PublishingPanel({
     selectedTopic?.node?.lastMessage?.retain === true && !retainedMessageRemoved;
 
   // Close dropdowns on outside click.
+  const { dropdown: schemaDropdown, setDropdown: setSchemaDropdown } = schemas;
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (showQosDropdown && !target.closest('.qos-select-wrapper')) {
         setShowQosDropdown(false);
       }
-      if (showTemplateDropdown && !target.closest('.template-select-wrapper')) {
-        setShowTemplateDropdown(false);
+      if (schemaDropdown && !target.closest('.template-select-wrapper')) {
+        setSchemaDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showQosDropdown, showTemplateDropdown]);
+  }, [showQosDropdown, schemaDropdown, setSchemaDropdown]);
 
   const loadFromSelectedTopic = () => {
     if (!selectedTopic) {
@@ -380,7 +251,7 @@ function PublishingPanel({
 
     setPropertyDraft(emptyPropertyDraft());
     generatedTopic.current = null;
-    setSelectedTemplate(null);
+    schemas.setSelected(null);
     setTopic(selectedTopic.topicPath || selectedTopic.topic || '');
     const messageData = connectionId
       ? TopicTreeService.getTopicMessages(connectionId, selectedTopic.topicPath)[0]
@@ -409,7 +280,7 @@ function PublishingPanel({
       return;
     }
     generatedTopic.current = null;
-    setSelectedTemplate(null);
+    schemas.setSelected(null);
     setTopic(historyItem.topic);
     setPayload(historyItem.payload);
     setEncoding(historyItem.encoding ?? 'utf8');
@@ -425,13 +296,8 @@ function PublishingPanel({
     setEncoding('utf8');
     setQos(0);
     setRetain(false);
-    setSelectedTemplate(null);
+    schemas.setSelected(null);
     localStorage.removeItem(formKey);
-  };
-
-  const clearHistory = () => {
-    setPublishHistory([]);
-    if (connectionId) localStorage.removeItem(`publish-history-${connectionId}`);
   };
 
   const formatJsonPayload = () => {
@@ -444,25 +310,9 @@ function PublishingPanel({
     }
   };
 
-  const isValidJson = (str: string) => {
-    if (!str.trim()) return false;
-    try {
-      JSON.parse(str);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
   const copyToClipboard = (text: string, feedbackMsg: string) => {
     navigator.clipboard.writeText(text);
     showFeedback?.(feedbackMsg, 'success');
-  };
-
-  const getSelectedTemplateName = () => {
-    if (!selectedTemplate) return 'Choose a message schema';
-    const template = messageTemplates.find((t) => t.id === selectedTemplate);
-    return template ? template.name : 'Choose a message schema';
   };
 
   return (
@@ -552,34 +402,33 @@ function PublishingPanel({
               isValidJson={(text) => encoding === 'utf8' && isValidJson(text)}
               formatJsonPayload={formatJsonPayload}
               copyToClipboard={copyToClipboard}
-              schemaValidation={schemaValidation}
+              schemaValidation={schemas.validation}
             />
 
             <TemplatesSection
-              showTemplates={showTemplates}
-              setShowTemplates={setShowTemplates}
-              handleTemplateImport={handleTemplateImport}
-              handleTemplateExport={handleTemplateExport}
-              messageTemplates={messageTemplates}
-              showTemplateDropdown={showTemplateDropdown}
-              setShowTemplateDropdown={setShowTemplateDropdown}
+              showTemplates={schemas.open}
+              setShowTemplates={schemas.setOpen}
+              handleTemplateImport={schemas.importFile}
+              handleTemplateExport={schemas.exportAll}
+              messageTemplates={schemas.templates}
+              showTemplateDropdown={schemas.dropdown}
+              setShowTemplateDropdown={schemas.setDropdown}
               isPublishing={isPublishing}
-              getSelectedTemplateName={getSelectedTemplateName}
-              selectedTemplate={selectedTemplate}
-              setSelectedTemplate={setSelectedTemplate}
-              setSchemaValidation={setSchemaValidation}
+              selectedTemplateName={schemas.selectedName}
+              selectedTemplate={schemas.selected}
+              setSelectedTemplate={schemas.setSelected}
               handleTemplateSelect={handleTemplateSelect}
-              handleTemplateDelete={handleTemplateDelete}
+              handleTemplateDelete={schemas.setPendingDelete}
             />
 
-            {showTemplates && selectedTemplate && (
+            {schemas.open && schemas.selected && (
               <TemplateVariables
-                definitions={templateService.getTemplate(selectedTemplate)?.variables ?? {}}
+                definitions={schemas.service.getTemplate(schemas.selected)?.variables ?? {}}
                 values={templateVariables}
                 onChange={(name, value) =>
                   setTemplateVariables((previous) => ({ ...previous, [name]: value }))
                 }
-                onApply={() => applyTemplate(selectedTemplate, templateVariables)}
+                onApply={() => applyTemplate(schemas.selected!, templateVariables)}
                 error={templateError}
                 disabled={isPublishing}
               />
@@ -617,7 +466,7 @@ function PublishingPanel({
                 onClick={handlePublish}
                 className="btn btn-md btn-primary publish-form-publish-btn"
                 disabled={
-                  !!(selectedTemplate && templateError) ||
+                  !!(schemas.selected && templateError) ||
                   !topic.trim() ||
                   isPublishing ||
                   !connectionId ||
@@ -706,21 +555,20 @@ function PublishingPanel({
           </div>
         </div>
 
-        {publishHistory.length > 0 && (
+        {history.history.length > 0 && (
           <PublishHistory
-            publishHistory={publishHistory}
-            clearHistory={clearHistory}
+            publishHistory={history.history}
+            clearHistory={history.clear}
             loadFromHistory={loadFromHistory}
           />
         )}
       </div>
 
-      {templateToDelete && (
+      {schemas.pendingDelete && (
         <TemplateDeleteDialog
-          templateToDelete={templateToDelete}
-          templateService={templateService}
-          cancelTemplateDelete={cancelTemplateDelete}
-          confirmTemplateDelete={confirmTemplateDelete}
+          name={schemas.service.getTemplate(schemas.pendingDelete)?.name ?? ''}
+          cancelTemplateDelete={() => schemas.setPendingDelete(null)}
+          confirmTemplateDelete={schemas.confirmDelete}
         />
       )}
     </div>

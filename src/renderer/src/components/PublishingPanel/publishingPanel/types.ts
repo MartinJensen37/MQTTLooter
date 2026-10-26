@@ -15,5 +15,4 @@ export interface SchemaValidationResult {
   errors: string[];
 }
 
-// Templates come from the (untyped) MessageTemplateService; shape kept loose.
-export type MessageTemplate = any;
+export type { MessageTemplate } from '../../../services/MessageTemplateService';
