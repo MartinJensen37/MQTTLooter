@@ -465,7 +465,7 @@ function MessagePanel({
                           )}
                           {msg.retain && (
                             <span className="badge badge-retain">
-                              <i className="fas fa-save"></i> RETAIN
+                              <i className="fas fa-save"></i> Retain
                             </span>
                           )}
                         </div>

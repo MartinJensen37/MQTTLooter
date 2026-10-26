@@ -64,8 +64,8 @@ function TopicTreeNode({ node, onClick, isSelected, sparkplug = false }) {
               </span>
             )}
             {hasRetainedMessage && (
-              <span className="retained-bubble" title="Has retained message">
-                <i className="fas fa-save"></i> Retained
+              <span className="badge badge-retain" title="Has a retained message">
+                <i className="fas fa-save"></i> Retain
               </span>
             )}
             {subtopicCount > 0 && (

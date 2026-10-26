@@ -231,7 +231,6 @@
 /* ── Bubbles ── */
 .node-bubbles { display: inline-flex; gap: 3px; margin-left: var(--spacing-sm); align-items: center; }
 
-.retained-bubble,
 .subtopic-bubble {
   display: inline-flex;
   align-items: center;
@@ -243,12 +242,6 @@
   white-space: nowrap;
 }
 
-.retained-bubble {
-  background: var(--warning-light);
-  color: var(--warning-text);
-  border: 1px solid rgba(255,193,7,.4);
-}
-.retained-bubble i { font-size: 8px; }
 
 .subtopic-bubble {
   background: var(--success-light);
@@ -257,9 +250,7 @@
 }
 .subtopic-bubble i { font-size: 8px; }
 
-.topic-tree-node:hover .retained-bubble { background: rgba(255,193,7,.3); border-color: rgba(255,193,7,.6); }
 .topic-tree-node:hover .subtopic-bubble { background: rgba(40,167,69,.25); border-color: rgba(40,167,69,.5); }
-.topic-tree-node.selected .retained-bubble { background: rgba(255,193,7,.4); color: var(--warning-text); }
 .topic-tree-node.selected .subtopic-bubble { background: rgba(40,167,69,.3); color: var(--success-text); }
 
 /* ── Responsive ── */
