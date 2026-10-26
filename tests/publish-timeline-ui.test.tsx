@@ -63,7 +63,6 @@ it('calculates only when open or settings change, preserves rare chances and rel
   await open();
   expect(workers).toHaveLength(1);
   expect(container.textContent).toContain('1%');
-  expect(container.textContent).toContain('459 s (outside window)');
   expect(
     Math.max(
       ...[...container.querySelectorAll('.publish-timeline-total rect')].map((rect) =>
@@ -125,7 +124,7 @@ it('virtualizes large signal lists and explicitly scopes the aggregate', async (
   expect(workers[0].postMessage.mock.calls[0][0].signals).toHaveLength(128);
   await act(async () => {
     const scroller = container.querySelector('.publish-timeline-rows')!;
-    scroller.scrollTop = 62 * 100;
+    scroller.scrollTop = 46 * 100;
     scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
   });
   expect(container.textContent).toContain('Signal 100');

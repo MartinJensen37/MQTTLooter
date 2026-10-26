@@ -43,7 +43,7 @@
   text-align: center;
 }
 .publish-timeline-rows {
-  height: 248px;
+  height: 230px;
   overflow-y: auto;
   scrollbar-gutter: stable;
   border-block: 1px solid var(--border-color);
@@ -53,8 +53,14 @@
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr) 48px;
   align-items: center;
-  height: 62px;
   gap: 0;
+}
+/* Matches ROW_HEIGHT in PublishTimeline.tsx. */
+.publish-timeline-row {
+  height: 46px;
+}
+.publish-timeline-total {
+  padding: 6px 0;
 }
 .publish-timeline-name {
   padding-right: 8px;

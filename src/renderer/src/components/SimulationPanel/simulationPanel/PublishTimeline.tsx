@@ -7,7 +7,6 @@ import {
   TIMELINE_SERIES,
   type TimelineInput,
   type TimelineResult,
-  type TimelineRow,
 } from './publishTimelineModel';
 import CheckToggle from '../../Controls/CheckToggle';
 import InfoTip from '../../Controls/InfoTip';
@@ -15,6 +14,8 @@ import './PublishTimeline.css';
 
 /** Height of the messages-at-once chart, and the width of its bars and the lanes' ticks. */
 const TOTAL_HEIGHT = 64;
+/** Height of one signal lane; the list is virtualized by it. */
+const ROW_HEIGHT = 46;
 const MARK_WIDTH = 3;
 /** A signal's color by its position; signals past the eighth share the "other" color. */
 const seriesColor = (index: number) =>
@@ -134,7 +135,7 @@ function Timeline({ device }: { device: SimulatedDevice }) {
           randomExpected: [],
           omitted: Math.max(0, device.outputs.length - TIMELINE_LIMITS.signals),
         };
-  const start = Math.max(0, Math.min(Math.floor(scroll / 62) - 2, lanes.rows.length - 1));
+  const start = Math.max(0, Math.min(Math.floor(scroll / ROW_HEIGHT) - 2, lanes.rows.length - 1));
   const shown = lanes.rows.slice(start, start + 10);
   // Bursts count messages due at the same moment; randomized schedules add per-interval estimates.
   const peak = Math.max(0, ...lanes.bursts, ...lanes.randomExpected);
@@ -276,12 +277,12 @@ function Timeline({ device }: { device: SimulatedDevice }) {
             tabIndex={0}
             aria-label="Signal schedules. Hover, or use the left and right arrow keys, to inspect a moment."
           >
-            <div style={{ height: lanes.rows.length * 62, position: 'relative' }}>
+            <div style={{ height: lanes.rows.length * ROW_HEIGHT, position: 'relative' }}>
               {shown.map((row, index) => (
                 <div
                   key={row.id}
                   className="publish-timeline-row"
-                  style={{ position: 'absolute', top: (start + index) * 62, width: '100%' }}
+                  style={{ position: 'absolute', top: (start + index) * ROW_HEIGHT, width: '100%' }}
                 >
                   <div className="publish-timeline-name" title={row.name}>
                     <strong>
@@ -332,9 +333,6 @@ function Timeline({ device }: { device: SimulatedDevice }) {
                               ))}
                           {cursor(24)}
                         </svg>
-                        <small title={pending ? undefined : rowNotes(row, horizon)}>
-                          {pending ? '\u00a0' : rowNotes(row, horizon)}
-                        </small>
                       </>
                     )}
                   </div>
@@ -458,14 +456,4 @@ function Timeline({ device }: { device: SimulatedDevice }) {
       )}
     </>
   );
-}
-
-function rowNotes(row: TimelineRow, horizon: number) {
-  if (row.chance === 0) return 'Never sends (0% chance)';
-  if (row.first[0] > horizon)
-    return `First opportunity ${seconds(row.first[0])}${row.random ? `–${seconds(row.first[1])}` : ''}, outside window`;
-  if (row.random)
-    return `Estimated timing · first opportunity ${seconds(row.first[0])}–${seconds(row.first[1])}`;
-  if (row.coverage99 === null) return '99% first-send time exceeds numeric limits';
-  return `99% first-send coverage by ${seconds(row.coverage99!)}${row.coverage99! > horizon ? ' (outside window)' : ''}`;
 }
