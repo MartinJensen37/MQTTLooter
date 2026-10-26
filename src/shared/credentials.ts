@@ -24,8 +24,10 @@ const hasSecrets = (secrets: ConnectionSecrets) =>
   Boolean(secrets.password || secrets.tlsKey || secrets.passphrase);
 
 /** Split a connection config into what may be stored in the renderer and its secrets. */
-export function splitSecrets(config: Config): {
-  config: Config;
+export function splitSecrets<T extends Config>(
+  config: T,
+): {
+  config: T;
   secrets: ConnectionSecrets | null;
 } {
   const secrets: ConnectionSecrets = {};
@@ -41,14 +43,14 @@ export function splitSecrets(config: Config): {
     tls.passphrase = '';
     stripped.tls = tls;
   }
-  return { config: stripped, secrets: hasSecrets(secrets) ? secrets : null };
+  return { config: stripped as T, secrets: hasSecrets(secrets) ? secrets : null };
 }
 
 /** Values present in the config win; stored secrets fill only what is missing. */
-export function mergeSecrets(
-  config: Config,
+export function mergeSecrets<T extends Config>(
+  config: T,
   secrets: ConnectionSecrets | null | undefined,
-): Config {
+): T {
   if (!secrets) return config;
   const merged: Config = { ...config };
   if (!merged.password && secrets.password) merged.password = secrets.password;
@@ -58,7 +60,7 @@ export function mergeSecrets(
     if (!tls.passphrase && secrets.passphrase) tls.passphrase = secrets.passphrase;
     merged.tls = tls;
   }
-  return merged;
+  return merged as T;
 }
 
 /** Runtime validation for secrets arriving over IPC. */

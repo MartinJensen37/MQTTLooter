@@ -8,6 +8,7 @@ import {
 } from '../config';
 import MQTTService from './MQTTService';
 import type { PayloadEncoding } from '../../../shared/payload';
+import type { IncomingPublish } from '../../../shared/traffic';
 
 type MQTTServiceInstance = typeof import('./MQTTService').default;
 type EventHandler = (data: any) => void;
@@ -67,7 +68,7 @@ export class TopicTreeService {
     this.MQTTService.onAny('message', (data) => this.handleMessage(data));
   }
 
-  private handleMessage(messageData: any): void {
+  private handleMessage(messageData: IncomingPublish): void {
     const { id: connectionId, topic, message, qos, retain, timestamp, encoding } = messageData;
 
     let topicTree = this.topicTrees.get(connectionId);

@@ -41,7 +41,7 @@ export interface OutgoingMessage {
   retain?: boolean;
   properties?: Record<string, unknown>;
 }
-type ConnectionEvent = { id: string; error?: string; message?: string };
+type ConnectionEvent = { id: string };
 
 // Loaded when first shown; afterwards they stay mounted like the other panels. Recording stays
 // eager so captures that main stops after a reload are still reported.
@@ -210,8 +210,8 @@ function App() {
         ),
       );
     };
-    const handleError = (data: ConnectionEvent) => {
-      const message = data.error || data.message || 'Unknown error';
+    const handleError = (data: { id: string; error: string }) => {
+      const message = data.error || 'Unknown error';
       if (notices.current.error(data.id, message)) showFeedback(`MQTT error: ${message}`, 'error');
     };
     const handleTreeCleared = ({ connectionId }: { connectionId: string }) => {
@@ -225,16 +225,16 @@ function App() {
         return next;
       });
     };
-    const handlers = {
-      connected: handleConnected,
-      disconnected: handleDisconnected,
-      reconnecting: handleReconnecting,
-      error: handleError,
-    };
-    Object.entries(handlers).forEach(([event, handler]) => MQTTService.onAny(event, handler));
+    MQTTService.onAny('connected', handleConnected);
+    MQTTService.onAny('disconnected', handleDisconnected);
+    MQTTService.onAny('reconnecting', handleReconnecting);
+    MQTTService.onAny('error', handleError);
     TopicTreeService.on('treeCleared', handleTreeCleared);
     return () => {
-      Object.entries(handlers).forEach(([event, handler]) => MQTTService.off('*', event, handler));
+      MQTTService.off('*', 'connected', handleConnected);
+      MQTTService.off('*', 'disconnected', handleDisconnected);
+      MQTTService.off('*', 'reconnecting', handleReconnecting);
+      MQTTService.off('*', 'error', handleError);
       TopicTreeService.off('treeCleared', handleTreeCleared);
     };
   }, [setConnections, setTopicTreeReady, setLastSelectedTopics, setPanePin, showFeedback]);

@@ -8,14 +8,8 @@ export interface IpcResult<T = unknown> {
   error?: string;
 }
 
-/** Loose connection config — spans MQTT 3/5, TLS and WebSocket options. */
-export interface ConnectionConfig {
-  name?: string;
-  brokerUrl?: string;
-  protocolVersion?: 4 | 5;
-  properties?: Record<string, unknown>;
-  [key: string]: unknown;
-}
+export type { ConnectionConfig } from './connection';
+import type { ConnectionConfig } from './connection';
 
 /** Connection state as reported back from the main process. */
 export interface MainConnectionInfo {
@@ -31,20 +25,33 @@ export interface ConnectResultData {
   properties?: Record<string, unknown>;
 }
 
-/** MQTT events the main process forwards to the renderer as `mqtt-<event>`. */
-export type MqttEventType =
-  | 'connected'
-  | 'disconnected'
-  | 'message'
-  | 'message-batch'
-  | 'error'
-  | 'reconnecting'
-  | 'subscribed'
-  | 'unsubscribed'
-  | 'published';
-
-// Event payloads are loosely shaped across event types; callers narrow as needed.
-export type MqttEventCallback = (data: any) => void;
+/** MQTT events the main process forwards to the renderer as `mqtt-<event>`, with their data. */
+export interface MqttEvents {
+  connected: {
+    id: string;
+    protocolVersion: number;
+    properties?: Record<string, unknown>;
+    connack?: unknown;
+  };
+  disconnected: { id: string };
+  error: { id: string; error: string; code?: string | number };
+  reconnecting: { id: string; attempt: number };
+  subscribed: {
+    id: string;
+    topic: string;
+    qos: number;
+    granted?: { topic: string; qos: number }[];
+    protocolVersion: number;
+  };
+  unsubscribed: { id: string; topic: string; protocolVersion: number };
+  published: { id: string; topic: string; byteLength: number; timestamp: number };
+  message: import('./traffic').IncomingPublish;
+  'message-batch': import('./traffic').MessageBatch;
+}
+export type MqttEventType = keyof MqttEvents;
+export type MqttEventCallback<E extends MqttEventType = MqttEventType> = (
+  data: MqttEvents[E],
+) => void;
 
 /** The surface the preload bridge exposes on window.electronAPI. */
 export interface ElectronAPI {
@@ -174,8 +181,8 @@ export interface ElectronAPI {
     rendererReady(): Promise<IpcResult>;
     getTrafficStatus(): Promise<IpcResult<import('./traffic').TrafficStatus>>;
     getConnections(): Promise<IpcResult<Record<string, MainConnectionInfo>>>;
-    on(eventType: MqttEventType, callback: MqttEventCallback): void;
-    off(eventType: MqttEventType, callback: MqttEventCallback): void;
+    on<E extends MqttEventType>(eventType: E, callback: MqttEventCallback<E>): void;
+    off<E extends MqttEventType>(eventType: E, callback: MqttEventCallback<E>): void;
     removeAllListeners(): void;
   };
 }

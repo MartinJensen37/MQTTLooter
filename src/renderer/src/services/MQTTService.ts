@@ -2,13 +2,19 @@ import type {
   ConnectionConfig,
   IpcResult,
   MainConnectionInfo,
+  MqttEvents,
   MqttEventType,
 } from '../../../shared/ipc';
 import { BatchProcessor } from './BatchProcessor';
 import type { TrafficStatus } from '../../../shared/traffic';
 import type { PayloadEncoding } from '../../../shared/payload';
 
-type EventHandler = (data: any) => void;
+/** Events from main, plus the window's own report of messages dropped before display. */
+export interface ServiceEvents extends MqttEvents {
+  'delivery-gap': { id: string; dropped: number; delta: number };
+}
+type ServiceEvent = keyof ServiceEvents;
+type EventHandler<E extends ServiceEvent = ServiceEvent> = (data: ServiceEvents[E]) => void;
 
 /** Connection state tracked in the renderer. */
 export interface RendererConnection {
@@ -44,7 +50,7 @@ const EVENT_TYPES: MqttEventType[] = [
 
 class MQTTService {
   private connections = new Map<string, RendererConnection>();
-  private eventHandlers = new Map<string, Set<EventHandler>>();
+  private eventHandlers = new Map<string, Set<EventHandler<any>>>();
 
   private dropped = new Map<string, number>();
   private batchProcessor = new BatchProcessor(
@@ -64,7 +70,9 @@ class MQTTService {
       return;
     }
     EVENT_TYPES.forEach((eventType) => {
-      window.electronAPI.mqtt.on(eventType, (data) => this.handleEvent(eventType, data));
+      window.electronAPI.mqtt.on(eventType, (data: ServiceEvents[typeof eventType]) =>
+        this.handleEvent(eventType, data),
+      );
     });
     // Let module initialization finish installing tree/recording subscribers first.
     queueMicrotask(() => {
@@ -72,12 +80,15 @@ class MQTTService {
     });
   }
 
-  private handleEvent(eventType: string, data: any): void {
+  private handleEvent<E extends ServiceEvent>(eventType: E, payload: ServiceEvents[E]): void {
     if (eventType === 'message-batch') {
-      this.checkGaps(data.dropped);
-      this.batchProcessor.accept(data);
+      const batch = payload as ServiceEvents['message-batch'];
+      this.checkGaps(batch.dropped);
+      this.batchProcessor.accept(batch);
       return;
     }
+    // Every other event names its connection; the switch reads each event's own fields.
+    const data = payload as ServiceEvents['connected'] & ServiceEvents['reconnecting'];
     const connectionId = data.id;
 
     const connection = this.connections.get(connectionId);
@@ -135,7 +146,7 @@ class MQTTService {
     return result.data;
   }
 
-  on(connectionId: string, eventType: string, handler: EventHandler): void {
+  on<E extends ServiceEvent>(connectionId: string, eventType: E, handler: EventHandler<E>): void {
     const key = `${connectionId}:${eventType}`;
     if (!this.eventHandlers.has(key)) {
       this.eventHandlers.set(key, new Set());
@@ -143,11 +154,11 @@ class MQTTService {
     this.eventHandlers.get(key)!.add(handler);
   }
 
-  onAny(eventType: string, handler: EventHandler): void {
+  onAny<E extends ServiceEvent>(eventType: E, handler: EventHandler<E>): void {
     this.on('*', eventType, handler);
   }
 
-  off(connectionId: string, eventType: string, handler: EventHandler): void {
+  off<E extends ServiceEvent>(connectionId: string, eventType: E, handler: EventHandler<E>): void {
     const key = `${connectionId}:${eventType}`;
     const handlers = this.eventHandlers.get(key);
     if (handlers) {
