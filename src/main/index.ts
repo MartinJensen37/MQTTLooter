@@ -322,11 +322,9 @@ handleIPC('mqtt-connect', async (_event, connectionId, config) => {
   try {
     if (!validId(connectionId) || !config || typeof config !== 'object')
       throw new Error('Invalid connection request');
-    console.log(`IPC: Connecting ${connectionId} with protocol version ${config.protocolVersion}`);
     // Secrets stay in main: the renderer's config omits them once they are stored.
     const secrets = await credentialStore.get(connectionId);
     const result = await mqttManager.connect(connectionId, mergeSecrets(config, secrets));
-    console.log(`IPC: Successfully connected ${connectionId}`);
     return { success: true, data: result };
   } catch (error) {
     console.error(`IPC: Failed to connect ${connectionId}:`, error);
@@ -345,9 +343,7 @@ handleIPC('mqtt-disconnect', async (_event, connectionId) => {
 
 handleIPC('mqtt-subscribe', async (_event, connectionId, topic, qos = 0, properties = {}) => {
   try {
-    console.log(`IPC: Subscribing ${connectionId} to ${topic} with QoS ${qos}`);
     const result = await mqttManager.subscribe(connectionId, topic, qos, properties);
-    console.log(`IPC: Subscription successful for ${connectionId}: ${topic}`);
     return { success: true, data: result };
   } catch (error) {
     console.error(`IPC: Subscribe failed for ${connectionId}:`, (error as Error).message);
@@ -357,9 +353,7 @@ handleIPC('mqtt-subscribe', async (_event, connectionId, topic, qos = 0, propert
 
 handleIPC('mqtt-unsubscribe', async (_event, connectionId, topic, properties = {}) => {
   try {
-    console.log(`IPC: Unsubscribing ${connectionId} from ${topic}`);
     const result = await mqttManager.unsubscribe(connectionId, topic, properties);
-    console.log(`IPC: Unsubscription successful for ${connectionId}: ${topic}`);
     return { success: true, data: result };
   } catch (error) {
     console.error(`IPC: Unsubscribe failed for ${connectionId}:`, (error as Error).message);

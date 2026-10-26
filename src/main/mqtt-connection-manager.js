@@ -124,21 +124,10 @@ class MQTTConnection extends EventEmitter {
           if (this.config.tls.alpnProtocols && this.config.tls.alpnProtocols.length > 0) {
             options.ALPNProtocols = this.config.tls.alpnProtocols;
           }
-
-          console.log(`TLS configuration applied for connection ${this.id}:`, {
-            rejectUnauthorized: options.rejectUnauthorized,
-            hasCa: !!options.ca,
-            hasCert: !!options.cert,
-            hasKey: !!options.key,
-            hasPassphrase: !!options.passphrase,
-            servername: options.servername,
-          });
         }
 
         // WebSocket specific options
         if (brokerUrl.startsWith('ws://') || brokerUrl.startsWith('wss://')) {
-          console.log(`WebSocket connection with path: ${this.config.wsPath || 'default'}`);
-
           const wsOptions = {};
           if (this.config.wsHeaders) wsOptions.headers = this.config.wsHeaders;
           // MQTT.js forwards CA, certificate and key to secure WebSockets, but not the server

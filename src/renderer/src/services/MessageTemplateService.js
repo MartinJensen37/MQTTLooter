@@ -273,15 +273,6 @@ class MessageTemplateService {
       const text = await file.text();
       const importData = JSON.parse(text);
 
-      console.log('Import data received:', {
-        hasSchema: !!importData.$schema,
-        hasId: !!importData.$id,
-        hasTitle: !!importData.title,
-        hasType: !!importData.type,
-        hasProperties: !!importData.properties,
-        hasTemplates: !!importData.templates,
-      });
-
       const imported = [];
       const errors = [];
 
@@ -293,7 +284,6 @@ class MessageTemplateService {
         (importData.type && importData.properties)
       ) {
         // This is a standalone JSON Schema - create a template from it
-        console.log('Detected standalone schema:', importData.title || 'Untitled');
         try {
           const template = this.createTemplateFromSchema(importData);
 
@@ -364,7 +354,6 @@ class MessageTemplateService {
           }
         }
       } else {
-        console.log('File format not recognized. Data structure:', Object.keys(importData));
         throw new Error('Choose a JSON Schema, or a file exported from Message schemas.');
       }
 
