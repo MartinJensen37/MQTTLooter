@@ -1,61 +1,26 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-
-# Diagnostic reports
-report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-.DS_Store
-.tmp
-
-# Build directories
-dist-builder
-build/
-out/
-out-test/
-
-# Dependency directories
+# Dependencies
 node_modules/
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Optional npm cache directory
 .npm
 
-# Optional eslint cache
-.eslintcache
-
-# dotenv environment variables file
-.env
-.env.test
-.env.production
-
-# Webpack
-.webpack/
-
-# Electron-Forge
+# Build output
 out/
+out-test/
+dist-builder/
 
-# React build
-/build
-/dist
-
-# Logs
-*.log
-
-# Coverage
+# Test and screenshot scratch space
+.tmp/
 coverage/
 
-# IDE
+# Logs and caches
+*.log
+*.tsbuildinfo
+.eslintcache
+
+# Local environment
+.env
+.env.*
+
+# Editors and OS files
 .vscode/
 .idea/
+.DS_Store
