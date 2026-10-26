@@ -1,6 +1,26 @@
-import { validateJson } from '../../../shared/json-schema';
+import { validateJson, type SchemaResult } from '../../../shared/json-schema';
 import { templateFromSchema } from '../../../shared/schema-template';
-import { expandTemplate } from '../../../shared/template-expansion';
+import { expandTemplate, type TemplateVariable } from '../../../shared/template-expansion';
+import type { PublishProperties } from '../../../shared/publish-properties';
+
+/** A message schema in Publishing: topic, payload template and options, with an optional schema. */
+export interface MessageTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  topic: string;
+  payload: string;
+  qos: number;
+  retain: boolean;
+  category?: string;
+  variables?: Record<string, TemplateVariable>;
+  schema?: Record<string, any>;
+  properties?: PublishProperties;
+  createdAt?: number;
+  updatedAt?: number;
+  imported?: boolean;
+}
+type Templates = Record<string, MessageTemplate>;
 
 const SCHEMA = 'https://json-schema.org/draft/2020-12/schema';
 const VERSION_KEY = 'mqtt-message-templates-version';
@@ -11,7 +31,10 @@ const VERSION = 2;
  * the schema, so every Fill payload produces a message that matches it. Properties named like
  * a variable take that variable's value.
  */
-const EXAMPLES = [
+const EXAMPLES: (Omit<MessageTemplate, 'payload'> & {
+  variables: Record<string, TemplateVariable>;
+  schema: Record<string, any>;
+})[] = [
   {
     id: 'sensor-reading',
     name: 'Sensor reading',
@@ -68,7 +91,7 @@ const EXAMPLES = [
 ];
 
 /** Topic and payload of the examples shipped before message schemas, to replace them unchanged. */
-const LEGACY_EXAMPLES = {
+const LEGACY_EXAMPLES: Record<string, { topic: string; payload: unknown }> = {
   'temperature-sensor': {
     topic: 'sensors/temperature/{{sensorId}}',
     payload: {
@@ -101,11 +124,13 @@ const LEGACY_EXAMPLES = {
 
 /** Message schemas for Publishing: a JSON Schema, a topic and a payload template generated from it. */
 class MessageTemplateService {
+  templates: Templates;
+
   constructor() {
     this.templates = this.loadTemplates();
   }
 
-  loadTemplates() {
+  loadTemplates(): Templates {
     try {
       const saved = localStorage.getItem('mqtt-message-templates');
       if (!saved) return this.getDefaultTemplates();
@@ -124,7 +149,7 @@ class MessageTemplateService {
   }
 
   /** Replace unchanged old examples with the current ones; edited and custom entries stay. */
-  migrate(templates) {
+  migrate(templates: Templates): Templates {
     const result = { ...templates };
     for (const [id, legacy] of Object.entries(LEGACY_EXAMPLES)) {
       const saved = result[id];
@@ -145,7 +170,7 @@ class MessageTemplateService {
     localStorage.setItem(VERSION_KEY, String(VERSION));
   }
 
-  getDefaultTemplates() {
+  getDefaultTemplates(): Templates {
     return Object.fromEntries(
       EXAMPLES.map((example) => [
         example.id,
@@ -164,11 +189,11 @@ class MessageTemplateService {
     return Object.values(this.templates);
   }
 
-  getTemplate(id) {
+  getTemplate(id: string): MessageTemplate | undefined {
     return this.templates[id];
   }
 
-  saveTemplate(template) {
+  saveTemplate(template: MessageTemplate): MessageTemplate {
     this.templates[template.id] = {
       ...template,
       createdAt: template.createdAt || Date.now(),
@@ -178,7 +203,7 @@ class MessageTemplateService {
     return this.templates[template.id];
   }
 
-  deleteTemplate(id) {
+  deleteTemplate(id: string): boolean {
     if (this.templates[id]) {
       delete this.templates[id];
       this.saveTemplates();
@@ -187,7 +212,7 @@ class MessageTemplateService {
     return false;
   }
 
-  processTemplate(template, variables = {}) {
+  processTemplate(template: MessageTemplate, variables: Record<string, unknown> = {}) {
     return {
       ...expandTemplate(template, variables),
       qos: template.qos,
@@ -197,7 +222,7 @@ class MessageTemplateService {
   }
 
   getCategories() {
-    const categories = new Set();
+    const categories = new Set<string>();
     Object.values(this.templates).forEach((template) => {
       if (template.category) {
         categories.add(template.category);
@@ -207,7 +232,7 @@ class MessageTemplateService {
   }
 
   // Create a template from a standalone JSON Schema
-  createTemplateFromSchema(schema) {
+  createTemplateFromSchema(schema: Record<string, any>): MessageTemplate {
     // Extract metadata from schema
     const title = schema.title || 'Imported Schema';
     const id = this.generateIdFromTitle(title);
@@ -232,7 +257,7 @@ class MessageTemplateService {
   }
 
   // Generate a valid ID from a title
-  generateIdFromTitle(title) {
+  generateIdFromTitle(title: string): string {
     return (
       title
         .toLowerCase()
@@ -245,19 +270,20 @@ class MessageTemplateService {
   }
 
   // Helper function to validate if a schema structure is valid
-  isValidSchema(schema) {
+  isValidSchema(schema: unknown): boolean {
     try {
       if (!schema || typeof schema !== 'object') {
         return false;
       }
 
       // Accept any object-type schema (including JSON Schema with metadata)
-      if (schema.type === 'object' || schema.$schema || schema.$id || schema.title) {
+      const candidate = schema as Record<string, unknown>;
+      if (candidate.type === 'object' || candidate.$schema || candidate.$id || candidate.title) {
         return true;
       }
 
       // Accept simple schemas with properties
-      if (schema.properties && typeof schema.properties === 'object') {
+      if (candidate.properties && typeof candidate.properties === 'object') {
         return true;
       }
 
@@ -268,13 +294,15 @@ class MessageTemplateService {
   }
 
   // Import templates from file
-  async importTemplates(file) {
+  async importTemplates(
+    file: Pick<Blob, 'text'>,
+  ): Promise<{ imported: number; errors: string[]; templates: MessageTemplate[] }> {
     try {
       const text = await file.text();
       const importData = JSON.parse(text);
 
-      const imported = [];
-      const errors = [];
+      const imported: MessageTemplate[] = [];
+      const errors: string[] = [];
 
       // Check if this is a standalone schema or a template collection
       if (
@@ -307,7 +335,7 @@ class MessageTemplateService {
           imported.push(templateToSave);
         } catch (error) {
           console.error('Schema processing error:', error);
-          errors.push(`Failed to create template from schema: ${error.message}`);
+          errors.push(`Failed to create template from schema: ${(error as Error).message}`);
         }
       } else if (importData.templates && Array.isArray(importData.templates)) {
         // This is a template collection file
@@ -350,7 +378,9 @@ class MessageTemplateService {
             this.templates[templateId] = templateToSave;
             imported.push(templateToSave);
           } catch (error) {
-            errors.push(`Failed to import template "${template.name}": ${error.message}`);
+            errors.push(
+              `Failed to import template "${template.name}": ${(error as Error).message}`,
+            );
           }
         }
       } else {
@@ -367,12 +397,12 @@ class MessageTemplateService {
         templates: imported,
       };
     } catch (error) {
-      throw new Error(error.message);
+      throw new Error((error as Error).message);
     }
   }
 
   // Export templates to file
-  exportTemplates(templateIds = null) {
+  exportTemplates(templateIds: string[] | null = null) {
     const templatesToExport = templateIds
       ? templateIds.map((id) => this.templates[id]).filter(Boolean)
       : Object.values(this.templates);
@@ -391,7 +421,7 @@ class MessageTemplateService {
   }
 
   // Validate payload against schema
-  validatePayload(templateId, payload) {
+  validatePayload(templateId: string, payload: string): SchemaResult {
     const template = this.templates[templateId];
     if (!template || !template.schema) {
       return { valid: true, errors: [] };
@@ -409,7 +439,7 @@ class MessageTemplateService {
   }
 
   // Standards-based JSON Schema validation for the dialect the schema declares.
-  validateAgainstSchema(data, schema) {
+  validateAgainstSchema(data: unknown, schema: unknown): SchemaResult {
     return validateJson(data, schema);
   }
 }
