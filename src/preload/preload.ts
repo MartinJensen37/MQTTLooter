@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     info: () => ipcRenderer.invoke('app-info'),
     openRepository: () => ipcRenderer.invoke('app-open-repository'),
+    setUpdateChannel: (channel: unknown) => ipcRenderer.invoke('app-update-channel', channel),
     /** Interface zoom from Settings > Text size. */
     setZoom: (factor: number) => {
       if (Number.isFinite(factor) && factor >= 0.5 && factor <= 2) webFrame.setZoomFactor(factor);

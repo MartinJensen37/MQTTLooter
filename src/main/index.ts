@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron';
 import { join } from 'path';
+import { autoUpdater } from 'electron-updater';
 import { MQTTConnectionManager } from './mqtt-connection-manager';
 import { RecordingService } from './recording-service';
 import { CredentialStore } from './credential-store';
@@ -12,6 +13,7 @@ import { MessageDelivery } from './message-delivery';
 import { DELIVERY_COALESCE, DELIVERY_LIMITS, type IncomingPublish } from '../shared/traffic';
 import { RECORDING_LIMITS, type RecordingPageQuery } from '../shared/recording';
 import { APP_INFO } from '../shared/app-info';
+import { Updates } from './updates';
 import { isSparkplugBirth, validateSparkplugPayload } from '../shared/sparkplug';
 
 let mainWindow: BrowserWindow | null = null;
@@ -138,6 +140,9 @@ function createWindow() {
     }
     mainWindow?.show();
     if (!app.isPackaged) mainWindow?.focus();
+    // A quiet check once the window has settled; it only speaks up when there is an update.
+    if (app.isPackaged && !startupCheck)
+      startupCheck = setTimeout(() => void updates.check(false), 10_000);
   });
 
   mainWindow.on('closed', () => {
@@ -382,6 +387,23 @@ handleIPC('app-open-repository', async () => {
   return { success: true };
 });
 
+// Help > Check for updates, against GitHub Releases. Settings chooses stable or beta releases.
+const updates = new Updates({
+  updater: autoUpdater,
+  packaged: app.isPackaged,
+  version: __APP_VERSION__,
+  window: () => mainWindow,
+  showMessage: (window, options) =>
+    window ? dialog.showMessageBox(window, options) : dialog.showMessageBox(options),
+  openReleases: () => void shell.openExternal(`${APP_INFO.repository}/releases`),
+});
+let startupCheck: ReturnType<typeof setTimeout> | undefined;
+handleIPC('app-update-channel', (_event, channel: unknown) => {
+  if (channel !== 'stable' && channel !== 'beta') throw new Error('Invalid update channel');
+  updates.setChannel(channel);
+  return { success: true };
+});
+
 handleIPC('mqtt-get-connections', async () => {
   try {
     return { success: true, data: mqttManager.getAllConnections() };
@@ -413,6 +435,12 @@ function createMenu() {
       {
         role: 'help',
         submenu: [
+          {
+            id: 'check-updates',
+            label: 'Check for Updates…',
+            click: () => void updates.check(true),
+          },
+          { type: 'separator' },
           {
             id: 'about',
             label: `About ${APP_INFO.name}`,

@@ -55,9 +55,6 @@
         }
       ],
       "icon": "assets/MQTTLooter_logo_small.ico",
-      "signtoolOptions": {
-        "publisherName": "martinjensen37"
-      },
       "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
@@ -73,12 +70,21 @@
       "runAfterFinish": true,
       "artifactName": "${productName}-Setup-${version}.${ext}",
       "differentialPackage": false
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "MartinJensen37",
+        "repo": "MQTTLooter",
+        "releaseType": "draft"
+      }
+    ]
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",
     "@fortawesome/fontawesome-free": "^6.7.2",
     "@tanstack/react-virtual": "^3.14.3",
+    "electron-updater": "^6.8.11",
     "mqtt": "^5.13.1",
     "protobufjs": "^8.8.1",
     "react": "^18.2.0",

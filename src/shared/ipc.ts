@@ -59,6 +59,8 @@ export interface ElectronAPI {
     info(): Promise<IpcResult<import('./app-info').AppVersions>>;
     /** Opens the project page in the default browser. */
     openRepository(): Promise<IpcResult>;
+    /** Which GitHub releases Help > Check for updates offers. */
+    setUpdateChannel(channel: 'stable' | 'beta'): Promise<IpcResult>;
   };
   history: {
     status(): Promise<IpcResult<import('./history').HistoryStatus>>;

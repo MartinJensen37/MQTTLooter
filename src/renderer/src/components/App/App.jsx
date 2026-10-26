@@ -10,6 +10,7 @@ import RecordingPanel from '../RecordingPanel/RecordingPanel';
 import SettingsDialog from './SettingsDialog';
 import AboutDialog from './AboutDialog';
 import { useAppearance } from '../../hooks/useAppearance';
+import { useSettings } from '../../services/Settings';
 import { useConnections } from '../../hooks/useConnections';
 import { useMessages } from '../../hooks/useMessages';
 import { useUIState } from '../../hooks/useUIState';
@@ -51,6 +52,11 @@ function App() {
   const [aboutOpen, setAboutOpen] = useState(false);
   useEffect(() => window.electronAPI?.app?.onOpenAbout?.(() => setAboutOpen(true)), []);
   useAppearance();
+  // Help > Check for updates offers stable releases, or betas too, as chosen in Settings.
+  const { updateChannel } = useSettings();
+  useEffect(() => {
+    void window.electronAPI?.app?.setUpdateChannel?.(updateChannel);
+  }, [updateChannel]);
   const mainPanelsRef = useRef(null);
   const [panelWidth, setPanelWidth] = useState(0);
   useEffect(() => {

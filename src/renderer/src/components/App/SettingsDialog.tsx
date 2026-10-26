@@ -186,6 +186,15 @@ export default function SettingsDialog({
                   ['12h', '12-hour'],
                 ]}
               />
+              <Choice
+                setting="updateChannel"
+                label="Updates"
+                info="Help > Check for updates offers new releases. Beta also offers pre-releases with features still being tested."
+                options={[
+                  ['stable', 'Stable releases'],
+                  ['beta', 'Stable and beta releases'],
+                ]}
+              />
             </Section>
             <Section id="appearance" title="Appearance">
               <Choice

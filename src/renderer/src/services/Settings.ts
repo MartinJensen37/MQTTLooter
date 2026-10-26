@@ -18,6 +18,8 @@ export interface Settings {
   sparkplug: boolean;
   /** Messages shown for the selected topic in Logging, newest first. */
   messagesShown: 300 | 1000 | 10000 | 'all';
+  /** Releases offered by Help > Check for updates; beta includes pre-releases. */
+  updateChannel: 'stable' | 'beta';
 }
 
 export const SETTING_CHOICES = {
@@ -31,6 +33,7 @@ export const SETTING_CHOICES = {
   protobufDecoders: [false, true],
   sparkplug: [false, true],
   messagesShown: [300, 1000, 10000, 'all'],
+  updateChannel: ['stable', 'beta'],
 } as const satisfies { [K in keyof Settings]: readonly Settings[K][] };
 
 const DEFAULTS: Settings = {
@@ -44,6 +47,7 @@ const DEFAULTS: Settings = {
   protobufDecoders: false,
   sparkplug: false,
   messagesShown: 'all',
+  updateChannel: 'stable',
 };
 const KEY = 'mqtt-settings';
 /** Saved by earlier versions as "Advanced settings". */
