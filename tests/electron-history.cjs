@@ -27,41 +27,30 @@ module.exports = async ({ evaluate, waitFor, field, send, captureSearch, saveTo 
     false,
   );
 
+  // Selecting a topic shows the live cache at once and loads the rest of disk history.
+  await field('[aria-label="Search topics"]', 'archive/series');
+  await waitFor(
+    () => evaluate('!!document.querySelector(\'.topic-tree-node[title="archive/series"]\')'),
+    'stored topic in tree',
+  );
+  await evaluate('document.querySelector(\'.topic-tree-node[title="archive/series"]\').click()');
   await field('[aria-label="Message order"]', 'desc');
-  await field('[aria-label="Message source"]', 'stored');
-  await field('[aria-label="Search stored topics"]', 'archive/series');
-  await waitFor(
-    () =>
-      evaluate(
-        "[...document.querySelector('[aria-label=\"Stored topic\"]').options].some(option=>option.value==='archive/series')",
-      ),
-    'stored topic catalog',
+  const heading = "document.querySelector('.message-panel h2')?.textContent";
+  await waitFor(async () => (await evaluate(heading))?.includes('Messages (650)'), 'all stored');
+  assert.ok(
+    (await evaluate("document.querySelector('.message-item').textContent")).includes('649'),
   );
-  await field('[aria-label="Stored topic"]', 'archive/series');
-  await waitFor(
-    () => evaluate("document.querySelector('.message-item')?.textContent.includes('649')"),
-    'stored page UI',
-  );
-  await evaluate(
-    "[...document.querySelectorAll('.message-history-toolbar button')].find(button=>button.textContent==='Older page').click()",
-  );
-  await waitFor(
-    () => evaluate("document.querySelector('.message-item')?.textContent.includes('349')"),
-    'older page UI',
-  );
-  assert.equal(await evaluate("document.querySelectorAll('.message-item').length"), 300);
-  await evaluate(
-    "[...document.querySelectorAll('.message-history-toolbar button')].find(button=>button.textContent==='Newer page').click()",
-  );
-  await waitFor(
-    () => evaluate("document.querySelector('.message-item')?.textContent.includes('649')"),
-    'newer page UI',
-  );
-  // Export every stored message, not just the displayed page, through main's streamed export.
+  // Cards render in steps as the list scrolls.
+  assert.equal(await evaluate("document.querySelectorAll('.message-item').length"), 200);
+  await field('[aria-label="Messages shown"]', '300');
+  await waitFor(async () => (await evaluate(heading))?.includes('Messages (300)'), 'newest 300');
+  await field('[aria-label="Messages shown"]', 'all');
+  await waitFor(async () => (await evaluate(heading))?.includes('Messages (650)'), 'all again');
+  // Export every stored message through main's streamed export.
   const exportFile = saveTo('archive-export.json');
   await evaluate(`document.querySelector('[title="Export topic data"]').click()`);
   await evaluate(
-    "[...document.querySelectorAll('.message-export-wrapper .dropdown-option')].find(button => button.textContent.includes('Export all stored as JSON')).click()",
+    "[...document.querySelectorAll('.message-export-wrapper .dropdown-option')].find(button => button.textContent.includes('Full disk history as JSON')).click()",
   );
   await waitFor(() => fs.existsSync(exportFile), 'whole-topic export file');
   const exported = JSON.parse(fs.readFileSync(exportFile, 'utf8'));
@@ -70,48 +59,23 @@ module.exports = async ({ evaluate, waitFor, field, send, captureSearch, saveTo 
   assert.deepEqual([exported.messages[0].payload, exported.messages.at(-1).payload], ['0', '649']);
 
   const status = await evaluate('window.electronAPI.history.status()');
-  await evaluate(
-    "[...document.querySelectorAll('.message-history-toolbar button')].find(button=>button.textContent==='Search message contents').click()",
-  );
+  // Content search covers the topic's whole stored history.
   await field('[aria-label="Search message contents"]', '123');
-  // A custom range starts as the last hour.
-  await field('[aria-label="Content search time range"]', 'custom');
-  await evaluate("document.querySelector('.history-search form').requestSubmit()");
-  await waitFor(
-    () =>
-      evaluate(
-        "document.querySelector('.history-search .message-item')?.textContent.includes('123')",
-      ),
-    'content match outside loaded page',
-  );
-  assert.equal(
-    await evaluate("document.querySelectorAll('.history-search .message-item').length"),
-    1,
+  await waitFor(async () => (await evaluate(heading))?.includes('Matches (1)'), 'content match');
+  assert.ok(
+    (await evaluate("document.querySelector('.message-item').textContent")).includes('123'),
   );
   await captureSearch?.();
-  // Every match of the search, not just the displayed page, streamed from main.
+  // Every match, streamed from main.
   const searchExport = saveTo('search-export.csv');
-  await evaluate(`document.querySelector('.history-search [title="Export topic data"]').click()`);
+  await evaluate(`document.querySelector('[title="Export topic data"]').click()`);
   await evaluate(
-    "[...document.querySelectorAll('.history-search .dropdown-option')].find(button => button.textContent.includes('Export all matches as CSV')).click()",
+    "[...document.querySelectorAll('.message-export-wrapper .dropdown-option')].find(button => button.textContent.includes('All matches as CSV')).click()",
   );
   await waitFor(() => fs.existsSync(searchExport), 'search export file');
   const rows = fs.readFileSync(searchExport, 'utf8').split('\n');
   assert.equal(rows.length, 2);
   assert.ok(rows[1].includes('"123"'), rows[1]);
-  // A past range is reached through the time index without scanning newer records.
-  const local = (ms) =>
-    new Date(ms - new Date(ms).getTimezoneOffset() * 60000).toISOString().slice(0, 19);
-  await field('[aria-label="Search from"]', local(Date.now() - 7200000));
-  await field('[aria-label="Search to"]', local(Date.now() - 3600000));
-  await evaluate("document.querySelector('.history-search form').requestSubmit()");
-  await waitFor(
-    () =>
-      evaluate(
-        "document.querySelector('.history-search [role=status]')?.textContent.includes('Reached the end of this retained snapshot. 0 records scanned; 0 matches.')",
-      ),
-    'empty past range',
-  );
   assert.equal(
     (
       await evaluate(
@@ -120,9 +84,7 @@ module.exports = async ({ evaluate, waitFor, field, send, captureSearch, saveTo 
     ).success,
     false,
   );
-  await evaluate(
-    "[...document.querySelectorAll('.message-history-toolbar button')].find(button=>button.textContent==='Close content search').click()",
-  );
+  await field('[aria-label="Search message contents"]', '');
   assert.equal(status.success, true);
   assert.equal(status.data.error, undefined);
   assert.equal(status.data.delivery.connections.smoke.dropped, 0);
@@ -144,7 +106,6 @@ module.exports = async ({ evaluate, waitFor, field, send, captureSearch, saveTo 
     ).success,
     false,
   );
-  await field('[aria-label="Message source"]', 'live');
   send('archive/json', '{"count":9007199254740993,"values":[1,2]}');
   await field('[aria-label="Search topics"]', 'archive/json');
   await waitFor(

@@ -36,9 +36,9 @@ MQTT 3.1.1 and 5 over TCP, TLS and WebSockets, with client certificates, last wi
 
 ### Logging
 
-The topic tree keeps topics in a stable order, shows message counts, rates, retained flags and the latest payload, and can be searched. Selecting a topic shows its messages as cards (JSON is indented automatically, binary payloads as hex) or as a plain log. **Source > Disk history** pages through everything stored for the topic, and content search finds text, hex bytes or decoded values across a topic or a topic filter. Messages and search results export to JSON or CSV.
+The topic tree keeps topics in a stable order, shows message counts, rates, retained flags and the latest payload, and can be searched. Selecting a topic shows its messages as cards (JSON is indented automatically, binary payloads as hex) or as a plain log. The newest messages appear at once and the rest of the topic's disk history loads in the background. **Show** keeps the newest 300, 1,000 or 10,000 messages, or all of them (up to 100,000); new messages are added at the top and the oldest drop off. The search field finds text, hex bytes or decoded values anywhere in the topic's stored history. Messages and search results export to JSON or CSV.
 
-Each topic keeps 300 messages in memory by default (100 to 2,000 in Settings). All messages are also written to a disk history for the session, kept for up to 24 hours; turn on **Keep disk history after closing the app** to retain it.
+Every topic keeps its newest 300 messages in memory (100 to 2,000 in Settings), so they show without waiting. All messages are also written to a disk history for the session, kept for up to 24 hours; turn on **Keep disk history after closing the app** to retain it.
 
 ### Plotting
 

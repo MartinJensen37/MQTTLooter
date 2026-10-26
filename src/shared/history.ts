@@ -83,7 +83,6 @@ export type HistoryRequest =
   | { action: 'page'; query: HistoryQuery }
   | { action: 'search'; query: import('./history-search').HistorySearchQuery }
   | { action: 'series'; query: import('./numeric-series').NumericQuery }
-  | { action: 'topics'; connectionId: string; search: string }
   | { action: 'export-chunk'; query: HistoryExportQuery }
   | { action: 'clear'; connectionId: string; topic?: string }
   | { action: 'status' }

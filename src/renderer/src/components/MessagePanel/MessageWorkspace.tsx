@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import MessagePanel from './MessagePanel';
 import IncomingPlot from './IncomingPlot';
-import HistorySearch from './HistorySearch';
 import DecoderSettings from './DecoderSettings';
-import { useDecoders } from '../../services/DecoderRegistry';
-import { useSettings } from '../../services/Settings';
-import type { HistoryPage, HistoryQuery, HistoryStatus } from '../../../../shared/history';
+import { useDecoders, useTopicDecoders } from '../../services/DecoderRegistry';
+import { settings as settingsStore, useSettings } from '../../services/Settings';
+import type { HistoryStatus } from '../../../../shared/history';
+import { matchDecoder } from '../../../../shared/decoders';
 import TopicTreeService from '../../services/TopicTreeService';
+import { useTopicMessages } from '../../hooks/useTopicMessages';
+import { useTopicSearch, type SearchMode } from '../../hooks/useTopicSearch';
 import { clockTime } from '../../utils/time';
 import './MessageWorkspace.css';
 
@@ -15,30 +17,42 @@ export default function MessageWorkspace(props: any) {
 }
 
 function Workspace(props: any) {
-  const [stored, setStored] = useState(false);
   const [plotOpen, setPlotOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [status, setStatus] = useState<HistoryStatus>();
-  const [page, setPage] = useState<HistoryPage>();
-  const [cursors, setCursors] = useState<Partial<HistoryQuery>[]>([{}]);
   const [refresh, setRefresh] = useState(0);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [topicOverride, setTopicOverride] = useState<string>();
-  const [search, setSearch] = useState('');
-  const [topics, setTopics] = useState<{ path: string }[]>([]);
+  const [term, setTerm] = useState('');
+  const [mode, setMode] = useState<SearchMode>('text');
   const [decodersOpen, setDecodersOpen] = useState(false);
   const { decoders } = useDecoders();
+  const topicDecoders = useTopicDecoders();
   const settings = useSettings();
-  const selectedPath = props.selectedTopic?.topicPath;
-  const topic = topicOverride ?? selectedPath;
+  const topic: string | undefined = props.selectedTopic?.topicPath;
   const connectionId = props.connectionId;
+  const active = props.active !== false;
+  const decodable = topic !== undefined && Boolean(matchDecoder(topicDecoders, topic));
+
+  const view = useTopicMessages(
+    connectionId,
+    topic,
+    props.messages,
+    settings.messagesShown,
+    active && !plotOpen,
+  );
+  const searchMode = mode === 'decoded' && !decodable ? 'text' : mode;
+  const search = useTopicSearch(
+    connectionId,
+    topic,
+    plotOpen ? '' : term,
+    searchMode,
+    settings.messagesShown,
+    active,
+  );
+  const searching = Boolean(term) && !plotOpen;
 
   useEffect(() => {
-    setTopicOverride(undefined);
-    setCursors([{}]);
-    setPage(undefined);
-  }, [selectedPath]);
+    setError('');
+  }, [topic]);
   useEffect(() => {
     if (!connectionId) return;
     let disposed = false;
@@ -60,75 +74,25 @@ function Workspace(props: any) {
     };
   }, [connectionId, refresh]);
 
-  useEffect(() => {
-    if (!stored || searchOpen || !connectionId || topic === undefined) return;
-    let disposed = false;
-    setBusy(true);
-    setError('');
-    void window.electronAPI.history
-      .page({ connectionId, topic, ...cursors.at(-1) })
-      .then((result) => {
-        if (disposed) return;
-        if (!result.success) {
-          setError(result.error ?? 'History query failed');
-          setPage(undefined);
-        } else setPage(result.data);
-      })
-      .catch((error) => {
-        if (!disposed) setError(error.message);
-      })
-      .finally(() => {
-        if (!disposed) setBusy(false);
-      });
-    return () => {
-      disposed = true;
-    };
-  }, [stored, searchOpen, connectionId, topic, cursors, refresh]);
-
-  useEffect(() => {
-    if (!stored || searchOpen || !connectionId) return;
-    let disposed = false;
-    const timer = setTimeout(() => {
-      void window.electronAPI.history
-        .topics(connectionId, search)
-        .then((result) => {
-          if (!disposed) setTopics(result.success ? (result.data ?? []) : []);
-        })
-        .catch(() => {
-          if (!disposed) setTopics([]);
-        });
-    }, 150);
-    return () => {
-      disposed = true;
-      clearTimeout(timer);
-    };
-  }, [stored, searchOpen, connectionId, search, refresh]);
-
-  const latest = () => {
-    setPage(undefined);
-    setCursors([{}]);
-    setRefresh((value) => value + 1);
-  };
-  const exportStored = async (format: 'json' | 'csv') => {
+  const exportAll = async (format: 'json' | 'csv') => {
     if (!connectionId || topic === undefined) return;
     try {
-      const result = await window.electronAPI.history.export(
-        connectionId,
-        topic,
-        format,
-        props.connectionName ?? 'Unknown',
-      );
+      const name = props.connectionName ?? 'Unknown';
+      const result =
+        searching && search.query
+          ? await window.electronAPI.history.exportSearch(search.query, format, name)
+          : await window.electronAPI.history.export(connectionId, topic, format, name);
       if (!result.success) throw new Error(result.error ?? 'Export failed');
       if (result.data?.saved)
         props.showFeedback?.(
-          `Exported ${result.data.count?.toLocaleString()} stored messages to ${result.data.path}`,
+          `Exported ${result.data.count?.toLocaleString()} messages to ${result.data.path}`,
           'success',
         );
     } catch (reason) {
       setError((reason as Error).message);
     }
   };
-  const clearStored = async () => {
+  const clear = async () => {
     if (!connectionId || topic === undefined) return;
     const result = await window.electronAPI.history.clear(connectionId, topic);
     if (!result.success) {
@@ -136,9 +100,9 @@ function Workspace(props: any) {
       return;
     }
     TopicTreeService.clearTopicMessages(connectionId, topic);
-    setSearchOpen(false);
-    latest();
-    props.showFeedback?.('Stored and cached messages cleared for this topic.', 'success');
+    view.reset();
+    setTerm('');
+    props.showFeedback?.('Messages cleared for this topic.', 'success');
   };
   // Durable gap records cover earlier runs; this run's drops may not be written yet.
   const gap = status?.store?.gaps?.[connectionId];
@@ -147,84 +111,23 @@ function Workspace(props: any) {
     status?.delivery.connections[connectionId]?.dropped ?? 0,
   );
   const lastGap = gap?.last;
-  const archiveMessages =
-    page?.messages.map((message) => ({
-      ...message,
-      id: `${message.sessionId}:${message.sequence}`,
-      connectionId: message.id,
-    })) ?? [];
+
+  const shown = searching ? search.matches : view.messages;
+  const progress = searching
+    ? [
+        `${search.scanned.toLocaleString()} stored messages searched`,
+        search.searching && 'searching…',
+        search.skipped > 0 &&
+          `${search.skipped.toLocaleString()} skipped (${searchMode === 'decoded' ? 'no matching decoder' : searchMode === 'text' ? 'binary or very large' : 'very large'})`,
+      ]
+    : [
+        view.loading && 'loading older messages…',
+        view.capped && 'older messages are in disk history; export to get them all',
+      ];
 
   return (
     <div className="message-workspace">
       {decodersOpen && <DecoderSettings onClose={() => setDecodersOpen(false)} />}
-      <div className="message-history-toolbar">
-        {stored && (
-          <button
-            className="btn btn-sm btn-secondary"
-            aria-expanded={searchOpen}
-            disabled={topic === undefined}
-            onClick={() => {
-              setSearchOpen((value) => !value);
-              setPlotOpen(false);
-              setBusy(false);
-            }}
-          >
-            {searchOpen ? 'Close content search' : 'Search message contents'}
-          </button>
-        )}
-        <label>
-          Source{' '}
-          <select
-            className="form-select custom-select-button"
-            aria-label="Message source"
-            value={stored ? 'stored' : 'live'}
-            onChange={(event) => {
-              setStored(event.target.value === 'stored');
-              setSearchOpen(false);
-              latest();
-            }}
-          >
-            <option value="live">Live cache</option>
-            <option value="stored">Disk history</option>
-          </select>
-        </label>
-        {(settings.protobufDecoders || decoders.length > 0) && (
-          <button className="btn btn-sm btn-secondary" onClick={() => setDecodersOpen(true)}>
-            Decoders{decoders.length ? ` (${decoders.length})` : ''}
-          </button>
-        )}
-        {stored && !searchOpen && !plotOpen && (
-          <>
-            <button className="btn btn-sm btn-secondary" onClick={latest} disabled={busy}>
-              Latest stored page
-            </button>
-            <button
-              className="btn btn-sm btn-secondary"
-              disabled={busy || cursors.length <= 1}
-              onClick={() => setCursors((previous) => previous.slice(0, -1))}
-            >
-              Newer page
-            </button>
-            <button
-              className="btn btn-sm btn-secondary"
-              disabled={busy || page?.nextBefore == null || cursors.length >= 1000}
-              onClick={() =>
-                setCursors((previous) => [
-                  ...previous,
-                  {
-                    before: page!.nextBefore!,
-                    snapshot: page!.snapshot,
-                    generation: page!.generation,
-                  },
-                ])
-              }
-            >
-              Older page
-            </button>
-            <span>{busy ? 'Loading...' : `Page ${cursors.length}`}</span>
-          </>
-        )}
-      </div>
       {status?.error && (
         <p role="alert" className="message-storage-notice">
           Disk capture stopped: {status.error}{' '}
@@ -246,85 +149,44 @@ function Workspace(props: any) {
           {lastGap ? ` (latest ${clockTime(lastGap)})` : ''}.
         </p>
       )}
-      {stored && !searchOpen && (
-        <div className="message-history-catalog">
-          <input
-            type="search"
-            className="form-input search-input"
-            aria-label="Search stored topics"
-            placeholder="Search stored topics"
-            title="Case-sensitive"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          <select
-            className="form-select custom-select-button"
-            aria-label="Stored topic"
-            value={topic ?? ''}
-            onChange={(event) => {
-              setTopicOverride(event.target.value);
-              latest();
-            }}
-          >
-            {topic === undefined && (
-              <option value="" disabled>
-                Select a stored topic
-              </option>
-            )}
-            {topic !== undefined && !topics.some((item) => item.path === topic) && (
-              <option value={topic}>{topic}</option>
-            )}
-            {topics.map((item) => (
-              <option key={item.path} value={item.path}>
-                {item.path}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-      {error && (
-        <p role="alert" className="message-storage-notice">
-          {error}
-        </p>
-      )}
-      {stored && searchOpen && connectionId && topic !== undefined ? (
-        <HistorySearch
-          key={`${connectionId}:${topic}`}
-          connectionId={connectionId}
-          topic={topic}
-          active={props.active}
-          connectionName={props.connectionName}
-          showFeedback={props.showFeedback}
-          onClearMessages={clearStored}
-        />
-      ) : (
-        <MessagePanel
-          {...props}
-          onPlotChange={setPlotOpen}
-          plotContent={
-            plotOpen && connectionId && (stored ? topic : selectedPath) !== undefined ? (
-              <IncomingPlot
-                active={props.active}
-                key={`${connectionId}:${stored ? topic : selectedPath}`}
-                connectionId={connectionId}
-                topic={stored ? topic : selectedPath}
-                connected={props.isConnected !== false}
-              />
-            ) : null
-          }
-          storedPage={stored}
-          messages={stored ? archiveMessages : props.messages}
-          selectedTopic={
-            stored
-              ? topic === undefined
-                ? null
-                : { topicPath: topic, connectionId }
-              : props.selectedTopic
-          }
-          onClearMessages={stored ? clearStored : props.onClearMessages}
-          onExportAll={stored ? exportStored : undefined}
-        />
-      )}
+      <MessagePanel
+        {...props}
+        onPlotChange={setPlotOpen}
+        plotContent={
+          plotOpen && connectionId && topic !== undefined ? (
+            <IncomingPlot
+              active={props.active}
+              key={`${connectionId}:${topic}`}
+              connectionId={connectionId}
+              topic={topic}
+              connected={props.isConnected !== false}
+            />
+          ) : null
+        }
+        messages={shown}
+        searching={searching}
+        shownLimit={settings.messagesShown}
+        onShownLimitChange={(messagesShown: typeof settings.messagesShown) =>
+          settingsStore.set({ messagesShown })
+        }
+        search={{
+          term,
+          mode: searchMode,
+          decodable,
+          onTermChange: setTerm,
+          onModeChange: setMode,
+        }}
+        progress={progress.filter(Boolean).join(' · ')}
+        error={error || (searching ? search.error : view.error)}
+        onDecoders={
+          settings.protobufDecoders || decoders.length > 0
+            ? { count: decoders.length, open: () => setDecodersOpen(true) }
+            : undefined
+        }
+        onClearMessages={clear}
+        onExportAll={exportAll}
+        exportAllLabel={searching ? 'All matches as' : 'Full disk history as'}
+      />
     </div>
   );
 }

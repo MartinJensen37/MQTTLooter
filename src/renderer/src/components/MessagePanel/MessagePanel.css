@@ -301,11 +301,59 @@
 }
 .message-filters {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--gray-300);
+  flex-shrink: 0;
+}
+
+.message-filter-row {
+  display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--gray-300);
+  gap: 8px 16px;
+}
+
+.message-filter-row .message-decoders-btn {
+  margin-left: auto;
+}
+
+.message-search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.message-search-row .search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.message-search-row .form-select {
+  width: auto;
+}
+
+.message-filter-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.message-filter-status[role='alert'] {
+  color: var(--danger-text);
+}
+
+.message-list-more {
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.message-copy-btn {
+  border-radius: 50%;
+  min-width: 24px;
+  height: 24px;
 }
 
 .message-filters label {

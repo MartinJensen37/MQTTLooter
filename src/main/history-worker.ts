@@ -103,9 +103,6 @@ parentPort!.on(
         case 'search':
           data = database.search(request.query, Date.now(), decodeText);
           break;
-        case 'topics':
-          data = database.topics(request.connectionId, request.search);
-          break;
         case 'export-chunk':
           data = database.exportChunk(request.query);
           break;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { validTopicFilter } from '../../../../shared/history-search';
+import { validTopicFilter } from '../../../../shared/topic-filter';
 import { DECODER_LIMITS } from '../../../../shared/decoders';
 import { decoderRegistry, useDecoders } from '../../services/DecoderRegistry';
 import './DecoderSettings.css';

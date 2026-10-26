@@ -1,7 +1,6 @@
 import { NumericSampler, type NumericQuery } from '../shared/numeric-series';
 import {
   SEARCH_LIMITS,
-  topicMatches,
   validateSearch,
   type HistorySearchQuery,
   type HistorySearchPage,
@@ -296,17 +295,13 @@ export class HistoryDatabase {
       skippedLarge: 0,
       skippedBinary: 0,
     };
-    // A topic filter scans the connection's messages in the same bounded chunks; rows from
-    // non-matching topics count toward the chunk, so sparse filters cannot scan unboundedly.
-    // It must walk the time index: planned through the topics, SQLite sorts the whole range.
-    const filter = query.scope === 'filter' ? query.filter! : null;
     const rows = this.db
       .prepare(
         `SELECT m.id, m.timestamp, m.storage_bytes, t.path,
       CASE WHEN length(m.payload)<=? AND m.storage_bytes<=? THEN m.payload ELSE NULL END payload
-      FROM messages m ${filter === null ? '' : 'INDEXED BY message_time'}
+      FROM messages m
       JOIN topics t ON t.id=m.topic_id
-      WHERE t.connection_id=? ${filter === null ? 'AND t.path=?' : ''}
+      WHERE t.connection_id=? AND t.path=?
       AND m.timestamp>=? AND (m.timestamp, m.id)<(?, ?) AND m.id<=?
       ORDER BY m.timestamp DESC, m.id DESC LIMIT ?`,
       )
@@ -314,7 +309,7 @@ export class HistoryDatabase {
         SEARCH_LIMITS.payloadBytes,
         SEARCH_LIMITS.resultBytes,
         query.connectionId,
-        ...(filter === null ? [query.topic] : []),
+        query.topic,
         Math.max(query.from, now - this.limits.maxAgeMs),
         query.beforeTime ?? query.to,
         query.before ?? Number.MAX_SAFE_INTEGER,
@@ -347,10 +342,9 @@ export class HistoryDatabase {
         resume();
         break;
       }
-      const inScope = filter === null || topicMatches(filter, String(row.path));
       let matches = false;
       let binary = false;
-      if (inScope && payload) {
+      if (payload) {
         if (needle)
           matches = Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength).includes(
             needle,
@@ -375,7 +369,7 @@ export class HistoryDatabase {
       scannedBytes += payload?.byteLength ?? 0;
       lastRow = Number(row.id);
       lastTime = Number(row.timestamp);
-      if (inScope && payload === null) result.skippedLarge++;
+      if (payload === null) result.skippedLarge++;
       if (binary) result.skippedBinary++;
       if (!matches) continue;
       resultBytes += Number(row.storage_bytes);
@@ -424,14 +418,6 @@ export class HistoryDatabase {
       cursor,
       snapshot,
     };
-  }
-
-  topics(connectionId: string, search: string): { path: string }[] {
-    return this.db
-      .prepare(
-        `SELECT path FROM topics WHERE connection_id=? AND instr(path,?)>0 ORDER BY path LIMIT 50`,
-      )
-      .all(connectionId, search) as { path: string }[];
   }
 
   /**

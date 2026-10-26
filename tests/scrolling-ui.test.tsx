@@ -59,6 +59,7 @@ const message = (id: number) => ({
   id: String(id),
   timestamp: id,
   topic: 'sensor',
+  encoding: 'utf8' as const,
   message: `Message ${id}`,
   qos: 0,
   retain: id % 2 === 0,

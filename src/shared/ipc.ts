@@ -71,7 +71,6 @@ export interface ElectronAPI {
     page(
       query: import('./history').HistoryQuery,
     ): Promise<IpcResult<import('./history').HistoryPage>>;
-    topics(connectionId: string, search: string): Promise<IpcResult<{ path: string }[]>>;
     clear(connectionId: string, topic?: string): Promise<IpcResult>;
     persist(enabled: boolean): Promise<IpcResult>;
     resume(): Promise<IpcResult>;

@@ -7,6 +7,8 @@ const RATE_BUCKET_MS = 100;
 
 /** Message handed to a node when a publish arrives. */
 export interface IncomingMessage {
+  /** `sessionId:sequence` from the main process, shared with disk history. */
+  key?: string;
   protocolVersion?: number;
   properties?: Record<string, unknown>;
   encoding?: PayloadEncoding;
@@ -19,6 +21,7 @@ export interface IncomingMessage {
 
 /** Message as stored in a node's ring buffer (`length` drives the byte budget). */
 export interface StoredMessage {
+  key?: string;
   protocolVersion?: number;
   properties?: Record<string, unknown>;
   encoding: PayloadEncoding;
@@ -106,6 +109,7 @@ class TopicNode {
     const beforeCount = this.messageHistory.count;
     const accepted = this.messageHistory.add({
       id,
+      key: message.key,
       encoding: message.encoding ?? 'utf8',
       protocolVersion: message.protocolVersion,
       properties,

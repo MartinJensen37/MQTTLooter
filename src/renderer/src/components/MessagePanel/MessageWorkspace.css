@@ -10,33 +10,6 @@
   flex: 1;
   min-height: 0;
 }
-.message-history-toolbar,
-.message-history-catalog {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-color);
-}
-.message-history-toolbar label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.message-history-toolbar,
-.message-history-catalog {
-  font-size: 12px;
-}
-.message-history-toolbar .form-select {
-  width: auto;
-}
-.message-history-catalog > input,
-.message-history-catalog > select {
-  flex: 1;
-  min-width: 160px;
-  max-width: 100%;
-}
 .message-storage-notice {
   margin: 0;
   padding: 8px 12px;

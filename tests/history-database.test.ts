@@ -96,7 +96,7 @@ it('clears only the requested topic/connection and invalidates old cursors', () 
     database.page({ connectionId: 'broker', topic: 'a//b', generation: first.generation }, now),
   ).toThrow('cleared');
   expect(database.status().retainedMessages).toBe(2);
-  expect(database.topics('broker', 'a/')).toEqual([{ path: 'a/b' }]);
+  expect(database.page({ connectionId: 'broker', topic: 'a/b' }, now).messages).toHaveLength(1);
   database.clear('broker');
   expect(database.status().retainedMessages).toBe(1);
   expect(database.page({ connectionId: 'other', topic: 'a//b' }, now).messages).toHaveLength(1);
@@ -242,7 +242,7 @@ it('hides cleared topics at once and purges their messages in bounded steps', ()
   // The first bounded step ran inside clear; the rest stays hidden until purged.
   expect(database.status().retainedMessages).toBe(7001);
   expect(database.page({ connectionId: 'broker', topic: 'a//b' }, now).messages).toEqual([]);
-  expect(database.topics('broker', '')).toEqual([{ path: 'keep' }]);
+  expect(database.page({ connectionId: 'broker', topic: 'keep' }, now).messages).toHaveLength(1);
   database.append([message(20_001)], now);
   expect(
     database.page({ connectionId: 'broker', topic: 'a//b' }, now).messages.map((m) => m.sequence),

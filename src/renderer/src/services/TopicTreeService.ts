@@ -80,6 +80,10 @@ export class TopicTreeService {
 
     const limitVersion = topicTree.limitVersion;
     topicTree.addMessage(topic, message, qos, retain, timestamp, encoding, {
+      key:
+        messageData.sessionId === undefined
+          ? undefined
+          : `${messageData.sessionId}:${messageData.sequence}`,
       protocolVersion: messageData.protocolVersion,
       properties: messageData.properties,
     });
@@ -326,7 +330,7 @@ export class TopicTreeService {
       .toArray()
       .reverse()
       .map((m) => ({
-        id: `${connectionId}:${topicPath}:${m.id}`,
+        id: m.key ?? `${connectionId}:${topicPath}:${m.id}`,
         connectionId,
         topic: m.topic || topicPath,
         message: m.payload || '',

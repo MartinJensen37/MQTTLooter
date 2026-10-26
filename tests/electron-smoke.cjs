@@ -314,24 +314,15 @@ async function run() {
   assert.ok(exports[1].includes('Payload,Encoding,QoS'));
   assert.ok(exports[1].includes(`"${binaryPayload.toString('base64')}",base64,0,true`));
 
-  await evaluate(
-    `(() => { const select=document.querySelector('[aria-label="Message source"]'); select.value='stored'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`,
-  );
-  await waitFor(
-    () => evaluate("document.querySelector('.message-item .message-properties') !== null"),
-    'stored property card',
-  );
-  await evaluate("document.querySelector('.message-properties input').click()");
-  await waitFor(
-    () =>
-      evaluate(
-        "document.querySelector('.message-correlation pre')?.textContent === '00 ff 80 0d 0a'",
-      ),
-    'stored correlation bytes',
-  );
-  await evaluate(
-    `(() => { const select=document.querySelector('[aria-label="Message source"]'); select.value='live'; select.dispatchEvent(new Event('change', {bubbles:true})); })()`,
-  );
+  // Disk history keeps the same MQTT 5 properties, including binary correlation data.
+  await waitFor(async () => {
+    const page = await evaluate(
+      "window.electronAPI.history.page({connectionId:'smoke',topic:'binary'})",
+    );
+    return (
+      page.data?.messages[0]?.properties?.correlationData?.data === binaryPayload.toString('base64')
+    );
+  }, 'stored correlation bytes');
   await evaluate(
     "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }))",
   );
@@ -843,7 +834,7 @@ async function run() {
       window.setSize(800, 600);
       await new Promise((resolve) => setTimeout(resolve, 250));
       const layout = await evaluate(
-        "(() => { const panel=document.querySelector('.history-search').getBoundingClientRect(); const list=document.querySelector('.history-search .message-list').getBoundingClientRect(); return {width:panel.width,right:panel.right,height:list.height}; })()",
+        "(() => { const panel=document.querySelector('.message-panel').getBoundingClientRect(); const list=document.querySelector('.message-panel .message-list').getBoundingClientRect(); return {width:panel.width,right:panel.right,height:list.height}; })()",
       );
       assert.ok(
         layout.width >= 350 && layout.right <= 801 && layout.height >= 50,

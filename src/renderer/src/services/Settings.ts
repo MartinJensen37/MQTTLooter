@@ -16,6 +16,8 @@ export interface Settings {
   protobufDecoders: boolean;
   /** Sparkplug B decoding and tools for spBv1.0 topics. */
   sparkplug: boolean;
+  /** Messages shown for the selected topic in Logging, newest first. */
+  messagesShown: 300 | 1000 | 10000 | 'all';
 }
 
 export const SETTING_CHOICES = {
@@ -28,6 +30,7 @@ export const SETTING_CHOICES = {
   payloadEncoding: [false, true],
   protobufDecoders: [false, true],
   sparkplug: [false, true],
+  messagesShown: [300, 1000, 10000, 'all'],
 } as const satisfies { [K in keyof Settings]: readonly Settings[K][] };
 
 const DEFAULTS: Settings = {
@@ -40,6 +43,7 @@ const DEFAULTS: Settings = {
   payloadEncoding: false,
   protobufDecoders: false,
   sparkplug: false,
+  messagesShown: 'all',
 };
 const KEY = 'mqtt-settings';
 /** Saved by earlier versions as "Advanced settings". */

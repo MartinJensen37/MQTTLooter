@@ -227,13 +227,11 @@ it('searches decoded protobuf text and counts payloads that do not decode', asyn
         return undefined;
       }
     };
-    const search = (term: string) =>
+    const search = (topic: string, term: string) =>
       database.search(
         {
           connectionId: 'broker',
-          topic: '',
-          scope: 'filter',
-          filter: '#',
+          topic,
           mode: 'decoded',
           term,
           from: now - 1000,
@@ -243,11 +241,16 @@ it('searches decoded protobuf text and counts payloads that do not decode', asyn
         decode,
       );
     // The exact 64-bit value exists only in the decoded text, not in the bytes.
-    const exact = search('"9007199254740993"');
+    const exact = search('plant/1/reading', '"9007199254740993"');
     expect(exact.messages.map((message) => message.topic)).toEqual(['plant/1/reading']);
+    expect(exact.skippedBinary).toBe(0);
     // Undecodable payloads and topics without a decoder are counted, not matched.
-    expect(exact.skippedBinary).toBe(2);
-    expect(search('pump-2').messages.map((message) => message.topic)).toEqual(['plant/2/reading']);
+    for (const topic of ['plant/3/reading', 'other/topic']) {
+      const skipped = search(topic, 'pump');
+      expect(skipped.messages).toEqual([]);
+      expect(skipped.skippedBinary).toBe(1);
+    }
+    expect(search('plant/2/reading', 'pump-2').messages).toHaveLength(1);
   } finally {
     database.close();
     rmSync(directory, { recursive: true, force: true });

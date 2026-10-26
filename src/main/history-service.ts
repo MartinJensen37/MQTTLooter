@@ -207,13 +207,13 @@ export class HistoryService {
       this.request({ action: 'search', query: cursor });
     let scanned = 0;
     let skipped = 0;
-    const { topic, term, mode, from, to, scope, filter } = query;
+    const { topic, term, mode, from, to } = query;
     const count = await this.writeExport(
       path,
       format,
       {
         connectionName,
-        search: { topic: scope === 'filter' ? filter : topic, term, mode, from, to },
+        search: { topic, term, mode, from, to },
       },
       (async function* () {
         let cursor: HistorySearchQuery = {

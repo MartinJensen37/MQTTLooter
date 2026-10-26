@@ -104,7 +104,7 @@ class TopicTree {
     retain = false,
     timestamp = Date.now(),
     encoding: PayloadEncoding = 'utf8',
-    metadata: Pick<IncomingMessage, 'protocolVersion' | 'properties'> = {},
+    metadata: Pick<IncomingMessage, 'key' | 'protocolVersion' | 'properties'> = {},
   ) {
     this.messageCount++;
     const leafNode = this.getOrCreateNode(topic);

@@ -60,13 +60,14 @@ module.exports = async function checkNavigation({ evaluate, waitFor, field, send
     'stable topic selection',
   );
 
-  // Exercise variable-height rows and the 300-message rolling history in the actual browser.
+  // Exercise variable-height rows in the actual browser. All 301 messages are kept; cards
+  // render in steps of 200 as the list scrolls.
+  const heading = (count) =>
+    evaluate(`document.querySelector('.message-panel h2').textContent.includes('(${count})')`);
   for (let i = 0; i < 300; i++)
     send(anchor.key, i % 2 ? `sample-${i}` : `sample-${i}: ${'long text '.repeat(12)}`);
-  await waitFor(
-    () => evaluate("document.querySelectorAll('.message-item').length === 300"),
-    'full message history',
-  );
+  await waitFor(() => heading(301), 'full message history');
+  assert.equal(await evaluate("document.querySelectorAll('.message-item').length"), 200);
   await settle();
   assert.equal(await evaluate("document.querySelector('.message-list').scrollTop"), 0);
   await evaluate("document.querySelector('.message-list').scrollTop = 1300");
@@ -120,25 +121,14 @@ module.exports = async function checkNavigation({ evaluate, waitFor, field, send
   await settle();
   const ascending = await capture();
   for (let i = 0; i < 5; i++) send(anchor.key, `ascending-new-${i}`);
-  await waitFor(
-    () =>
-      evaluate(
-        "[...document.querySelectorAll('.message-item')].at(-1).textContent.includes('ascending-new-4')",
-      ),
-    'ascending appends',
-  );
+  // Oldest first, new messages join the end of the list, below the rendered cards.
+  await waitFor(() => heading(317), 'ascending appends');
   await settle();
   await assertAnchor(ascending);
   await evaluate("document.querySelector('.message-list').scrollTop = 0");
   await settle();
   send(anchor.key, 'follow-oldest');
-  await waitFor(
-    () =>
-      evaluate(
-        "[...document.querySelectorAll('.message-item')].at(-1).textContent.includes('follow-oldest')",
-      ),
-    'oldest-first history update',
-  );
+  await waitFor(() => heading(318), 'oldest-first history update');
   assert.equal(await evaluate("document.querySelector('.message-list').scrollTop"), 0);
   // Cache settings and pins use the real controls; pressure must not remove the inspected path.
   const cacheSize = async (profile) => {

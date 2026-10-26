@@ -255,10 +255,6 @@ for (const [channel, handler] of Object.entries({
       throw new Error('Invalid numeric history query');
     return historyService!.request({ action: 'series', query });
   },
-  'history-topics': (connectionId: unknown, search: unknown) => {
-    if (!validId(connectionId) || !validTopic(search)) throw new Error('Invalid topic search');
-    return historyService!.request({ action: 'topics', connectionId, search });
-  },
   'history-clear': (connectionId: unknown, topic?: unknown) => {
     if (!validId(connectionId) || (topic !== undefined && !validTopic(topic)))
       throw new Error('Invalid history scope');

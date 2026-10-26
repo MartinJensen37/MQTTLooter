@@ -1,4 +1,4 @@
-import { topicMatches, validTopicFilter } from './history-search';
+import { topicMatches, validTopicFilter } from './topic-filter';
 
 /** A user-provided protobuf schema applied to topics matching an MQTT filter. */
 export interface DecoderDefinition {
