@@ -7,7 +7,7 @@ Versions follow [Semantic Versioning](https://semver.org): major for breaking ch
 First release.
 
 - MQTT 3.1.1 and 5 connections over TCP, TLS and WebSockets, with secrets in the OS credential store.
-- Topic tree, message cards with automatic JSON formatting and a plain log. Each topic shows its whole disk history in one list, up to a chosen number of messages, with content search and JSON/CSV export.
+- Topic tree, message cards with automatic JSON formatting and a plain log. Each topic shows its whole disk history in one list, up to a chosen number of messages, with content search and JSON/CSV export. Disk history keeps 1 hour to 7 days and up to 4 GiB.
 - Plots of any numeric JSON field, decoded protobuf or Sparkplug B metric.
 - Publishing with MQTT 5 properties and message schemas.
 - Recording and playback stored in a local database, with file import and export.
