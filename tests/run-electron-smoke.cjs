@@ -11,10 +11,13 @@ child.on('error', (error) => {
   console.error(error);
   process.exitCode = 1;
 });
-const timeout = setTimeout(() => {
-  console.error('Electron smoke test timed out');
-  child.kill();
-}, 45000);
+const timeout = setTimeout(
+  () => {
+    console.error('Electron smoke test timed out');
+    child.kill();
+  },
+  Number(process.env.SMOKE_TIMEOUT_MS) || 45000,
+);
 child.on('exit', (code) => {
   clearTimeout(timeout);
   process.exitCode = code ?? 1;

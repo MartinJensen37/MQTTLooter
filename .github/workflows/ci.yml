@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The interoperability tests run against a real broker when one is installed.
+      - name: Install Mosquitto
+        run: choco install mosquitto --no-progress -y
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npx prettier --check "src/**/*.{ts,tsx,js,jsx,css}" "tests/**/*.{ts,tsx,cjs}"
+      - run: npm test
+      - name: Electron tests
+        run: npm run test:electron
+        env:
+          SMOKE_TIMEOUT_MS: 180000
+      - name: Upload Electron screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-screenshots
+          path: .tmp/*.png
+          if-no-files-found: ignore
