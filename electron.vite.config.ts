@@ -37,6 +37,8 @@ export default defineConfig({
     root: resolve(__dirname, 'src/renderer'),
     build: {
       outDir: resolve(outDir, 'renderer'),
+      // Smaller files load faster; the main process stays readable for stack traces.
+      minify: true,
       rollupOptions: {
         input: resolve(__dirname, 'src/renderer/index.html'),
       },
