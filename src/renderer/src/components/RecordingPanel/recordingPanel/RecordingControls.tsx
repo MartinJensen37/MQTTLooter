@@ -31,14 +31,13 @@ function RecordingControls({
   return (
     <div className="recording-fixed-controls">
       {isRecordingDisabled && storageReady && (
-        <div className="recording-connection-warning">
-          <div className="recording-warning-content">
-            <i className="fas fa-plug"></i>
-            <h3>No Active Connection</h3>
-            <p>Please connect to an MQTT broker to start recording messages.</p>
-            <p>You can still view and playback existing recordings below.</p>
-          </div>
-        </div>
+        <p
+          className="recording-connection-warning"
+          role="status"
+          title="Connect to a broker to record. Saved recordings can still be played."
+        >
+          <i className="fas fa-plug"></i> No active connection
+        </p>
       )}
 
       <div
