@@ -24,18 +24,13 @@ import { useConnections } from '../../hooks/useConnections';
 import { useMessages } from '../../hooks/useMessages';
 import { useUIState, type PanePin } from '../../hooks/useUIState';
 import type { PayloadEncoding } from '../../../../shared/payload';
+import { NotificationStack, useNotifications } from './Notifications';
+import MainTabs, { type Tab } from './MainTabs';
 import './App.css';
 
-type Tab = 'logging' | 'publishing' | 'recording' | 'simulation';
 interface SelectedTopic {
   topicPath: string;
   connectionId: string;
-}
-interface Notification {
-  id: number;
-  message: string;
-  type: string;
-  timestamp: number;
 }
 /** A message from Publishing, Recording playback or Simulation. */
 export interface OutgoingMessage {
@@ -54,13 +49,6 @@ const PublishingPanel = lazy(() => import('../PublishingPanel/PublishingPanel'))
 const SimulationPanel = lazy(() => import('../SimulationPanel/SimulationPanel'));
 const panelLoading = <p className="panel-loading">Loading…</p>;
 
-const TAB_LIST: { id: Tab; icon: string; label: string; key: string }[] = [
-  { id: 'logging', icon: 'fa-list', label: 'Logging', key: 'F1' },
-  { id: 'publishing', icon: 'fa-paper-plane', label: 'Publishing', key: 'F2' },
-  { id: 'recording', icon: 'fa-video', label: 'Recording', key: 'F3' },
-  { id: 'simulation', icon: 'fa-microchip', label: 'Simulation', key: 'F4' },
-];
-
 async function publishTo(connectionId: string | null, messageData: OutgoingMessage) {
   if (!connectionId) throw new Error('No connection selected');
   if (!MQTTService.isConnected(connectionId)) throw new Error('Selected connection is not active');
@@ -76,7 +64,6 @@ async function publishTo(connectionId: string | null, messageData: OutgoingMessa
 
 function App() {
   const [selectedTopic, setSelectedTopic] = useState<SelectedTopic | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   // Tools > Settings in the app menu.
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => window.electronAPI?.app?.onOpenSettings(() => setSettingsOpen(true)), []);
@@ -101,16 +88,7 @@ function App() {
   // Clamp the rendered width without overwriting the user's preferred split on window resize.
   const maxTopicWidth = Math.max(50, panelWidth - 361);
 
-  // ── Notifications ────────────────────────────────────────────────────────
-  const showFeedback = useCallback((message: string, type = 'success') => {
-    const id = Date.now() + Math.random();
-    setNotifications((prev) => [...prev, { id, message, type, timestamp: Date.now() }]);
-    setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 2000);
-  }, []);
-
-  const removeNotification = useCallback((id: number) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
+  const { notifications, showFeedback, remove: removeNotification } = useNotifications();
 
   // ── Custom hooks ─────────────────────────────────────────────────────────
   const {
@@ -462,29 +440,7 @@ function App() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
-      <div className="notification-stack">
-        {notifications.map((n) => (
-          <div
-            key={n.id}
-            className={`notification ${n.type}`}
-            onClick={() => removeNotification(n.id)}
-          >
-            <i
-              className={`fas ${n.type === 'success' ? 'fa-check-circle' : n.type === 'error' ? 'fa-exclamation-circle' : n.type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'}`}
-            ></i>
-            <span className="notification-message">{n.message}</span>
-            <button
-              className="notification-close"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeNotification(n.id);
-              }}
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
+      <NotificationStack notifications={notifications} onClose={removeNotification} />
 
       <div
         className="app-layout"
@@ -542,81 +498,26 @@ function App() {
               )}
             </div>
             {selectedConnection && (
-              <div className="header-controls">
-                <div className="main-tabs">
-                  {TAB_LIST.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      // Clicking selects without focusing, so F-keys leave no focus ring behind.
-                      onMouseDown={(event) => event.preventDefault()}
-                      className={`tab-btn ${activeTab === tab.id ? 'active' : tab.id === splitTab ? 'secondary' : ''}`}
-                      title={`${tab.key} - ${tab.label} Panel`}
-                    >
-                      <i className={`fas ${tab.icon}`}></i> {tab.label}{' '}
-                      <span className="shortcut-hint">{tab.key}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="split-controls">
-                  {splitTab && (
-                    <select
-                      aria-label="Second pane"
-                      className="custom-select-button form-select form-select-compact"
-                      value={splitTab}
-                      onChange={(event) => setSplitTab(event.target.value as Tab)}
-                    >
-                      {TAB_LIST.filter((tab) => tab.id !== activeTab).map((tab) => (
-                        <option key={tab.id} value={tab.id}>
-                          {tab.label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {splitTab && (
-                    <button
-                      className={`btn btn-sm ${panePin ? 'btn-primary' : 'btn-secondary'}`}
-                      aria-pressed={Boolean(panePin)}
-                      aria-label="Pin second pane"
-                      onMouseDown={(event) => event.preventDefault()}
-                      title={
-                        panePin
-                          ? 'Let the second pane follow the sidebar again'
-                          : 'Keep the second pane on this connection and topic'
-                      }
-                      onClick={() =>
-                        setPanePin(
-                          panePin
-                            ? null
-                            : {
-                                connectionId: selectedConnection,
-                                topic:
-                                  selectedTopic?.connectionId === selectedConnection
-                                    ? selectedTopic
-                                    : null,
-                              },
-                        )
-                      }
-                    >
-                      <i className="fas fa-thumbtack"></i> <span className="split-label">Pin</span>
-                    </button>
-                  )}
-                  <button
-                    className={`btn btn-sm ${splitTab ? 'btn-primary' : 'btn-secondary'}`}
-                    aria-pressed={Boolean(splitTab)}
-                    aria-label="Split view"
-                    onMouseDown={(event) => event.preventDefault()}
-                    title={splitTab ? 'Close split view' : 'Show a second tab beside this one'}
-                    onClick={() =>
-                      setSplitTab(
-                        splitTab ? null : TAB_LIST.find((tab) => tab.id !== activeTab)!.id,
-                      )
-                    }
-                  >
-                    <i className="fas fa-columns"></i> <span className="split-label">Split</span>
-                  </button>
-                </div>
-              </div>
+              <MainTabs
+                activeTab={activeTab}
+                onActiveTabChange={setActiveTab}
+                splitTab={splitTab}
+                onSplitTabChange={setSplitTab}
+                pinned={Boolean(panePin)}
+                onTogglePin={() =>
+                  setPanePin(
+                    panePin
+                      ? null
+                      : {
+                          connectionId: selectedConnection,
+                          topic:
+                            selectedTopic?.connectionId === selectedConnection
+                              ? selectedTopic
+                              : null,
+                        },
+                  )
+                }
+              />
             )}
           </div>
 
