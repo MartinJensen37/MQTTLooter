@@ -142,13 +142,13 @@ module.exports = async function checkNavigation({ evaluate, waitFor, field, send
   assert.equal(await evaluate("document.querySelector('.message-list').scrollTop"), 0);
   // Cache settings and pins use the real controls; pressure must not remove the inspected path.
   const cacheSize = async (profile) => {
-    menu('advanced-settings');
+    menu('settings');
     await waitFor(
       () => evaluate('!!document.querySelector(\'[aria-label="Cache size"]\')'),
-      'advanced settings',
+      'settings',
     );
     await field('[aria-label="Cache size"]', profile);
-    await evaluate('document.querySelector(\'[aria-label="Close advanced settings"]\').click()');
+    await evaluate('document.querySelector(\'[aria-label="Close settings"]\').click()');
   };
   await cacheSize('compact');
   await evaluate('document.querySelector(\'[aria-label="Pin topic"]\').click()');

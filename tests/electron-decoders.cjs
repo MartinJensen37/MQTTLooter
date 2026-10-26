@@ -26,15 +26,12 @@ module.exports = async ({ evaluate, waitFor, field, send, userData, capture, men
 
   // Add the decoder through the real dialog and a real file input, with an imported file.
   // Decoders are an advanced option: turn them on in Tools > Advanced settings first.
-  menu('advanced-settings');
-  await waitFor(
-    () => evaluate("!!document.querySelector('.advanced-settings')"),
-    'advanced settings',
-  );
+  menu('settings');
+  await waitFor(() => evaluate("!!document.querySelector('.settings-dialog')"), 'settings');
   await evaluate(
-    "[...document.querySelectorAll('.advanced-settings label')].find(label => label.textContent.trim() === 'Protobuf decoders').querySelector('input').click()",
+    "[...document.querySelectorAll('.settings-dialog label')].find(label => label.textContent.trim() === 'Protobuf decoders').querySelector('input').click()",
   );
-  await evaluate('document.querySelector(\'[aria-label="Close advanced settings"]\').click()');
+  await evaluate('document.querySelector(\'[aria-label="Close settings"]\').click()');
   await waitFor(() => evaluate(`!!${button('Decoders')}`), 'decoders button');
   await evaluate(`${button('Decoders')}.click()`);
   await waitFor(() => evaluate("!!document.querySelector('.decoder-dialog')"), 'decoder dialog');

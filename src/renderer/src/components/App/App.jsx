@@ -7,7 +7,8 @@ import ConnectionSidebar from '../ConnectionSidebar/ConnectionSidebar';
 import TopicTreeComponent from '../TopicTree/TopicTreeComponent';
 import MessagePanel from '../MessagePanel/MessageWorkspace';
 import RecordingPanel from '../RecordingPanel/RecordingPanel';
-import AdvancedSettingsDialog from './AdvancedSettingsDialog';
+import SettingsDialog from './SettingsDialog';
+import { useAppearance } from '../../hooks/useAppearance';
 import { useConnections } from '../../hooks/useConnections';
 import { useMessages } from '../../hooks/useMessages';
 import { useUIState } from '../../hooks/useUIState';
@@ -42,9 +43,10 @@ async function publishTo(connectionId, messageData) {
 function App() {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [notifications, setNotifications] = useState([]);
-  // Tools > Advanced settings in the app menu.
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  useEffect(() => window.electronAPI?.app?.onOpenAdvancedSettings(() => setAdvancedOpen(true)), []);
+  // Tools > Settings in the app menu.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  useEffect(() => window.electronAPI?.app?.onOpenSettings(() => setSettingsOpen(true)), []);
+  useAppearance();
   const mainPanelsRef = useRef(null);
   const [panelWidth, setPanelWidth] = useState(0);
   useEffect(() => {
@@ -406,13 +408,13 @@ function App() {
   // ── JSX ──────────────────────────────────────────────────────────────────
   return (
     <div className="app">
-      {advancedOpen && (
-        <AdvancedSettingsDialog
+      {settingsOpen && (
+        <SettingsDialog
           connections={connections.map((connection) => ({
             id: connection.id,
             name: connection.config?.name || 'Unnamed connection',
           }))}
-          onClose={() => setAdvancedOpen(false)}
+          onClose={() => setSettingsOpen(false)}
         />
       )}
       <div className="notification-stack">

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webFrame } from 'electron';
 
 type EventCallback = (data: unknown) => void;
 
@@ -42,13 +42,17 @@ const mqttEvents = createEventHandler('mqtt');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   app: {
-    /** Tools > Advanced settings in the app menu. Returns a function that stops listening. */
-    onOpenAdvancedSettings: (callback: () => void) => {
+    /** Tools > Settings in the app menu. Returns a function that stops listening. */
+    onOpenSettings: (callback: () => void) => {
       const listener = () => callback();
-      ipcRenderer.on('app-open-advanced-settings', listener);
+      ipcRenderer.on('app-open-settings', listener);
       return () => {
-        ipcRenderer.removeListener('app-open-advanced-settings', listener);
+        ipcRenderer.removeListener('app-open-settings', listener);
       };
+    },
+    /** Interface zoom from Settings > Text size. */
+    setZoom: (factor: number) => {
+      if (Number.isFinite(factor) && factor >= 0.5 && factor <= 2) webFrame.setZoomFactor(factor);
     },
   },
   history: {

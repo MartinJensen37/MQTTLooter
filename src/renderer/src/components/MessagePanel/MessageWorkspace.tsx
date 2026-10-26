@@ -4,7 +4,7 @@ import IncomingPlot from './IncomingPlot';
 import HistorySearch from './HistorySearch';
 import DecoderSettings from './DecoderSettings';
 import { useDecoders } from '../../services/DecoderRegistry';
-import { useAdvancedSettings } from '../../services/AdvancedSettings';
+import { useSettings } from '../../services/Settings';
 import type { HistoryPage, HistoryQuery, HistoryStatus } from '../../../../shared/history';
 import TopicTreeService from '../../services/TopicTreeService';
 import './MessageWorkspace.css';
@@ -28,7 +28,7 @@ function Workspace(props: any) {
   const [topics, setTopics] = useState<{ path: string }[]>([]);
   const [decodersOpen, setDecodersOpen] = useState(false);
   const { decoders } = useDecoders();
-  const settings = useAdvancedSettings();
+  const settings = useSettings();
   const selectedPath = props.selectedTopic?.topicPath;
   const topic = topicOverride ?? selectedPath;
   const connectionId = props.connectionId;

@@ -381,7 +381,7 @@ handleIPC('mqtt-get-connections', async () => {
   }
 });
 
-/** The standard menus plus Tools, which opens settings that are rarely changed. */
+/** The standard menus plus Tools, which opens Settings. */
 function createMenu() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -393,10 +393,10 @@ function createMenu() {
         label: 'Tools',
         submenu: [
           {
-            id: 'advanced-settings',
-            label: 'Advanced settings…',
+            id: 'settings',
+            label: 'Settings…',
             accelerator: 'CmdOrCtrl+,',
-            click: () => mainWindow?.webContents.send('app-open-advanced-settings'),
+            click: () => mainWindow?.webContents.send('app-open-settings'),
           },
         ],
       },

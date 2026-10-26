@@ -3,7 +3,7 @@ import MessageTemplateService from '../../services/MessageTemplateService';
 import './PublishingPanel.css';
 import { payloadBytes, type PayloadEncoding } from '../../../../shared/payload';
 import TopicTreeService from '../../services/TopicTreeService';
-import { useAdvancedSettings } from '../../services/AdvancedSettings';
+import { useSettings } from '../../services/Settings';
 import type { PublishHistoryItem, SchemaValidationResult } from './publishingPanel/types';
 import PayloadEditor from './publishingPanel/PayloadEditor';
 import PublishPropertiesEditor from './publishingPanel/PublishPropertiesEditor';
@@ -37,7 +37,7 @@ function PublishingPanel({
   selectedTopic = null,
   showFeedback,
 }: PublishingPanelProps) {
-  const settings = useAdvancedSettings();
+  const settings = useSettings();
   const formKey = `publish-form-state-${connectionId}`;
   const [initialForm] = useState(() => {
     try {
