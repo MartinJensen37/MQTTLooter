@@ -38,7 +38,13 @@ it('shows incoming topics and expansion without waiting for animation frames', a
   };
   try {
     await act(async () =>
-      root.render(<TopicTreeComponent connectionId="test" topicTreeService={service} />),
+      root.render(
+        <TopicTreeComponent
+          connectionId="test"
+          selectedPath={null}
+          topicTreeService={service as any}
+        />,
+      ),
     );
     expect(host.textContent).toContain('Waiting for messages');
     await act(async () => {
