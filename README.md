@@ -42,7 +42,7 @@ Every topic keeps its newest 300 messages in memory (100 to 2,000 in Settings), 
 
 ### Plotting
 
-**Display > Plot** charts numeric values over time from disk history. Pick fields from the suggestion list or type a JSON pointer such as `/sensors/0/value`; any JSON structure works, as do plain numbers and decoded protobuf or Sparkplug fields. Up to four fields can be plotted on a shared or per-field scale. Hover for a cursor and value card, pause, zoom, and step through time. The plot pauses while the broker is disconnected.
+**Display > Plot** charts numeric values over time from disk history. Pick fields from the suggestion list or type a JSON pointer such as `/sensors/0/value`; any JSON structure works, as do plain numbers and decoded protobuf or Sparkplug fields. Up to four fields can be plotted on a shared or per-field scale. Hover for a cursor and value card, pause, zoom, and step through time. The plot redraws up to four times a second however fast messages arrive, adding everything received since the last redraw at once, and pauses while the broker is disconnected.
 
 ![Plotting a JSON field](docs/images/plotting.png)
 
