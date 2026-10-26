@@ -170,6 +170,8 @@ export default function IncomingPlot({
       setFields((previous) => [...previous, pointer]);
       setAutomaticField(false);
       setFieldError('');
+      // Ready for the next field, without deleting the last one first.
+      setCandidate('');
     } catch (reason) {
       setFieldError((reason as Error).message);
     }
@@ -291,22 +293,6 @@ export default function IncomingPlot({
         </select>
       </div>
       <div className="incoming-plot-fields">
-        {fields.map((field, index) => (
-          <span key={field} className="incoming-plot-field" style={{ borderColor: COLORS[index] }}>
-            {name(field)}
-            <button
-              className="btn btn-sm btn-secondary"
-              aria-label={`Remove plot field ${name(field)}`}
-              disabled={fields.length === 1}
-              onClick={() => {
-                setFields((previous) => previous.filter((item) => item !== field));
-                setAutomaticField(false);
-              }}
-            >
-              ×
-            </button>
-          </span>
-        ))}
         <label>
           Field{' '}
           <input
@@ -315,17 +301,20 @@ export default function IncomingPlot({
             aria-label="Numeric field path"
             list={fieldListId}
             placeholder="/field, e.g. /value"
-            title="A JSON field such as /value. Empty plots the whole payload as a number."
+            title="A JSON field such as /value or /sensors/0/value. Empty plots the whole payload as a number."
             value={candidate}
             onChange={(event) => {
               setCandidate(event.target.value);
               setFieldError('');
             }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && fields.length < 4) addField();
+            }}
           />
           <datalist id={fieldListId}>
             {(result?.availablePaths ?? [])
               .map(fieldPointer)
-              .filter(Boolean)
+              .filter((pointer) => pointer && !fields.includes(pointer))
               .map((pointer) => (
                 <option key={pointer} value={pointer} />
               ))}
@@ -339,6 +328,27 @@ export default function IncomingPlot({
           Add field
         </button>
       </div>
+      <ul className="incoming-plot-legend" aria-label="Plotted fields">
+        {fields.map((field, index) => (
+          <li key={field} className="incoming-plot-field">
+            <span className="incoming-plot-swatch" style={{ background: COLORS[index] }} />
+            {name(field)}
+            {fields.length > 1 && (
+              <button
+                className="incoming-plot-field-remove"
+                aria-label={`Remove plot field ${name(field)}`}
+                title="Remove from the plot"
+                onClick={() => {
+                  setFields((previous) => previous.filter((item) => item !== field));
+                  setAutomaticField(false);
+                }}
+              >
+                ×
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
       {decoder && <p className="incoming-plot-decoder">Decoded with {decoder.name}</p>}
       {fieldError && <p role="alert">{fieldError}</p>}
       {error && <p role="alert">{error}</p>}

@@ -146,6 +146,19 @@ it('scales fields independently and plots by a validated payload time field', as
   await set('Numeric field path', '/b', 'input');
   await click('Add field');
   await act(async () => vi.advanceTimersByTimeAsync(300));
+  // The entry clears for the next field, the legend lists both fields below it, and
+  // suggestions leave out what is already plotted.
+  expect(
+    (container.querySelector('[aria-label="Numeric field path"]') as HTMLInputElement).value,
+  ).toBe('');
+  expect(
+    [...container.querySelectorAll('.incoming-plot-legend li')].map((item) => item.textContent),
+  ).toEqual(['Whole payload×', '/b×']);
+  expect(
+    [...container.querySelectorAll('datalist option')].map((option) =>
+      option.getAttribute('value'),
+    ),
+  ).toEqual(['/a']);
   const axis = () => [...container.querySelectorAll('svg text')].map((node) => node.textContent);
   expect(axis()).toContain('2000');
   await set('Plot scale', 'independent');
