@@ -71,7 +71,7 @@
       "installerHeaderIcon": "assets/MQTTLooter_logo_small.ico",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
-      "artifactName": "${productName} Setup ${version}.${ext}",
+      "artifactName": "${productName}-Setup-${version}.${ext}",
       "differentialPackage": false
     }
   },
