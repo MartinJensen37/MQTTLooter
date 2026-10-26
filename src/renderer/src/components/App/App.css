@@ -664,3 +664,10 @@
     gap: var(--spacing-xs);
   }
 }
+
+/* Panes rendered by react-split-pane, which adds this class itself. */
+.split-pane-pane {
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
