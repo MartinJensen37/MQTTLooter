@@ -1,32 +1,53 @@
-import React from 'react';
+import { Component, type MutableRefObject, type ReactNode } from 'react';
+
+interface Props {
+  className?: string;
+  children?: ReactNode;
+  /** Changing it scrolls back to the top, for a different list. */
+  viewKey?: string;
+  /** Pinned to the top as rows are added. */
+  following?: boolean;
+  onFollowingChange?: (following: boolean) => void;
+  viewportRef?: MutableRefObject<HTMLDivElement | null>;
+  /** For a virtualized list of fixed-height rows: the keys of every row, in order. */
+  itemKeys?: string[];
+  rowHeight?: number;
+}
+
+type Snapshot =
+  | { reset: true }
+  | { keys: string[]; index: number; scrollTop: number }
+  | { rows: { key: string; offset: number; bottom: number }[]; scrollTop: number }
+  | null;
 
 /** Capture before React mutates rows; restore the same row and pixel offset after commit. */
-export default class StableScrollViewport extends React.Component {
-  element = null;
-  snapshot = null;
-  expectedScrollTop = null;
-  pointerKey = null;
-  observer = null;
+export default class StableScrollViewport extends Component<Props> {
+  element: HTMLDivElement | null = null;
+  snapshot: Snapshot = null;
+  expectedScrollTop: number | null = null;
+  pointerKey: string | null = null;
+  observer: ResizeObserver | null = null;
 
-  setElement = (element) => {
+  setElement = (element: HTMLDivElement | null) => {
     this.element = element;
     if (this.props.viewportRef) this.props.viewportRef.current = element;
   };
 
-  capture(props = this.props) {
+  capture(props: Props = this.props): Snapshot {
     const element = this.element;
     if (!element || !element.clientHeight) return this.snapshot;
     if (props.itemKeys) {
+      const rowHeight = props.rowHeight ?? 1;
       const index = this.pointerKey === null ? -1 : props.itemKeys.indexOf(this.pointerKey);
       return {
         keys: props.itemKeys,
-        index: index < 0 ? Math.floor(element.scrollTop / props.rowHeight) : index,
+        index: index < 0 ? Math.floor(element.scrollTop / rowHeight) : index,
         scrollTop: element.scrollTop,
       };
     }
     const top = element.getBoundingClientRect().top + element.clientTop;
-    const rows = [...element.querySelectorAll('[data-scroll-key]')].map((row) => ({
-      key: row.dataset.scrollKey,
+    const rows = [...element.querySelectorAll<HTMLElement>('[data-scroll-key]')].map((row) => ({
+      key: row.dataset.scrollKey!,
       offset: row.getBoundingClientRect().top - top,
       bottom: row.getBoundingClientRect().bottom - top,
     }));
@@ -40,22 +61,23 @@ export default class StableScrollViewport extends React.Component {
     };
   }
 
-  scrollTo(top) {
-    const element = this.element;
+  scrollTo(top: number) {
+    const element = this.element!;
     const target = Math.max(0, Math.min(top, element.scrollHeight - element.clientHeight));
     if (Math.abs(element.scrollTop - target) < 0.5) return;
     this.expectedScrollTop = target;
     element.scrollTop = target;
   }
 
-  restore(snapshot) {
+  restore(snapshot: Snapshot) {
     if (!this.element?.clientHeight) return;
-    if (snapshot?.reset || this.props.following) {
+    if ((snapshot && 'reset' in snapshot) || this.props.following) {
       this.scrollTo(0);
       return;
     }
     if (!snapshot) return;
-    if (snapshot.keys && this.props.itemKeys) {
+    if ('keys' in snapshot && this.props.itemKeys) {
+      const rowHeight = this.props.rowHeight ?? 1;
       const positions = new Map(this.props.itemKeys.map((key, index) => [key, index]));
       // If eviction removes the anchor, use its nearest surviving neighbor.
       for (let distance = 0; distance < snapshot.keys.length; distance++) {
@@ -64,14 +86,14 @@ export default class StableScrollViewport extends React.Component {
           : [snapshot.index]) {
           const position = positions.get(snapshot.keys[index]);
           if (position !== undefined) {
-            this.scrollTo(snapshot.scrollTop + (position - index) * this.props.rowHeight);
+            this.scrollTo(snapshot.scrollTop + (position - index) * rowHeight);
             return;
           }
         }
       }
-    } else if (snapshot.rows) {
+    } else if ('rows' in snapshot) {
       const rows = new Map(
-        [...this.element.querySelectorAll('[data-scroll-key]')].map((row) => [
+        [...this.element.querySelectorAll<HTMLElement>('[data-scroll-key]')].map((row) => [
           row.dataset.scrollKey,
           row,
         ]),
@@ -87,7 +109,7 @@ export default class StableScrollViewport extends React.Component {
         }
       }
     }
-    this.scrollTo(snapshot.scrollTop);
+    if ('scrollTop' in snapshot) this.scrollTo(snapshot.scrollTop);
   }
 
   observeRows() {
@@ -112,15 +134,15 @@ export default class StableScrollViewport extends React.Component {
     }
   }
 
-  getSnapshotBeforeUpdate(previous) {
+  getSnapshotBeforeUpdate(previous: Props): Snapshot {
     if (previous.viewKey !== this.props.viewKey) return { reset: true };
     if (this.props.following) return null;
     return this.capture(previous);
   }
 
-  componentDidUpdate(_previous, _state, snapshot) {
+  componentDidUpdate(_previous: Props, _state: unknown, snapshot: Snapshot) {
     this.restore(snapshot);
-    if (snapshot?.reset) {
+    if (snapshot && 'reset' in snapshot) {
       this.pointerKey = null;
       if (!this.props.following) this.props.onFollowingChange?.(true);
     }
@@ -138,7 +160,7 @@ export default class StableScrollViewport extends React.Component {
   }
 
   handleScroll = () => {
-    const top = this.element.scrollTop;
+    const top = this.element!.scrollTop;
     const programmatic =
       this.expectedScrollTop !== null && Math.abs(top - this.expectedScrollTop) < 1;
     this.expectedScrollTop = null;
@@ -157,7 +179,8 @@ export default class StableScrollViewport extends React.Component {
           this.props.itemKeys
             ? (event) => {
                 this.pointerKey =
-                  event.target.closest('[data-scroll-key]')?.dataset.scrollKey ?? null;
+                  (event.target as Element).closest<HTMLElement>('[data-scroll-key]')?.dataset
+                    .scrollKey ?? null;
               }
             : undefined
         }

@@ -1,24 +1,44 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { memo, useState, useEffect, useCallback, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import StableScrollViewport from '../StableScrollViewport';
 import TopicTreeNode from './TopicTreeNode';
 import TrafficStatus from './TrafficStatus';
 import { useSettings } from '../../services/Settings';
+import type { TopicTreeService } from '../../services/TopicTreeService';
+import type TopicTree from '../../services/models/TopicTree';
+import type { FlattenedNode } from '../../services/models/TopicTree';
 import './TopicTree.css';
 
-function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTreeService }) {
-  const [nodes, setNodes] = useState([]);
+type Statistics = ReturnType<TopicTree['getStatistics']>;
+interface TreeEvent {
+  connectionId: string;
+}
+interface TopicTreeProps {
+  connectionId: string | null;
+  selectedPath: string | null;
+  onTopicSelect?: (path: string, node: FlattenedNode) => void;
+  topicTreeService: TopicTreeService;
+}
+
+function TopicTreeWorkspace({
+  connectionId,
+  selectedPath,
+  onTopicSelect,
+  topicTreeService,
+}: TopicTreeProps) {
+  const [nodes, setNodes] = useState<FlattenedNode[]>([]);
   const { sparkplug } = useSettings();
   const [search, setSearch] = useState('');
   const searchRef = useRef('');
   searchRef.current = search;
-  const [statistics, setStatistics] = useState(null);
+  const [statistics, setStatistics] = useState<Statistics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const scrollRef = useRef(null);
-  const pendingRefresh = useRef(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const pendingRefresh = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadNodes = useCallback(() => {
+    if (!connectionId) return;
     try {
       setNodes(topicTreeService.getTopicTreeNodes(connectionId, false, searchRef.current));
       setStatistics(topicTreeService.getTopicTreeStatistics(connectionId));
@@ -43,30 +63,21 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
     setIsLoading(true);
     loadNodes();
 
-    const handleTreeUpdated = (data) => {
+    const handleTreeChanged = (data: TreeEvent) => {
       if (data.connectionId === connectionId) scheduleLoad();
     };
-    const handleNodeToggled = (data) => {
-      if (data.connectionId === connectionId) scheduleLoad();
-    };
-    const handleTreeExpanded = (data) => {
-      if (data.connectionId === connectionId) scheduleLoad();
-    };
-
-    const handleTreeCleared = (data) => {
+    const handleTreeCleared = (data: TreeEvent) => {
       if (data.connectionId !== connectionId) return;
       setNodes([]);
       setStatistics(null);
     };
-
-    const handleTreeRemoved = (data) => {
+    const handleTreeRemoved = (data: TreeEvent) => {
       if (data.connectionId !== connectionId) return;
       setNodes([]);
       setStatistics(null);
       setIsLoading(false);
     };
-
-    const handleRatesUpdated = (data) => {
+    const handleRatesUpdated = (data: { trees?: Record<string, Statistics> }) => {
       if (data.trees && data.trees[connectionId]) {
         setStatistics(data.trees[connectionId]);
         scheduleLoad();
@@ -74,9 +85,9 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
     };
 
     topicTreeService.on('historySettingsChanged', scheduleLoad);
-    topicTreeService.on('treeUpdated', handleTreeUpdated);
-    topicTreeService.on('nodeToggled', handleNodeToggled);
-    topicTreeService.on('treeExpanded', handleTreeExpanded);
+    topicTreeService.on('treeUpdated', handleTreeChanged);
+    topicTreeService.on('nodeToggled', handleTreeChanged);
+    topicTreeService.on('treeExpanded', handleTreeChanged);
     topicTreeService.on('treeCleared', handleTreeCleared);
     topicTreeService.on('treeRemoved', handleTreeRemoved);
     topicTreeService.on('ratesUpdated', handleRatesUpdated);
@@ -87,9 +98,9 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
         pendingRefresh.current = null;
       }
       topicTreeService.off('historySettingsChanged', scheduleLoad);
-      topicTreeService.off('treeUpdated', handleTreeUpdated);
-      topicTreeService.off('nodeToggled', handleNodeToggled);
-      topicTreeService.off('treeExpanded', handleTreeExpanded);
+      topicTreeService.off('treeUpdated', handleTreeChanged);
+      topicTreeService.off('nodeToggled', handleTreeChanged);
+      topicTreeService.off('treeExpanded', handleTreeChanged);
       topicTreeService.off('treeCleared', handleTreeCleared);
       topicTreeService.off('treeRemoved', handleTreeRemoved);
       topicTreeService.off('ratesUpdated', handleRatesUpdated);
@@ -97,7 +108,8 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
   }, [connectionId, topicTreeService, loadNodes, scheduleLoad]);
 
   const handleNodeClick = useCallback(
-    (node) => {
+    (node: FlattenedNode) => {
+      if (!connectionId) return;
       const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
       const hasMessages = node.messageCount > 0;
 
@@ -110,24 +122,17 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
         node.pinned ||
         selectedPath === node.fullPath
       ) {
-        if (onTopicSelect) onTopicSelect(node.fullPath, node);
+        onTopicSelect?.(node.fullPath, node);
       }
     },
     [connectionId, topicTreeService, onTopicSelect, selectedPath],
   );
 
-  const handleExpandAll = useCallback(
-    () => topicTreeService.expandTopicTreeToDepth(connectionId, Infinity),
-    [connectionId, topicTreeService],
-  );
-  const handleCollapseAll = useCallback(
-    () => topicTreeService.expandTopicTreeToDepth(connectionId, 0),
-    [connectionId, topicTreeService],
-  );
-  const handleClearTree = useCallback(
-    () => topicTreeService.clearTopicTree(connectionId),
-    [connectionId, topicTreeService],
-  );
+  const handleExpandAll = () =>
+    connectionId && topicTreeService.expandTopicTreeToDepth(connectionId, Infinity);
+  const handleCollapseAll = () =>
+    connectionId && topicTreeService.expandTopicTreeToDepth(connectionId, 0);
+  const handleClearTree = () => connectionId && topicTreeService.clearTopicTree(connectionId);
 
   // Virtualize: only render visible topic rows (massive DOM savings)
   const rowVirtualizer = useVirtualizer({
@@ -138,11 +143,12 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
     overscan: 15,
   });
 
-  const historyNotice = (statistics?.discardedMessages > 0 || statistics?.evictedTopics > 0) && (
-    <p role="status" className="history-limit-notice">
-      {statistics.discardedMessages} messages expired; {statistics.evictedTopics} topics evicted.
-    </p>
-  );
+  const historyNotice = statistics &&
+    (statistics.discardedMessages > 0 || statistics.evictedTopics > 0) && (
+      <p role="status" className="history-limit-notice">
+        {statistics.discardedMessages} messages expired; {statistics.evictedTopics} topics evicted.
+      </p>
+    );
 
   return (
     <div className="topic-tree-container">
@@ -214,7 +220,7 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
             {nodes.filter((node) => node.searchMatch).length} matches
           </div>
         )}
-        <TrafficStatus connectionId={connectionId} />
+        {connectionId && <TrafficStatus connectionId={connectionId} />}
         {historyNotice}
       </div>
 
@@ -265,7 +271,7 @@ function TopicTreeWorkspace({ connectionId, selectedPath, onTopicSelect, topicTr
   );
 }
 
-function TopicTreeComponent(props) {
+function TopicTreeComponent(props: TopicTreeProps) {
   return <TopicTreeWorkspace key={props.connectionId ?? 'none'} {...props} />;
 }
-export default React.memo(TopicTreeComponent);
+export default memo(TopicTreeComponent);
