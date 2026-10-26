@@ -5,6 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org): major for breaking ch
 ## Unreleased
 
 - Smaller, minified window code.
+- Help > About saves a diagnostics file for bug reports.
 
 ## 1.0.0 - 2026-10-26
 

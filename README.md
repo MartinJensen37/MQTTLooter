@@ -120,4 +120,4 @@ How the parts fit together is described in [docs/ARCHITECTURE.md](docs/ARCHITECT
 
 ## Releases and license
 
-Windows installers are attached to [GitHub Releases](https://github.com/MartinJensen37/MQTTLooter/releases), and changes are listed in [CHANGELOG.md](CHANGELOG.md). The app checks for new releases at startup and from **Help > Check for updates**, and asks before downloading; **Settings > General > Updates** can include beta releases. **Help > About** shows the installed version. How releases are made is described in [docs/RELEASING.md](docs/RELEASING.md). Released under the [MIT License](LICENSE).
+Windows installers are attached to [GitHub Releases](https://github.com/MartinJensen37/MQTTLooter/releases), and changes are listed in [CHANGELOG.md](CHANGELOG.md). The app checks for new releases at startup and from **Help > Check for updates**, and asks before downloading; **Settings > General > Updates** can include beta releases. **Help > About** shows the installed version and saves a diagnostics file to attach to bug reports. How releases are made is described in [docs/RELEASING.md](docs/RELEASING.md). Released under the [MIT License](LICENSE).
