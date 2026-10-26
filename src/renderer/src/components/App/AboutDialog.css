@@ -1,0 +1,45 @@
+.about-dialog {
+  width: min(420px, calc(100vw - 32px));
+}
+
+.about-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xxl);
+  text-align: center;
+  color: var(--text-body);
+  font-size: 13px;
+}
+
+.about-body p {
+  margin: 0;
+}
+
+.about-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-lg);
+}
+
+.about-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-heading);
+}
+
+.about-version {
+  font-weight: 600;
+}
+
+.about-runtime,
+.about-repository {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.about-license {
+  margin: var(--spacing-sm) 0 !important;
+  line-height: 1.6;
+}

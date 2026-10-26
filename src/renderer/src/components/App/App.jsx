@@ -8,6 +8,7 @@ import TopicTreeComponent from '../TopicTree/TopicTreeComponent';
 import MessagePanel from '../MessagePanel/MessageWorkspace';
 import RecordingPanel from '../RecordingPanel/RecordingPanel';
 import SettingsDialog from './SettingsDialog';
+import AboutDialog from './AboutDialog';
 import { useAppearance } from '../../hooks/useAppearance';
 import { useConnections } from '../../hooks/useConnections';
 import { useMessages } from '../../hooks/useMessages';
@@ -46,6 +47,9 @@ function App() {
   // Tools > Settings in the app menu.
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => window.electronAPI?.app?.onOpenSettings(() => setSettingsOpen(true)), []);
+  // Help > About in the app menu.
+  const [aboutOpen, setAboutOpen] = useState(false);
+  useEffect(() => window.electronAPI?.app?.onOpenAbout?.(() => setAboutOpen(true)), []);
   useAppearance();
   const mainPanelsRef = useRef(null);
   const [panelWidth, setPanelWidth] = useState(0);
@@ -409,6 +413,7 @@ function App() {
   // ── JSX ──────────────────────────────────────────────────────────────────
   return (
     <div className="app">
+      {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
       {settingsOpen && (
         <SettingsDialog
           connections={connections.map((connection) => ({

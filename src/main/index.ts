@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron';
 import { join } from 'path';
 import { MQTTConnectionManager } from './mqtt-connection-manager';
 import { RecordingService } from './recording-service';
@@ -11,6 +11,7 @@ import { validateSearch, type HistorySearchQuery } from '../shared/history-searc
 import { MessageDelivery } from './message-delivery';
 import { DELIVERY_COALESCE, DELIVERY_LIMITS, type IncomingPublish } from '../shared/traffic';
 import { RECORDING_LIMITS, type RecordingPageQuery } from '../shared/recording';
+import { APP_INFO } from '../shared/app-info';
 import { isSparkplugBirth, validateSparkplugPayload } from '../shared/sparkplug';
 
 let mainWindow: BrowserWindow | null = null;
@@ -370,6 +371,21 @@ handleIPC('mqtt-publish', async (_event, connectionId, topic, message, options) 
   }
 });
 
+// Help > About: versions, and the project page opened in the default browser.
+handleIPC('app-info', () => ({
+  success: true,
+  data: {
+    app: __APP_VERSION__,
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+  },
+}));
+handleIPC('app-open-repository', async () => {
+  await shell.openExternal(APP_INFO.repository);
+  return { success: true };
+});
+
 handleIPC('mqtt-get-connections', async () => {
   try {
     return { success: true, data: mqttManager.getAllConnections() };
@@ -378,7 +394,7 @@ handleIPC('mqtt-get-connections', async () => {
   }
 });
 
-/** The standard menus plus Tools, which opens Settings. */
+/** The standard menus plus Tools (Settings) and Help (About). */
 function createMenu() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -398,6 +414,16 @@ function createMenu() {
         ],
       },
       { role: 'windowMenu' },
+      {
+        role: 'help',
+        submenu: [
+          {
+            id: 'about',
+            label: `About ${APP_INFO.name}`,
+            click: () => mainWindow?.webContents.send('app-open-about'),
+          },
+        ],
+      },
     ]),
   );
 }

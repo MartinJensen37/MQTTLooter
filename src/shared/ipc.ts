@@ -53,6 +53,12 @@ export interface ElectronAPI {
     onOpenSettings(callback: () => void): () => void;
     /** Interface zoom, 0.5 to 2. */
     setZoom(factor: number): void;
+    /** Help > About in the app menu. Returns a function that stops listening. */
+    onOpenAbout(callback: () => void): () => void;
+    /** App and runtime versions. */
+    info(): Promise<IpcResult<import('./app-info').AppVersions>>;
+    /** Opens the project page in the default browser. */
+    openRepository(): Promise<IpcResult>;
   };
   history: {
     status(): Promise<IpcResult<import('./history').HistoryStatus>>;

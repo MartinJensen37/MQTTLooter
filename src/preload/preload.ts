@@ -50,6 +50,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('app-open-settings', listener);
       };
     },
+    /** Help > About in the app menu. Returns a function that stops listening. */
+    onOpenAbout: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('app-open-about', listener);
+      return () => {
+        ipcRenderer.removeListener('app-open-about', listener);
+      };
+    },
+    info: () => ipcRenderer.invoke('app-info'),
+    openRepository: () => ipcRenderer.invoke('app-open-repository'),
     /** Interface zoom from Settings > Text size. */
     setZoom: (factor: number) => {
       if (Number.isFinite(factor) && factor >= 0.5 && factor <= 2) webFrame.setZoomFactor(factor);

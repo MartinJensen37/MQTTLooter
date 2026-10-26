@@ -923,6 +923,11 @@ async function run() {
         );
     },
   });
+  await require('./electron-about.cjs')({
+    evaluate,
+    waitFor,
+    menu: (id) => electron.Menu.getApplicationMenu().getMenuItemById(id).click(),
+  });
   await require('./electron-credentials.cjs')({ evaluate, waitFor, field });
   await require('./electron-plots.cjs')({
     evaluate,
