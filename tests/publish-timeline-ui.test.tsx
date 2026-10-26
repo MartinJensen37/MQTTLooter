@@ -86,9 +86,12 @@ it('calculates only when open or settings change, preserves rare chances and rel
   await act(async () => vi.advanceTimersByTimeAsync(500));
   expect(workers).toHaveLength(1);
   await act(async () => {
-    const select = container.querySelector('select')!;
-    select.value = '60000';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    const slider = container.querySelector('[aria-label="Timeline horizon"]') as HTMLInputElement;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      slider,
+      '60000',
+    );
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await act(async () => vi.advanceTimersByTimeAsync(120));
   expect(workers).toHaveLength(2);

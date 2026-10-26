@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import type { SimulatedDevice } from './types';
 import { validateTiming } from './model';
 import {
@@ -161,19 +161,24 @@ function Timeline({ device }: { device: SimulatedDevice }) {
     <>
       <div className="publish-timeline-controls">
         <label>
-          Preview window{' '}
-          <select
-            className="form-select custom-select-button"
+          Preview window
+          <input
+            type="range"
+            className="form-range"
             aria-label="Timeline horizon"
+            aria-valuetext={seconds(horizon)}
+            min={1000}
+            max={TIMELINE_LIMITS.horizon}
+            step={1000}
             value={horizon}
+            style={
+              {
+                '--range-progress': `${((horizon - 1000) / (TIMELINE_LIMITS.horizon - 1000)) * 100}%`,
+              } as CSSProperties
+            }
             onChange={(event) => setHorizon(Number(event.target.value))}
-          >
-            {[5000, 10000, 30000, 60000].map((value) => (
-              <option key={value} value={value}>
-                {seconds(value)}
-              </option>
-            ))}
-          </select>
+          />
+          <output>{seconds(horizon)}</output>
         </label>
         <InfoTip text="When each signal may publish after starting the loop, assuming the connection is up and no publish stalls." />
       </div>

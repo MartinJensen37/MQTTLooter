@@ -16,8 +16,12 @@
   align-items: center;
   gap: 6px;
 }
-.publish-timeline-controls select {
-  width: auto;
+.publish-timeline-controls .form-range {
+  width: min(240px, 40vw);
+}
+.publish-timeline-controls output {
+  min-width: 3.5em;
+  font-variant-numeric: tabular-nums;
 }
 .publish-timeline-controls > span,
 .publish-timeline small,
