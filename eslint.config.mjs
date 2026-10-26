@@ -36,7 +36,7 @@ export default tseslint.config(
     },
   },
 
-  // Pragmatic relaxations while the JS→TS migration is in progress.
+  // Untyped boundaries (IPC payloads, loosely shaped configs) still use `any`.
   {
     rules: {
       'no-unused-vars': 'off',
