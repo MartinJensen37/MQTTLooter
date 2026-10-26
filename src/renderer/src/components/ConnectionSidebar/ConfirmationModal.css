@@ -14,7 +14,7 @@
 
 /* Size and frame as rendered before the publishing panel's modal rules were scoped. */
 .confirmation-modal {
-  background: white;
+  background: var(--bg-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   min-width: 200px;
@@ -24,7 +24,7 @@
   overflow: auto;
   margin: 20px;
   animation: confirmationSlideIn 0.2s ease-out;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--gray-200);
 }
 
 @keyframes confirmationSlideIn {
@@ -40,14 +40,14 @@
 
 .confirmation-header {
   padding: 24px 24px 16px;
-  border-bottom: 1px solid #e9ecef;
-  background: #f8f9fa;
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--gray-100);
   border-radius: 12px 12px 0 0;
 }
 
 .confirmation-header h3 {
   margin: 0;
-  color: #495057;
+  color: var(--gray-700);
   font-size: 18px;
   font-weight: 600;
   display: flex;
@@ -56,18 +56,18 @@
 }
 
 .confirmation-header .warning-icon {
-  color: #ffc107;
+  color: var(--warning);
   font-size: 20px;
 }
 
 .confirmation-content {
   padding: 20px 24px;
-  background: white;
+  background: var(--bg-surface);
 }
 
 .confirmation-content p {
   margin: 0;
-  color: #6c757d;
+  color: var(--gray-600);
   line-height: 1.6;
   font-size: 14px;
 }
@@ -77,7 +77,7 @@
   display: flex;
   gap: 12px;
   justify-content: flex-end;
-  background: white;
+  background: var(--bg-surface);
   border-radius: 0 0 12px 12px;
 }
 
@@ -101,14 +101,14 @@
 }
 
 .cancel-btn {
-  background-color: #6c757d;
+  background-color: var(--neutral);
   color: white;
-  border: 1px solid #6c757d;
+  border: 1px solid var(--neutral);
 }
 
 .cancel-btn:hover {
-  background-color: #5a6268;
-  border-color: #545b62;
+  background-color: var(--neutral-hover);
+  border-color: var(--neutral-hover);
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
@@ -118,14 +118,14 @@
 }
 
 .confirm-btn.danger {
-  background-color: #dc3545;
+  background-color: var(--danger);
   color: white;
-  border: 1px solid #dc3545;
+  border: 1px solid var(--danger);
 }
 
 .confirm-btn.danger:hover {
-  background-color: #c82333;
-  border-color: #bd2130;
+  background-color: var(--danger-hover);
+  border-color: var(--danger-hover);
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
 }

@@ -10,7 +10,7 @@ beforeEach(() => {
 
 it('starts from defaults and keeps choices from the old advanced settings', async () => {
   expect((await load()).snapshot()).toMatchObject({
-    theme: 'system',
+    theme: 'light',
     textSize: 100,
     sparkplug: false,
   });

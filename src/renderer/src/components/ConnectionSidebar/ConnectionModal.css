@@ -309,8 +309,8 @@
   transition: all var(--transition-fast);
   border: none;
 }
-.mqtt-cancel-btn       { background: var(--gray-600); color: white; }
-.mqtt-cancel-btn:hover { background: var(--gray-700); transform: translateY(-1px); }
+.mqtt-cancel-btn       { background: var(--neutral); color: white; }
+.mqtt-cancel-btn:hover { background: var(--neutral-hover); transform: translateY(-1px); }
 .mqtt-save-btn         { background: var(--primary); color: white; }
 .mqtt-save-btn:hover   { background: var(--primary-hover); transform: translateY(-1px); }
 
@@ -354,8 +354,8 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--spacing-sm) var(--spacing-md);
-  background: #e7f3ff;
-  border: 1px solid #b8daff;
+  background: color-mix(in srgb, var(--primary) 10%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--bg-surface));
   border-radius: var(--radius-sm);
   font-size: 12px;
 }
@@ -373,7 +373,7 @@
   transition: all var(--transition-fast);
   font-size: 13px;
 }
-.mqtt-cert-remove:hover { background: #f5c6cb; color: #721c24; }
+.mqtt-cert-remove:hover { background: color-mix(in srgb, var(--danger) 25%, var(--bg-surface)); color: var(--danger-text); }
 
 .mqtt-secret-input { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .mqtt-secret-input input { flex: 1; min-width: 0; }

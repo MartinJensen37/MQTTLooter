@@ -194,7 +194,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  border: 1px solid white;
+  border: 1px solid var(--bg-surface);
 }
 .connection-card.collapsed .mqtt-version-indicator.mqtt5   { background: #b331ff; }
 .connection-card.collapsed .mqtt-version-indicator.mqtt311 { background: var(--gray-500); }

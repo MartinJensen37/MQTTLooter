@@ -18,8 +18,8 @@
 .connection-card:hover { border-color: var(--primary); box-shadow: 0 2px 8px var(--primary-light); }
 
 /* ── Status backgrounds ── */
-.connection-card.connected    { background: var(--bg-connected);   border-color: #c3e6cb; }
-.connection-card.connecting   { background: var(--bg-connecting);  border-color: #ffeaa7; }
+.connection-card.connected    { background: var(--bg-connected);   border-color: var(--border-connected); }
+.connection-card.connecting   { background: var(--bg-connecting);  border-color: var(--border-connecting); }
 .connection-card.disconnected { background: var(--bg-disconnected); border-color: var(--border-color); }
 
 .connection-card.connected:hover    { border-color: var(--success); box-shadow: 0 2px 8px var(--success-light); }
@@ -115,11 +115,11 @@
   letter-spacing: 0.4px;
   padding: 2px 8px;
   border-radius: 10px;
-  background: rgba(255,255,255,.8);
-  border: 1px solid rgba(0,0,0,.1);
+  background: var(--bg-glass);
+  border: 1px solid var(--hairline);
   backdrop-filter: blur(4px);
 }
-.connection-card.connected .connection-status-text   { color: #155724; border-color: rgba(40,167,69,.3); }
+.connection-card.connected .connection-status-text   { color: var(--success-text); border-color: rgba(40,167,69,.3); }
 .connection-card.connecting .connection-status-text  { color: var(--warning-text); border-color: rgba(255,193,7,.3); }
 .connection-card.disconnected .connection-status-text { color: var(--gray-700); border-color: rgba(108,117,125,.3); }
 
@@ -127,10 +127,10 @@
 .connection-client-id {
   font-size: 11px;
   font-family: var(--font-mono);
-  background: rgba(255,255,255,.8);
+  background: var(--bg-glass);
   padding: 2px 8px;
   border-radius: 10px;
-  border: 1px solid rgba(0,0,0,.1);
+  border: 1px solid var(--hairline);
   backdrop-filter: blur(4px);
   font-weight: 500;
   max-width: 160px;
@@ -167,19 +167,19 @@
   justify-content: center;
   font-size: 10px;
   transition: all var(--transition-fast);
-  background: rgba(255,255,255,.9);
-  border: 1px solid rgba(0,0,0,.1);
+  background: var(--bg-glass);
+  border: 1px solid var(--hairline);
   backdrop-filter: blur(4px);
 }
 .action-btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 
-.toggle-btn.connect    { background: rgba(231,243,255,.9); border-color: var(--primary); color: var(--primary); }
+.toggle-btn.connect    { background: color-mix(in srgb, var(--primary) 10%, var(--bg-surface)); border-color: var(--primary); color: var(--primary); }
 .toggle-btn.connect:hover { background: var(--primary); color: white; }
-.toggle-btn.disconnect    { background: rgba(255,243,205,.9); border-color: var(--warning); color: var(--warning-text); }
+.toggle-btn.disconnect    { background: color-mix(in srgb, var(--warning) 20%, var(--bg-surface)); border-color: var(--warning); color: var(--warning-text); }
 .toggle-btn.disconnect:hover { background: var(--warning); color: var(--gray-900); }
-.edit-btn    { background: rgba(226,227,229,.9); border-color: var(--gray-500); color: var(--gray-600); }
-.edit-btn:hover    { background: var(--gray-600); color: white; }
-.delete-btn  { background: rgba(248,215,218,.9); border-color: var(--danger); color: var(--danger); }
+.edit-btn    { background: var(--gray-200); border-color: var(--gray-500); color: var(--gray-600); }
+.edit-btn:hover    { background: var(--neutral); color: white; }
+.delete-btn  { background: color-mix(in srgb, var(--danger) 20%, var(--bg-surface)); border-color: var(--danger); color: var(--danger); }
 .delete-btn:hover  { background: var(--danger); color: white; }
 
 /* ── MQTT version bubble ── */
@@ -194,5 +194,5 @@
   white-space: nowrap;
   box-shadow: var(--shadow-sm);
 }
-.mqtt-version-bubble.mqtt311 { background: rgba(255,255,255,.8); color: var(--gray-900); border-color: rgba(255,255,255,.8); }
-.mqtt-version-bubble.mqtt5   { background: rgba(255,255,255,.8); color: var(--gray-900); border-color: rgba(255,255,255,.8); }
+.mqtt-version-bubble.mqtt311 { background: var(--bg-glass); color: var(--gray-900); border-color: var(--bg-glass); }
+.mqtt-version-bubble.mqtt5   { background: var(--bg-glass); color: var(--gray-900); border-color: var(--bg-glass); }

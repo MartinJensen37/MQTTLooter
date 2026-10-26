@@ -5,7 +5,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: white;
+  background: var(--bg-surface);
   overflow: hidden;
 }
 
@@ -49,7 +49,7 @@
   font-size: 12px;
   color: var(--primary-blue);
   font-weight: 500;
-  background: white;
+  background: var(--bg-surface);
   padding: 4px var(--spacing-sm);
   border-radius: var(--radius-sm);
   border: 1px solid var(--gray-300);
@@ -126,7 +126,7 @@
 
 /* Message Items */
 .message-item {
-  background: white;
+  background: var(--bg-surface);
   border: 1px solid var(--gray-200);
   border-radius: 6px;
   box-shadow: var(--shadow-md);
@@ -200,7 +200,7 @@
 .payload-preview {
   font-family: var(--font-mono);
   font-size: 13px;
-  color: #2c3e50;
+  color: var(--text-heading);
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
@@ -316,17 +316,17 @@
 }
 
 .message-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--gray-100);
   border-radius: var(--radius-sm);
 }
 
 .message-list::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--gray-400);
   border-radius: var(--radius-sm);
 }
 
 .message-list::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: var(--gray-500);
 }
 .message-filters {
   display: flex;
@@ -348,7 +348,7 @@
   padding: 4px 8px;
   border: 1px solid var(--gray-300);
   border-radius: 4px;
-  background: white;
+  background: var(--bg-surface);
 }
 
 .message-list { scrollbar-gutter: stable; }

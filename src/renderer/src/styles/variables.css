@@ -56,11 +56,25 @@
   --text-body:    var(--gray-700);
   --text-muted:   var(--gray-600);
 
-  /* === Status backgrounds === */
+  /* Translucent surface for bars over scrolling content. */
+  --bg-glass:     rgba(255, 255, 255, 0.9);
+  /* Thin borders on tinted backgrounds. */
+  --hairline:     rgba(0, 0, 0, 0.1);
+  /* Same in both themes: gray buttons with white text, tooltips, text on yellow. */
+  --neutral:       #6c757d;
+  --neutral-hover: #5a6268;
+  --tooltip-bg:    #343a40;
+  --on-warning:    #212529;
+
+  /* === Status colours === */
   --bg-connected:   #d4edda;
   --bg-connecting:  #fff3cd;
   --bg-disconnected: var(--gray-100);
   --bg-error:       #f8d7da;
+  --border-connected:  #c3e6cb;
+  --border-connecting: #ffeaa7;
+  --success-text:   #155724;
+  --danger-text:    #721c24;
 
   /* === Typography === */
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -89,4 +103,49 @@
   /* === Transitions === */
   --transition-fast:   0.15s ease;
   --transition-normal: 0.25s ease;
+}
+
+/* Dark theme, set by Settings > Appearance (useAppearance). */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --primary:        #4493f8;
+  --primary-hover:  #6cabfa;
+  --primary-light:  rgba(68, 147, 248, 0.18);
+  --success:        #2f9e50;
+  --success-hover:  #3bb361;
+  --success-light:  rgba(47, 158, 80, 0.18);
+  --warning-light:  rgba(255, 193, 7, 0.16);
+  --warning-text:   #f0c95a;
+  --danger:         #e5534b;
+  --danger-hover:   #f06b63;
+  --danger-light:   rgba(229, 83, 75, 0.18);
+
+  --gray-100: #1c2026;
+  --gray-200: #272c33;
+  --gray-300: #343a42;
+  --gray-400: #4a525c;
+  --gray-500: #6b747e;
+  --gray-600: #98a1ab;
+  --gray-700: #c0c7ce;
+  --gray-800: #dce1e6;
+  --gray-900: #eef1f4;
+
+  --bg-surface:   #22272e;
+  --text-heading: #e6ebf0;
+  --bg-glass:     rgba(34, 39, 46, 0.92);
+  --hairline:     rgba(255, 255, 255, 0.12);
+  --tooltip-bg:   #4a525c;
+
+  --bg-connected:   rgba(47, 158, 80, 0.16);
+  --bg-connecting:  rgba(255, 193, 7, 0.12);
+  --bg-error:       rgba(229, 83, 75, 0.16);
+  --border-connected:  rgba(47, 158, 80, 0.45);
+  --border-connecting: rgba(255, 193, 7, 0.4);
+  --success-text:   #7fd99d;
+  --danger-text:    #ff9d96;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.55);
 }

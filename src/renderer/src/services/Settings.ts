@@ -33,7 +33,7 @@ export const SETTING_CHOICES = {
 const DEFAULTS: Settings = {
   payloadView: 'auto',
   timeFormat: 'system',
-  theme: 'system',
+  theme: 'light',
   textSize: 100,
   uiFont: 'system',
   codeFont: 'system',

@@ -7,7 +7,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--bg-glass);
   backdrop-filter: blur(8px);
   overflow: hidden;
   font-family: var(--font-family);
@@ -23,7 +23,7 @@
 }
 
 .publish-form {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--bg-glass);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
@@ -44,7 +44,7 @@
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-md);
   font-size: 14px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--bg-glass);
   color: var(--gray-700);
   transition: all var(--transition-normal);
 }
@@ -69,7 +69,7 @@
 }
 
 .copy-topic-btn:hover {
-  background: var(--gray-600);
+  background: var(--neutral);
   color: white;
 }
 
@@ -106,7 +106,7 @@
 }
 
 .copy-payload-btn:hover {
-  background: var(--gray-600);
+  background: var(--neutral);
   color: white;
 }
 
@@ -116,7 +116,7 @@
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-md);
   font-size: 14px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--bg-glass);
   color: var(--gray-700);
   transition: all var(--transition-normal);
   min-height: 120px;
@@ -153,7 +153,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #155724;
+  color: var(--success-text);
   font-weight: 500;
   font-size: 12px;
   padding: 2px 6px;
@@ -208,13 +208,13 @@
   gap: 12px;
   cursor: pointer;
   font-weight: 500;
-  color: #495057;
+  color: var(--gray-700);
   margin: 0 !important;
   margin-top: 20px !important;
   padding: 12px;
-  background: #f8f9fa;
+  background: var(--gray-100);
   border-radius: 6px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--gray-200);
   transition: all 0.2s ease;
   font-size: 14px;
   min-height: 38px;
@@ -222,9 +222,9 @@
 }
 
 .retain-checkbox-label:hover {
-  background: #e9ecef;
-  color: #007bff;
-  border-color: #007bff;
+  background: var(--gray-200);
+  color: var(--primary);
+  border-color: var(--primary);
 }
 
 .retain-checkbox-label input[type="checkbox"] {
@@ -234,17 +234,17 @@
 .retain-checkbox-custom {
   width: 18px;
   height: 18px;
-  border: 2px solid #ced4da;
+  border: 2px solid var(--gray-400);
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--bg-glass);
   position: relative;
   transition: all 0.3s ease;
   flex-shrink: 0;
 }
 
 .retain-checkbox-label input[type="checkbox"]:checked + .retain-checkbox-custom {
-  background: #007bff;
-  border-color: #007bff;
+  background: var(--primary);
+  border-color: var(--primary);
 }
 
 .retain-checkbox-label input[type="checkbox"]:checked + .retain-checkbox-custom::after {
@@ -259,14 +259,14 @@
 }
 
 .retain-checkbox-label:hover .retain-checkbox-custom {
-  border-color: #007bff;
+  border-color: var(--primary);
 }
 
 .retain-checkbox-text {
   flex: 1;
   line-height: 1.4;
   font-size: 14px;
-  color: #495057;
+  color: var(--gray-700);
   min-width: 0;
   display: flex;
   align-items: center;
@@ -467,7 +467,7 @@
 }
 
 .preview-payload {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--bg-glass);
   padding: 10px 12px;
   border-radius: 6px;
   font-family: var(--font-mono);
@@ -480,7 +480,7 @@
 
 /* Publish History */
 .publish-history {
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--bg-glass);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
@@ -516,7 +516,7 @@
   text-decoration: none;
   white-space: nowrap;
   background: var(--danger-red-light);
-  color: #721c24;
+  color: var(--danger-text);
   border: 1px solid rgba(220, 53, 69, 0.3);
 }
 
@@ -542,7 +542,7 @@
 }
 
 .history-item:hover {
-  background: rgba(248, 249, 250, 0.95);
+  background: var(--bg-glass);
   border-color: var(--primary-blue);
   box-shadow: 0 2px 8px rgba(40, 167, 69, 0.1);
 }
@@ -603,7 +603,7 @@
   text-decoration: none;
   white-space: nowrap;
   background: var(--success-green-light);
-  color: #155724;
+  color: var(--success-text);
   border: 1px solid rgba(40, 167, 69, 0.3);
 }
 
@@ -613,7 +613,7 @@
 }
 
 .history-payload {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--bg-glass);
   padding: var(--spacing-sm) 10px;
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
@@ -855,7 +855,7 @@
 }
 
 .template-delete-dialog .confirmation-modal {
-  background: white;
+  background: var(--bg-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   max-width: 400px;
@@ -961,7 +961,7 @@
   width: 9px;
   left: 2px;
   bottom: 1.5px;
-  background-color: white;
+  background-color: var(--bg-surface);
   transition: 0.3s;
   border-radius: 50%;
   /* box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); */
