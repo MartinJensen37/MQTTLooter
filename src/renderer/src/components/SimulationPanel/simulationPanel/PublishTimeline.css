@@ -100,6 +100,10 @@
 .publish-timeline-total svg {
   height: 40px;
 }
+/* Estimates for randomized timing, under the exact bursts of fixed schedules. */
+.publish-timeline-total .publish-timeline-estimate {
+  opacity: 0.35;
+}
 .publish-timeline-total > span:last-child {
   text-align: right;
 }

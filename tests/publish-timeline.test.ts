@@ -134,3 +134,26 @@ it('bounds the horizon, rows and bins, reports long waits and excludes invalid s
   expect(invalid.rows[0].error).toBeTruthy();
   expect(sum(invalid.aggregate)).toBe(0);
 });
+
+it('counts messages due at the same moment, however the period meets the bin width', () => {
+  // Four synchronized signals every 100 ms; 20 s bins of 156.25 ms hold one tick or two.
+  const result = calculateTimeline({
+    period: 100,
+    horizon: 20000,
+    signals: [1, 2, 3, 4].map((id) => ({ id, name: `s${id}` })),
+  });
+  expect(new Set(result.aggregate.filter(Boolean))).toEqual(new Set([4, 8]));
+  expect(new Set(result.bursts.filter(Boolean))).toEqual(new Set([4]));
+  expect(result.randomExpected.every((value) => value === 0)).toBe(true);
+  // An offset signal is its own burst; randomized timing stays a per-interval estimate.
+  const mixed = calculateTimeline({
+    ...base,
+    signals: [
+      { id: 1, name: 'a' },
+      { id: 2, name: 'b', timing: { mode: 'sync', offsetMs: 500 } },
+      { id: 3, name: 'c', timing: { mode: 'random', intervalMs: 1000, jitterPercent: 50 } },
+    ],
+  });
+  expect(Math.max(...mixed.bursts)).toBe(1);
+  expect(sum(mixed.randomExpected)).toBeGreaterThan(0);
+});

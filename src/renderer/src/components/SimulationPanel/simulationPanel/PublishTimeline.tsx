@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } fr
 import type { SimulatedDevice } from './types';
 import { validateTiming } from './model';
 import {
+  TIMELINE_COLUMNS,
   TIMELINE_LIMITS,
   type TimelineInput,
   type TimelineResult,
@@ -121,11 +122,23 @@ function Timeline({ device }: { device: SimulatedDevice }) {
             expected: [],
           })),
           aggregate: [],
+          bursts: [],
+          randomExpected: [],
           omitted: Math.max(0, device.outputs.length - TIMELINE_LIMITS.signals),
         };
   const start = Math.max(0, Math.min(Math.floor(scroll / 62) - 2, lanes.rows.length - 1));
   const shown = lanes.rows.slice(start, start + 10);
-  const peak = Math.max(0, ...lanes.aggregate);
+  // Bursts count messages due at the same moment; randomized schedules add per-interval estimates.
+  const peak = Math.max(0, ...lanes.bursts, ...lanes.randomExpected);
+  const columnsPerBin = TIMELINE_COLUMNS / TIMELINE_LIMITS.bins;
+  const atOnce = (index: number) =>
+    Math.max(
+      0,
+      ...lanes.bursts.slice(
+        Math.floor(index * columnsPerBin),
+        Math.floor((index + 1) * columnsPerBin),
+      ),
+    );
   const bin = pending ? null : (hover?.bin ?? null);
   const leave = () => {
     clearTimeout(dwell.current);
@@ -310,11 +323,11 @@ function Timeline({ device }: { device: SimulatedDevice }) {
           </div>
           <div className="publish-timeline-total">
             <span>
-              Expected messages
+              Messages at once
               {bin !== null && (
                 <>
                   <br />
-                  <strong>{count(lanes.aggregate[bin])} here</strong>
+                  <strong>{count(atOnce(bin) || lanes.aggregate[bin])} here</strong>
                 </>
               )}
             </span>
@@ -322,17 +335,33 @@ function Timeline({ device }: { device: SimulatedDevice }) {
               viewBox="0 0 640 40"
               preserveAspectRatio="none"
               role="img"
-              aria-label="Expected messages per time bin"
+              aria-label="Messages due at the same moment over time"
             >
-              {lanes.aggregate.map((value, index) => (
-                <rect
-                  key={index}
-                  x={(index * 640) / TIMELINE_LIMITS.bins}
-                  width={640 / TIMELINE_LIMITS.bins - 0.5}
-                  y={40 - (value / (peak || 1)) * 38}
-                  height={(value / (peak || 1)) * 38}
-                />
-              ))}
+              {lanes.randomExpected.map(
+                (value, index) =>
+                  value > 0 && (
+                    <rect
+                      key={`r${index}`}
+                      className="publish-timeline-estimate"
+                      x={(index * 640) / TIMELINE_LIMITS.bins}
+                      width={640 / TIMELINE_LIMITS.bins - 0.5}
+                      y={40 - (value / (peak || 1)) * 38}
+                      height={(value / (peak || 1)) * 38}
+                    />
+                  ),
+              )}
+              {lanes.bursts.map(
+                (value, column) =>
+                  value > 0 && (
+                    <rect
+                      key={column}
+                      x={(column * 640) / TIMELINE_COLUMNS}
+                      width={1.5}
+                      y={40 - (value / (peak || 1)) * 38}
+                      height={(value / (peak || 1)) * 38}
+                    />
+                  ),
+              )}
               {cursor(40)}
             </svg>
             <span>
@@ -355,8 +384,13 @@ function Timeline({ device }: { device: SimulatedDevice }) {
               <time>
                 {seconds(bin * binWidth)}–{seconds((bin + 1) * binWidth)}
               </time>
+              {atOnce(bin) > 0 && (
+                <div>
+                  Most at once <strong>{count(atOnce(bin))}</strong>
+                </div>
+              )}
               <div>
-                Expected messages <strong>{count(lanes.aggregate[bin])}</strong>
+                Expected in this interval <strong>{count(lanes.aggregate[bin])}</strong>
               </div>
               {likely.slice(0, 5).map((row) => (
                 <div key={row.id}>

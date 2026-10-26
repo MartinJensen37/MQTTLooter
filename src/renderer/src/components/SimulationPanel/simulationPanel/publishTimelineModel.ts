@@ -3,6 +3,8 @@ import { validateTiming } from './model';
 import { signalDelay, signalPeriod } from '../../../services/signalTiming';
 
 export const TIMELINE_LIMITS = { signals: 128, bins: 128, trials: 512, horizon: 60_000 };
+/** Horizontal resolution of the burst chart, one column per chart unit. */
+export const TIMELINE_COLUMNS = 640;
 export interface TimelineInput {
   period: number;
   horizon: number;
@@ -25,7 +27,15 @@ export interface TimelineRow {
 export interface TimelineResult {
   horizon: number;
   rows: TimelineRow[];
+  /** Expected messages per time bin, from every signal. */
   aggregate: number[];
+  /**
+   * Fixed schedules: the most messages due at one exact millisecond within each chart column.
+   * Bins would split or merge bursts depending on how the period meets the bin width.
+   */
+  bursts: number[];
+  /** Expected messages per time bin from randomized schedules, which have no exact moments. */
+  randomExpected: number[];
   omitted: number;
 }
 export const chanceOfAny = (chance: number, count: number) =>
@@ -49,6 +59,9 @@ export function calculateTimeline(input: TimelineInput): TimelineResult {
     throw new Error('Choose a timeline horizon between 0.1 and 60 seconds.');
   const { bins, trials } = TIMELINE_LIMITS;
   const aggregate = Array<number>(bins).fill(0);
+  const randomExpected = Array<number>(bins).fill(0);
+  // Expected messages at each exact due time (ms) of the fixed schedules.
+  const moments = new Map<number, number>();
   const rows = input.signals.slice(0, TIMELINE_LIMITS.signals).map((signal): TimelineRow => {
     const timing = signal.timing;
     const period = signalPeriod(input.period, timing);
@@ -94,7 +107,10 @@ export function calculateTimeline(input: TimelineInput): TimelineResult {
       while (due <= input.horizon) {
         const bin = Math.min(bins - 1, Math.floor((due / input.horizon) * bins));
         counts[bin]++;
-        if (!random) row.ticks.push(due);
+        if (!random) {
+          row.ticks.push(due);
+          moments.set(due, (moments.get(due) ?? 0) + chance);
+        }
         // Random deadlines restart at the actual (integer-ms) callback time; fixed deadlines retain phase.
         due =
           timing?.mode === 'random'
@@ -108,13 +124,24 @@ export function calculateTimeline(input: TimelineInput): TimelineResult {
     }
     row.expected.forEach((value, bin) => {
       aggregate[bin] += value;
+      if (random) randomExpected[bin] += value;
     });
     return row;
   });
+  const bursts = Array<number>(TIMELINE_COLUMNS).fill(0);
+  for (const [time, count] of moments) {
+    const column = Math.min(
+      TIMELINE_COLUMNS - 1,
+      Math.floor((time / input.horizon) * TIMELINE_COLUMNS),
+    );
+    bursts[column] = Math.max(bursts[column], count);
+  }
   return {
     horizon: input.horizon,
     rows,
     aggregate,
+    bursts,
+    randomExpected,
     omitted: Math.max(0, (input.totalSignals ?? input.signals.length) - rows.length),
   };
 }
