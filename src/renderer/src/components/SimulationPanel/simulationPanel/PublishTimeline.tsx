@@ -4,6 +4,7 @@ import { validateTiming } from './model';
 import {
   TIMELINE_COLUMNS,
   TIMELINE_LIMITS,
+  TIMELINE_SERIES,
   type TimelineInput,
   type TimelineResult,
   type TimelineRow,
@@ -12,6 +13,9 @@ import CheckToggle from '../../Controls/CheckToggle';
 import InfoTip from '../../Controls/InfoTip';
 import './PublishTimeline.css';
 
+/** A signal's color by its position; signals past the eighth share the "other" color. */
+const seriesColor = (index: number) =>
+  index < TIMELINE_SERIES ? `var(--series-${index + 1})` : 'var(--series-other)';
 const seconds = (ms: number) => `${Number((ms / 1000).toFixed(3))} s`;
 const percent = (value: number) =>
   value > 0 && value < 0.0001 ? '<0.01%' : `${Number((value * 100).toFixed(2))}%`;
@@ -123,6 +127,7 @@ function Timeline({ device }: { device: SimulatedDevice }) {
           })),
           aggregate: [],
           bursts: [],
+          burstParts: [],
           randomExpected: [],
           omitted: Math.max(0, device.outputs.length - TIMELINE_LIMITS.signals),
         };
@@ -131,6 +136,18 @@ function Timeline({ device }: { device: SimulatedDevice }) {
   // Bursts count messages due at the same moment; randomized schedules add per-interval estimates.
   const peak = Math.max(0, ...lanes.bursts, ...lanes.randomExpected);
   const columnsPerBin = TIMELINE_COLUMNS / TIMELINE_LIMITS.bins;
+  /** Stacked segments, first signal at the bottom, with a thin gap between neighbors. */
+  const stack = (parts: [number, number][]) => {
+    let base = 0;
+    return parts.map(([series, value], index) => {
+      const size = (value / (peak || 1)) * 38;
+      // The gap separates a segment from the one above it; the top segment keeps its height.
+      const gap = index < parts.length - 1 && size > 2 ? 1 : 0;
+      const segment = { series, y: 40 - base - size + gap, height: size - gap };
+      base += size;
+      return segment;
+    });
+  };
   const atOnce = (index: number) =>
     Math.max(
       0,
@@ -264,7 +281,13 @@ function Timeline({ device }: { device: SimulatedDevice }) {
                   style={{ position: 'absolute', top: (start + index) * 62, width: '100%' }}
                 >
                   <div className="publish-timeline-name" title={row.name}>
-                    <strong>{row.name}</strong>
+                    <strong>
+                      <span
+                        className="publish-timeline-swatch"
+                        style={{ background: seriesColor(start + index) }}
+                      />
+                      {row.name}
+                    </strong>
                     <span>{pending ? '…' : `${percent(row.chance)} · ${seconds(row.period)}`}</span>
                   </div>
                   <div className="publish-timeline-lane">
@@ -275,6 +298,7 @@ function Timeline({ device }: { device: SimulatedDevice }) {
                         <svg
                           viewBox="0 0 640 24"
                           preserveAspectRatio="none"
+                          style={{ '--series-color': seriesColor(start + index) } as CSSProperties}
                           role="img"
                           aria-label={`${row.name}: ${row.random ? 'estimated likelihood' : 'scheduled opportunities'}`}
                         >
@@ -337,30 +361,43 @@ function Timeline({ device }: { device: SimulatedDevice }) {
               role="img"
               aria-label="Messages due at the same moment over time"
             >
-              {lanes.randomExpected.map(
-                (value, index) =>
-                  value > 0 && (
-                    <rect
-                      key={`r${index}`}
-                      className="publish-timeline-estimate"
-                      x={(index * 640) / TIMELINE_LIMITS.bins}
-                      width={640 / TIMELINE_LIMITS.bins - 0.5}
-                      y={40 - (value / (peak || 1)) * 38}
-                      height={(value / (peak || 1)) * 38}
-                    />
-                  ),
+              {lanes.randomExpected.map((value, bin) =>
+                value > 0
+                  ? stack(
+                      lanes.rows.flatMap((row, index) =>
+                        row.random && !row.error && row.expected[bin] > 0
+                          ? [
+                              [Math.min(index, TIMELINE_SERIES), row.expected[bin]] as [
+                                number,
+                                number,
+                              ],
+                            ]
+                          : [],
+                      ),
+                    ).map(({ series, y, height }) => (
+                      <rect
+                        key={`r${bin}-${series}`}
+                        className="publish-timeline-estimate"
+                        x={(bin * 640) / TIMELINE_LIMITS.bins}
+                        width={640 / TIMELINE_LIMITS.bins - 0.5}
+                        y={y}
+                        height={height}
+                        style={{ fill: seriesColor(series) }}
+                      />
+                    ))
+                  : null,
               )}
-              {lanes.bursts.map(
-                (value, column) =>
-                  value > 0 && (
-                    <rect
-                      key={column}
-                      x={(column * 640) / TIMELINE_COLUMNS}
-                      width={1.5}
-                      y={40 - (value / (peak || 1)) * 38}
-                      height={(value / (peak || 1)) * 38}
-                    />
-                  ),
+              {lanes.burstParts.map((parts, column) =>
+                stack(parts).map(({ series, y, height }) => (
+                  <rect
+                    key={`${column}-${series}`}
+                    x={(column * 640) / TIMELINE_COLUMNS}
+                    width={1.5}
+                    y={y}
+                    height={height}
+                    style={{ fill: seriesColor(series) }}
+                  />
+                )),
               )}
               {cursor(40)}
             </svg>
@@ -394,7 +431,14 @@ function Timeline({ device }: { device: SimulatedDevice }) {
               </div>
               {likely.slice(0, 5).map((row) => (
                 <div key={row.id}>
-                  {row.name} <strong>{percent(row.likelihood[bin])}</strong>
+                  <span>
+                    <span
+                      className="publish-timeline-swatch"
+                      style={{ background: seriesColor(lanes.rows.indexOf(row)) }}
+                    />
+                    {row.name}
+                  </span>{' '}
+                  <strong>{percent(row.likelihood[bin])}</strong>
                 </div>
               ))}
               {likely.length > 5 && <small>{likely.length - 5} more signals may send</small>}

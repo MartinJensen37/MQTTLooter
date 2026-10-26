@@ -77,11 +77,12 @@
   height: 24px;
   overflow: hidden;
 }
+/* Lanes set --series-color to their signal's color. */
 .publish-timeline svg rect {
-  fill: var(--primary);
+  fill: var(--series-color, var(--primary));
 }
 .publish-timeline svg line {
-  stroke: var(--primary);
+  stroke: var(--series-color, var(--primary));
   stroke-width: 2;
 }
 .publish-timeline svg .publish-timeline-cursor {
@@ -103,6 +104,16 @@
 /* Estimates for randomized timing, under the exact bursts of fixed schedules. */
 .publish-timeline-total .publish-timeline-estimate {
   opacity: 0.35;
+}
+/* A signal's color beside its name, in lanes and the hover card. */
+.publish-timeline-swatch,
+.publish-timeline-name .publish-timeline-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: 0;
 }
 .publish-timeline-total > span:last-child {
   text-align: right;

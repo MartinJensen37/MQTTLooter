@@ -144,6 +144,20 @@ it('counts messages due at the same moment, however the period meets the bin wid
   });
   expect(new Set(result.aggregate.filter(Boolean))).toEqual(new Set([4, 8]));
   expect(new Set(result.bursts.filter(Boolean))).toEqual(new Set([4]));
+  // Each burst is split by signal, bottom to top, for the stacked chart.
+  const stacked = result.burstParts.find((parts) => parts.length)!;
+  expect(stacked).toEqual([
+    [0, 1],
+    [1, 1],
+    [2, 1],
+    [3, 1],
+  ]);
+  // Signals past the eighth share one segment.
+  const many = calculateTimeline({
+    ...base,
+    signals: Array.from({ length: 10 }, (_, id) => ({ id, name: `s${id}` })),
+  });
+  expect(many.burstParts.find((parts) => parts.length)!.at(-1)).toEqual([8, 2]);
   expect(result.randomExpected.every((value) => value === 0)).toBe(true);
   // An offset signal is its own burst; randomized timing stays a per-interval estimate.
   const mixed = calculateTimeline({
