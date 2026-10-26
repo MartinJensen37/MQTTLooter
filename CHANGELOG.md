@@ -6,6 +6,7 @@ Versions follow [Semantic Versioning](https://semver.org): major for breaking ch
 
 - Smaller, minified window code.
 - Help > About saves a diagnostics file for bug reports.
+- Content search also searches payloads up to 64 MiB; payloads over 256 KiB load in full on request.
 
 ## 1.0.0 - 2026-10-26
 

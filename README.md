@@ -99,7 +99,7 @@ Turn on **Protobuf decoders** in Settings, then add `.proto` files and a topic f
 
 - Live cache: 300 messages per topic by default, 2 MiB of payload per topic, 20,000 topics and 64 MiB per connection (Compact: 5,000 topics, 32 MiB). Pin up to eight topics to protect them.
 - Message delivery to the window is batched and bounded; under overload each topic keeps its newest message and drops are counted in Settings.
-- Disk history: 24 hours and 256 MiB of payload by default, up to 7 days and 4 GiB; kept for the session unless set to persist.
+- Disk history: 24 hours and 256 MiB of payload by default, up to 7 days and 4 GiB; kept for the session unless set to persist. Payloads over 256 KiB show as a preview until loaded in full, and content search reads payloads up to 64 MiB.
 - Recordings: a 2 GiB database; individual imported messages up to 1 MiB.
 - Decoding: payloads and decoded output up to 1 MiB each.
 
