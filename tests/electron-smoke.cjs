@@ -932,6 +932,10 @@ async function run() {
     evaluate,
     waitFor,
     menu: (id) => electron.Menu.getApplicationMenu().getMenuItemById(id).click(),
+    saveTo: (file) => {
+      saveDialog.path = path.join(temporary, file);
+      return saveDialog.path;
+    },
   });
   await require('./electron-credentials.cjs')({ evaluate, waitFor, field });
   await require('./electron-plots.cjs')({

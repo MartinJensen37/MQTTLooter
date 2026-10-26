@@ -66,6 +66,10 @@ export interface ElectronAPI {
     info(): Promise<IpcResult<import('./app-info').AppVersions>>;
     /** Opens the project page in the default browser. */
     openRepository(): Promise<IpcResult>;
+    /** Saves a diagnostics file for a bug report, after a save dialog. */
+    saveDiagnostics(
+      window: import('./app-info').WindowDiagnostics,
+    ): Promise<IpcResult<{ saved: boolean; path?: string }>>;
     /** Which GitHub releases Help > Check for updates offers. */
     setUpdateChannel(channel: 'stable' | 'beta'): Promise<IpcResult>;
   };

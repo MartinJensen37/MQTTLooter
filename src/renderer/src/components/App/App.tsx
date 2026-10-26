@@ -430,7 +430,7 @@ function App() {
   // ── JSX ──────────────────────────────────────────────────────────────────
   return (
     <div className="app">
-      {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
+      {aboutOpen && <AboutDialog connections={connections} onClose={() => setAboutOpen(false)} />}
       {settingsOpen && (
         <SettingsDialog
           connections={connections.map((connection) => ({

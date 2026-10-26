@@ -13,3 +13,11 @@ export interface AppVersions {
   chrome: string;
   node: string;
 }
+
+/** What the window adds to a diagnostics file: settings and connection options, without hosts or secrets. */
+export interface WindowDiagnostics {
+  settings: Record<string, unknown>;
+  storageVersion: number;
+  connections: Record<string, unknown>[];
+  topicTrees: Record<string, unknown>[];
+}

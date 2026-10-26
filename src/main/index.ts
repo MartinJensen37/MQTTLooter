@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron';
 import { join } from 'path';
+import { writeFile } from 'node:fs/promises';
 import { autoUpdater } from 'electron-updater';
 import { MQTTConnectionManager, type BrokerConfig } from './mqtt-connection-manager';
 import { RecordingService } from './recording-service';
@@ -16,6 +17,12 @@ import { APP_INFO } from '../shared/app-info';
 import { Updates } from './updates';
 import { validRetention } from '../shared/history';
 import { isSparkplugBirth, validateSparkplugPayload } from '../shared/sparkplug';
+import { buildDiagnostics, RecentLog } from './diagnostics';
+import type { WindowDiagnostics } from '../shared/app-info';
+
+// Warnings and errors are kept for Help > About > Save diagnostics.
+const recentLog = new RecentLog();
+recentLog.capture();
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
@@ -393,6 +400,36 @@ handleIPC('app-info', () => ({
 handleIPC('app-open-repository', async () => {
   await shell.openExternal(APP_INFO.repository);
   return { success: true };
+});
+handleIPC('app-save-diagnostics', async (_event, window: unknown) => {
+  try {
+    if (!window || typeof window !== 'object' || JSON.stringify(window).length > 1024 * 1024)
+      throw new Error('Invalid diagnostics');
+    const result = await dialog.showSaveDialog(mainWindow!, {
+      defaultPath: `mqttlooter-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return { success: true, data: { saved: false } };
+    const report = buildDiagnostics({
+      versions: {
+        app: __APP_VERSION__,
+        electron: process.versions.electron,
+        chrome: process.versions.chrome,
+        node: process.versions.node,
+      },
+      window: window as WindowDiagnostics,
+      history: await historyService
+        ?.request({ action: 'status' })
+        .catch((error: Error) => ({ error: error.message })),
+      recordings: recordingService?.status(),
+      delivery: messageDelivery.status(),
+      log: recentLog.entries(),
+    });
+    await writeFile(result.filePath, JSON.stringify(report, null, 2), 'utf8');
+    return { success: true, data: { saved: true, path: result.filePath } };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
 });
 
 // Help > Check for updates, against GitHub Releases. Settings chooses stable or beta releases.
