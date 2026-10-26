@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './RecordingPanel.css';
 import { useRecordingLibrary, unwrap } from '../../hooks/useRecordingLibrary';
-import { RecordingCursor } from '../../services/RecordingCursor';
-import type {
-  PlaybackState,
-  RecordingSummary,
-  StoredRecordingMessage,
-} from './recordingPanel/types';
+import type { RecordingSummary, StoredRecordingMessage } from './recordingPanel/types';
+import { usePlayback } from './recordingPanel/usePlayback';
 import { formatBytes } from './recordingPanel/recordingHelpers';
 import RecordingControls from './recordingPanel/RecordingControls';
 import RecordingItem from './recordingPanel/RecordingItem';
@@ -36,19 +32,6 @@ function RecordingPanel({
   const [busy, setBusy] = useState(false);
   const [republish, setRepublish] = useState(false);
 
-  // Playback state. Messages are read through a cursor over main's database.
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [playback, setPlayback] = useState<PlaybackState | null>(null);
-  const cursorRef = useRef<RecordingCursor | null>(null);
-  const [cursorVersion, setCursorVersion] = useState(0);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [currentMessage, setCurrentMessage] = useState<StoredRecordingMessage | null>(null);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  // Wall-clock origin for the current play run, so publish latency does not accumulate.
-  const anchor = useRef<{ wall: number; time: number; speed: number } | null>(null);
-  const [stepSize, setStepSize] = useState(1);
-
   // UI state.
   const [expandedRecording, setExpandedRecording] = useState<number | null>(null);
   const [selectedTopicsFilter, setSelectedTopicsFilter] = useState<string[]>([]);
@@ -60,7 +43,6 @@ function RecordingPanel({
   const isRecording = Boolean(capture);
   const isRecordingDisabled =
     !isConnected || !activeConnectionId || !ready || Boolean(status?.error);
-  const playbackGeneration = useRef(0);
 
   // Captures stopped by main (storage limit or failure) are reported once.
   const seenNotice = useRef<number | null>(null);
@@ -75,77 +57,8 @@ function RecordingPanel({
   }, [status, showFeedback]);
 
   useEffect(() => {
-    playbackGeneration.current++;
-    setIsPlaying(false);
-    setIsPaused(false);
     setRepublish(false);
   }, [activeConnectionId, isRecordingDisabled]);
-
-  // A new cursor and filtered total whenever the expanded recording or topic filter changes.
-  const filterKey = JSON.stringify(selectedTopicsFilter);
-  useEffect(() => {
-    playbackGeneration.current++;
-    setIsPlaying(false);
-    setIsPaused(false);
-    setCurrentIndex(0);
-    setCurrentMessage(null);
-    if (expandedRecording === null) {
-      cursorRef.current = null;
-      setPlayback(null);
-      return;
-    }
-    const recordingId = expandedRecording;
-    const topics: string[] | undefined = JSON.parse(filterKey);
-    const filter = topics?.length ? topics : undefined;
-    cursorRef.current = new RecordingCursor(async (query) =>
-      unwrap(await api().page({ recordingId, ...query, topics: filter })),
-    );
-    setCursorVersion((value) => value + 1);
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [topicList, total, list] = await Promise.all([
-          api().topics(recordingId),
-          api().count(recordingId, filter),
-          api().list(),
-        ]);
-        const recording = unwrap(list).find((item) => item.id === recordingId);
-        if (cancelled || !recording) return;
-        const { topics: available, total: topicTotal } = unwrap(topicList);
-        setPlayback({
-          recording,
-          topics: available.map((item) => item.topic),
-          topicTotal,
-          total: unwrap(total),
-        });
-      } catch (error) {
-        if (!cancelled)
-          showFeedback?.(`Recording could not be loaded: ${(error as Error).message}`, 'error');
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [expandedRecording, filterKey, showFeedback]);
-
-  // The message last played or stepped over.
-  useEffect(() => {
-    const cursor = cursorRef.current;
-    if (!cursor || currentIndex === 0) {
-      setCurrentMessage(null);
-      return;
-    }
-    let cancelled = false;
-    void cursor
-      .at(currentIndex - 1)
-      .then((message) => {
-        if (!cancelled) setCurrentMessage(message ?? null);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [currentIndex, cursorVersion]);
 
   const publish = useCallback(
     async (message: StoredRecordingMessage) => {
@@ -161,58 +74,13 @@ function RecordingPanel({
     [republish, isConnected, onPublishMessage],
   );
 
-  // Only one timer is live. Publishing is never performed inside a React state updater.
-  useEffect(() => {
-    const cursor = cursorRef.current;
-    if (!isPlaying || !cursor) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const stop = (error?: Error) => {
-      if (cancelled) return;
-      setIsPlaying(false);
-      if (error) showFeedback?.(`Playback publish failed: ${error.message}`, 'error');
-      else setIsPaused(false);
-    };
-    void (async () => {
-      const message = await cursor.at(currentIndex);
-      const previous = currentIndex > 0 ? await cursor.at(currentIndex - 1) : undefined;
-      if (cancelled) return;
-      if (!message) return stop();
-      if (!anchor.current || anchor.current.speed !== playbackSpeed)
-        anchor.current = {
-          wall: Date.now(),
-          time: previous?.timestamp ?? message.timestamp,
-          speed: playbackSpeed,
-        };
-      // A late or slow publish shortens the next wait instead of delaying every later message.
-      const delay = Math.max(
-        0,
-        anchor.current.wall +
-          (message.timestamp - anchor.current.time) / playbackSpeed -
-          Date.now(),
-      );
-      timer = setTimeout(
-        async () => {
-          try {
-            await publish(message);
-            if (!cancelled) setCurrentIndex(currentIndex + 1);
-          } catch (error) {
-            stop(error as Error);
-          }
-        },
-        Math.min(delay, 2_147_483_647),
-      );
-    })().catch((error: Error) => {
-      if (!cancelled) {
-        setIsPlaying(false);
-        showFeedback?.(`Playback failed: ${error.message}`, 'error');
-      }
-    });
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [isPlaying, cursorVersion, currentIndex, playbackSpeed, publish, showFeedback]);
+  const player = usePlayback({
+    recordingId: expandedRecording,
+    topics: selectedTopicsFilter,
+    publish,
+    showFeedback,
+    stopKey: `${activeConnectionId}:${isRecordingDisabled}`,
+  });
 
   const startRecording = async () => {
     if (isRecordingDisabled || !activeConnectionId) return;
@@ -250,54 +118,6 @@ function RecordingPanel({
     setExpandedRecording((current) => (current === recording.id ? null : recording.id));
     setSelectedTopicsFilter([]);
     setShowTopicFilter(false);
-  };
-
-  const resetPlayback = () => {
-    playbackGeneration.current++;
-    setCurrentIndex(0);
-    setIsPlaying(false);
-    setIsPaused(false);
-  };
-
-  const startRealtimePlayback = () => {
-    if (!playback?.total) return;
-    anchor.current = null;
-    if (currentIndex >= playback.total) setCurrentIndex(0);
-    setIsPlaying(true);
-    setIsPaused(false);
-  };
-
-  const pausePlayback = () => {
-    playbackGeneration.current++;
-    setIsPlaying(false);
-    setIsPaused(true);
-  };
-
-  const stepForward = async (e?: React.MouseEvent) => {
-    e?.preventDefault();
-    setIsPlaying(false);
-    const cursor = cursorRef.current;
-    if (!cursor || !playback) return;
-    const generation = ++playbackGeneration.current;
-    const nextIndex = Math.min(currentIndex + stepSize, playback.total);
-    try {
-      let index = currentIndex;
-      for (; index < nextIndex; index++) {
-        const message = await cursor.at(index);
-        if (playbackGeneration.current !== generation || !message) break;
-        await publish(message);
-      }
-      if (playbackGeneration.current === generation) setCurrentIndex(index);
-    } catch (error) {
-      showFeedback?.(`Playback publish failed: ${(error as Error).message}`, 'error');
-    }
-  };
-
-  const stepBackward = (e?: React.MouseEvent) => {
-    playbackGeneration.current++;
-    e?.preventDefault();
-    setIsPlaying(false);
-    setCurrentIndex(Math.max(currentIndex - stepSize, 0));
   };
 
   const toggleTopicFilter = (topic: string) => {
@@ -457,7 +277,7 @@ function RecordingPanel({
         className="recording-republish"
         label={`Republish playback to ${connectionName || 'the selected broker'}`}
         checked={republish}
-        disabled={!isConnected || isPlaying}
+        disabled={!isConnected || player.isPlaying}
         onChange={setRepublish}
       />
       <div className="recording-scrollable-content">
@@ -500,17 +320,17 @@ function RecordingPanel({
                   saveRecordingToFile={saveRecordingToFile}
                   deleteRecording={deleteRecording}
                   expandedContent={
-                    expandedRecording === recording.id && playback ? (
+                    expandedRecording === recording.id && player.playback ? (
                       <PlaybackControls
-                        playback={playback}
-                        currentMessage={currentMessage}
-                        currentIndex={currentIndex}
-                        isPlaying={isPlaying}
-                        isPaused={isPaused}
-                        playbackSpeed={playbackSpeed}
-                        setPlaybackSpeed={setPlaybackSpeed}
-                        stepSize={stepSize}
-                        setStepSize={setStepSize}
+                        playback={player.playback}
+                        currentMessage={player.currentMessage}
+                        currentIndex={player.currentIndex}
+                        isPlaying={player.isPlaying}
+                        isPaused={player.isPaused}
+                        playbackSpeed={player.playbackSpeed}
+                        setPlaybackSpeed={player.setPlaybackSpeed}
+                        stepSize={player.stepSize}
+                        setStepSize={player.setStepSize}
                         selectedTopicsFilter={selectedTopicsFilter}
                         setSelectedTopicsFilter={setSelectedTopicsFilter}
                         showTopicFilter={showTopicFilter}
@@ -518,12 +338,12 @@ function RecordingPanel({
                         isRecordingDisabled={isRecordingDisabled}
                         clearTopicFilter={clearTopicFilter}
                         toggleTopicFilter={toggleTopicFilter}
-                        stepBackward={stepBackward}
-                        resetPlayback={resetPlayback}
-                        resumePlayback={startRealtimePlayback}
-                        startRealtimePlayback={startRealtimePlayback}
-                        pausePlayback={pausePlayback}
-                        stepForward={stepForward}
+                        stepBackward={player.stepBackward}
+                        resetPlayback={player.reset}
+                        resumePlayback={player.start}
+                        startRealtimePlayback={player.start}
+                        pausePlayback={player.pause}
+                        stepForward={player.stepForward}
                       />
                     ) : null
                   }
