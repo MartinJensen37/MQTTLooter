@@ -348,7 +348,17 @@ async function run() {
   await evaluate(
     "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F3', bubbles: true }))",
   );
+  // Recording storage may still be loading on a slow machine; Record is enabled once it is ready.
+  await waitFor(
+    () =>
+      evaluate("document.querySelector('.recording-action-buttons button')?.disabled === false"),
+    'recording ready',
+  );
   await evaluate("document.querySelector('.recording-action-buttons button').click()");
+  await waitFor(
+    () => evaluate("!!document.querySelector('.recording-live-info')"),
+    'recording started',
+  );
   await evaluate("window.electronAPI.mqtt.subscribe('smoke', 'capture/#', 0)");
   await waitFor(
     () =>
