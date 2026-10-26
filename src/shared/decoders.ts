@@ -96,5 +96,14 @@ export type DecoderRequest =
       decoderId: string;
       message: string;
       encoding: import('./payload').PayloadEncoding;
+      /** Sparkplug B names aliased metrics from the births of the topic's edge node. */
+      topic?: string;
     }
+  | {
+      action: 'observe';
+      topic: string;
+      message: string;
+      encoding: import('./payload').PayloadEncoding;
+    }
+  | { action: 'encode-sparkplug'; payload: import('./sparkplug').SparkplugOutgoingPayload }
   | { action: 'close' };

@@ -20,8 +20,24 @@ parentPort!.on(
           data = decoders.decode(
             request.decoderId,
             payloadBytes(request.message, request.encoding),
+            request.topic,
           );
           break;
+        case 'observe':
+          decoders.sparkplug.observe(
+            request.topic,
+            payloadBytes(request.message, request.encoding),
+          );
+          break;
+        case 'encode-sparkplug': {
+          const bytes = decoders.sparkplug.encode(request.payload);
+          data = {
+            message: Buffer.from(bytes).toString('base64'),
+            encoding: 'base64',
+            byteLength: bytes.byteLength,
+          };
+          break;
+        }
         case 'close':
           parentPort!.postMessage({ requestId, data: null });
           parentPort!.close();

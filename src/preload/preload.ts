@@ -75,8 +75,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     list: () => ipcRenderer.invoke('decoders-list'),
     save: (decoders: unknown[]) => ipcRenderer.invoke('decoders-save', decoders),
     types: (sources: string[]) => ipcRenderer.invoke('decoders-types', sources),
-    decode: (decoderId: string, message: string, encoding: string) =>
-      ipcRenderer.invoke('decoders-decode', decoderId, message, encoding),
+    decode: (decoderId: string, message: string, encoding: string, topic?: string) =>
+      ipcRenderer.invoke('decoders-decode', decoderId, message, encoding, topic),
+  },
+  sparkplug: {
+    encode: (payload: unknown) => ipcRenderer.invoke('sparkplug-encode', payload),
   },
   credentials: {
     status: () => ipcRenderer.invoke('credentials-status'),

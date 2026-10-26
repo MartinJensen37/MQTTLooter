@@ -11,6 +11,7 @@ import { validateSearch, type HistorySearchQuery } from '../shared/history-searc
 import { MessageDelivery } from './message-delivery';
 import { DELIVERY_COALESCE, DELIVERY_LIMITS, type IncomingPublish } from '../shared/traffic';
 import { RECORDING_LIMITS, type RecordingPageQuery } from '../shared/recording';
+import { isSparkplugBirth, validateSparkplugPayload } from '../shared/sparkplug';
 
 let mainWindow: BrowserWindow | null = null;
 let splashWindow: BrowserWindow | null = null;
@@ -158,6 +159,8 @@ function setupMQTTEventForwarding() {
   mqttManager.on('message', (message: IncomingPublish) => {
     recordingService?.capture(message);
     historyService?.append(message);
+    if (isSparkplugBirth(message.topic))
+      decoderService?.observe(message.topic, message.message, message.encoding);
     messageDelivery.enqueue(message);
   });
   mqttManager.on('disconnected', ({ id }: { id: string }) => recordingService?.connectionLost(id));
@@ -447,17 +450,20 @@ for (const [channel, handler] of Object.entries({
       throw new Error('Invalid .proto sources');
     return decoderService!.types(sources);
   },
-  'decoders-decode': (decoderId: unknown, message: unknown, encoding: unknown) => {
+  'decoders-decode': (decoderId: unknown, message: unknown, encoding: unknown, topic: unknown) => {
     if (
       typeof decoderId !== 'string' ||
       decoderId.length > 128 ||
       typeof message !== 'string' ||
       message.length > DECODER_LIMITS.maxPayloadBytes * 2 ||
-      (encoding !== 'utf8' && encoding !== 'base64')
+      (encoding !== 'utf8' && encoding !== 'base64') ||
+      (topic !== undefined && (typeof topic !== 'string' || topic.length > 65535))
     )
       throw new Error('Invalid decode request');
-    return decoderService!.decode(decoderId, message, encoding);
+    return decoderService!.decode(decoderId, message, encoding, topic);
   },
+  'sparkplug-encode': (payload: unknown) =>
+    decoderService!.encodeSparkplug(validateSparkplugPayload(payload)),
 })) {
   handleIPC(channel, async (_event, ...args) => {
     try {

@@ -9,6 +9,7 @@ import {
   type DecoderRequest,
 } from '../shared/decoders';
 import type { PayloadEncoding } from '../shared/payload';
+import type { SparkplugOutgoingPayload } from '../shared/sparkplug';
 
 /** Saved decoder definitions, compiled and applied in a worker. */
 export class DecoderService {
@@ -29,8 +30,10 @@ export class DecoderService {
       {},
       {
         name: 'Decoder',
-        // A virtualized message list decodes only visible cards, a few dozen at a time.
-        maxPending: (request) => (request.action === 'decode' ? 64 : 8),
+        // A virtualized message list decodes only visible cards, a few dozen at a time;
+        // births arrive in bursts when many edge nodes come online.
+        maxPending: (request) =>
+          request.action === 'observe' ? 1024 : request.action === 'decode' ? 64 : 8,
         onFailure: () => {},
       },
     );
@@ -98,9 +101,26 @@ export class DecoderService {
     return this.worker.request({ action: 'types', sources });
   }
 
-  async decode(decoderId: string, message: string, encoding: PayloadEncoding): Promise<string> {
+  async decode(
+    decoderId: string,
+    message: string,
+    encoding: PayloadEncoding,
+    topic?: string,
+  ): Promise<string> {
     await this.ready;
-    return this.worker.request({ action: 'decode', decoderId, message, encoding });
+    return this.worker.request({ action: 'decode', decoderId, message, encoding, topic });
+  }
+
+  /** Sparkplug birth messages name the aliases that later data messages use. */
+  observe(topic: string, message: string, encoding: PayloadEncoding): void {
+    this.worker.request({ action: 'observe', topic, message, encoding }).catch(() => {});
+  }
+
+  /** Protobuf bytes for a Sparkplug B payload, base64-encoded for publishing. */
+  encodeSparkplug(
+    payload: SparkplugOutgoingPayload,
+  ): Promise<{ message: string; encoding: 'base64'; byteLength: number }> {
+    return this.worker.request({ action: 'encode-sparkplug', payload });
   }
 
   close(): Promise<void> {

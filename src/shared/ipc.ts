@@ -104,7 +104,14 @@ export interface ElectronAPI {
       decoderId: string,
       message: string,
       encoding: import('./payload').PayloadEncoding,
+      topic?: string,
     ): Promise<IpcResult<string>>;
+  };
+  sparkplug: {
+    /** Protobuf bytes for a Sparkplug B payload, as base64 ready to publish. */
+    encode(
+      payload: import('./sparkplug').SparkplugOutgoingPayload,
+    ): Promise<IpcResult<{ message: string; encoding: 'base64'; byteLength: number }>>;
   };
   credentials: {
     status(): Promise<IpcResult<import('./credentials').CredentialStatus>>;
