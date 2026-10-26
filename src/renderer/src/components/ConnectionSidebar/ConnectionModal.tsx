@@ -5,6 +5,8 @@ import {
   buildBrokerUrl,
   buildInitialFormData,
   createDefaultFormData,
+  hostnameError,
+  splitHostInput,
 } from './connectionModal/formHelpers';
 import ConnectionDetailsSection from './connectionModal/ConnectionDetailsSection';
 import Mqtt5PropertiesSection from './connectionModal/Mqtt5PropertiesSection';
@@ -114,6 +116,14 @@ function ConnectionModal({ connection, onSave, onCancel }: ConnectionModalProps)
   };
 
   const handleInputChange = (field: keyof ConnectionFormData, value: any) => {
+    // A pasted address fills the protocol, port and path, keeping just the host here.
+    if (field === 'hostname' && typeof value === 'string' && value.includes('://')) {
+      const { protocol, ...parts } = splitHostInput(value);
+      if (protocol && protocol !== formData.protocol) handleProtocolChange(protocol);
+      setFormData((prev) => ({ ...prev, ...parts }));
+      setErrors((prev) => ({ ...prev, hostname: null }));
+      return;
+    }
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: null }));
@@ -153,7 +163,7 @@ function ConnectionModal({ connection, onSave, onCancel }: ConnectionModalProps)
     const newErrors: FormErrors = {};
 
     if (!formData.name.trim()) newErrors.name = 'Connection name is required';
-    if (!formData.hostname.trim()) newErrors.hostname = 'Hostname is required';
+    if (hostnameError(formData.hostname)) newErrors.hostname = hostnameError(formData.hostname);
     if (!formData.port || Number(formData.port) < 1 || Number(formData.port) > 65535) {
       newErrors.port = 'Port must be between 1 and 65535';
     }
@@ -187,7 +197,7 @@ function ConnectionModal({ connection, onSave, onCancel }: ConnectionModalProps)
 
     const brokerUrl = buildBrokerUrl(
       formData.protocol,
-      formData.hostname,
+      formData.hostname.trim(),
       formData.port,
       formData.wsPath,
     );

@@ -11,15 +11,71 @@ export function parseBrokerUrl(url: string): ParsedBrokerUrl {
   try {
     const urlObj = new URL(url);
     const protocol = urlObj.protocol.replace(':', '');
-    const hostname = urlObj.hostname;
+    let hostname = urlObj.hostname;
+    let pathname = urlObj.pathname || '';
+    let portText = urlObj.port;
+    // Saved before the host field accepted URLs, e.g. mqtt://https://host:1883: recover the host.
+    const nested = /^\/\/([^/:]+)(?::(\d+))?/.exec(pathname);
+    if (nested && /^(https?|mqtts?|wss?|tcp|ssl|tls)$/.test(hostname)) {
+      hostname = nested[1];
+      portText = nested[2] ?? portText;
+      pathname = '';
+    }
     const port =
-      parseInt(urlObj.port) ||
+      parseInt(portText) ||
       (protocol === 'mqtt' ? 1883 : protocol === 'mqtts' ? 8883 : protocol === 'ws' ? 80 : 443);
-    const pathname = urlObj.pathname || '';
     return { protocol, hostname, port, pathname };
   } catch {
     return { protocol: 'mqtt', hostname: 'localhost', port: 1883, pathname: '' };
   }
+}
+
+const BROKER_SCHEMES: Record<string, string> = {
+  mqtt: 'mqtt',
+  tcp: 'mqtt',
+  mqtts: 'mqtts',
+  ssl: 'mqtts',
+  tls: 'mqtts',
+  ws: 'ws',
+  wss: 'wss',
+};
+
+/**
+ * Text pasted into the host field. A broker address such as `mqtts://host:8883` also gives the
+ * protocol, port and WebSocket path; any other URL, such as a broker's web page, keeps only its
+ * host. Plain host names are returned trimmed.
+ */
+export function splitHostInput(text: string): {
+  hostname: string;
+  protocol?: string;
+  port?: number;
+  wsPath?: string;
+} {
+  const match = /^\s*([a-z][a-z0-9+.-]*):\/\/([^/?#]*)([^?#]*)/i.exec(text);
+  if (!match) return { hostname: text.trim() };
+  // Credentials in the address are dropped; they belong in the username and password fields.
+  const authority = match[2].replace(/^.*@/, '');
+  const hostPort = /^(\[[^\]]*\]|[^:]*)(?::(\d+))?$/.exec(authority);
+  const hostname = hostPort?.[1] ?? authority;
+  const port = hostPort?.[2] ? Number(hostPort[2]) : undefined;
+  const protocol = BROKER_SCHEMES[match[1].toLowerCase()];
+  if (!protocol) return { hostname };
+  return {
+    hostname,
+    protocol,
+    ...(port && { port }),
+    ...(protocol.startsWith('ws') && match[3] && match[3] !== '/' && { wsPath: match[3] }),
+  };
+}
+
+/** Why a host name cannot be used, or '' when it can. */
+export function hostnameError(hostname: string): string {
+  const host = hostname.trim();
+  if (!host) return 'Hostname is required';
+  if (/^\[[0-9a-f:.]+\]$/i.test(host)) return '';
+  if (/[\s/:@?#]/.test(host))
+    return 'Enter only the host name, for example test.mosquitto.org. Choose the protocol and port beside it.';
+  return '';
 }
 
 export function buildBrokerUrl(
