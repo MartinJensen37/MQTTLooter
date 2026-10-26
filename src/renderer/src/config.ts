@@ -1,17 +1,3 @@
-export const MQTT_DEFAULTS = {
-  HOSTNAME: 'localhost',
-  PORTS: {
-    mqtt: 1883,
-    mqtts: 8883,
-    ws: 80,
-    wss: 443,
-  },
-  KEEPALIVE: 60,
-  CONNECT_TIMEOUT: 30000,
-  RECONNECT_PERIOD: 1000,
-  PROTOCOL_VERSION: 4,
-};
-
 export const MESSAGE_HISTORY = {
   MAX_ITEMS_PER_TOPIC: 300,
   /** Choices for the messages each topic keeps in the live cache (Settings). */
