@@ -629,10 +629,6 @@
   background: var(--primary);
 }
 
-/* Keep panels mounted while giving the device editor the whole workspace. */
-.simulation-workspace > .topic-browser-pane {
-  display: none !important;
-}
 @media (max-width: 1100px) {
   .main-header {
     flex-wrap: wrap;

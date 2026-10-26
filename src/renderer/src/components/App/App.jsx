@@ -380,19 +380,17 @@ function App() {
     return (
       <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
         <SplitPane
-          className={activeTab === 'simulation' ? 'simulation-workspace' : ''}
           direction="horizontal"
-          resizable={activeTab !== 'simulation'}
-          dividerSize={activeTab === 'simulation' ? 0 : 9}
-          dividerStyle={activeTab === 'simulation' ? { display: 'none' } : { width: '9px' }}
+          dividerSize={9}
+          dividerStyle={{ width: '9px' }}
           onResize={(sizes) => setTopicTreeWidth(sizes[0])}
           dividerClassName="resizer-divider"
         >
           <Pane
             className="topic-browser-pane"
-            minSize={activeTab === 'simulation' ? 0 : 50}
-            maxSize={activeTab === 'simulation' ? 0 : maxTopicWidth}
-            size={activeTab === 'simulation' ? 0 : Math.min(topicTreeWidth, maxTopicWidth)}
+            minSize={50}
+            maxSize={maxTopicWidth}
+            size={Math.min(topicTreeWidth, maxTopicWidth)}
           >
             <div className="topic-tree-panel">
               <TopicTreeComponent
