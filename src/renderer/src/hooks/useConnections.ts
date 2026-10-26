@@ -101,24 +101,34 @@ export function useConnections(
 
   const updateConnectionsList = async () => {
     try {
-      const mainConns = await MQTTService.refreshConnectionsFromMain();
+      const mainConns = (await MQTTService.refreshConnectionsFromMain()) ?? {};
+      // An empty list stays the same object, so saving does not run again for nothing.
       setConnections((saved) =>
-        saved.map((lc) => {
-          const mc = mainConns[lc.id];
-          return mc
-            ? {
-                ...lc,
-                isConnected: mc.isConnected,
-                status: mc.isConnected ? 'connected' : 'disconnected',
-                subscriptions: Object.keys(mc.subscriptions || {}),
-              }
-            : { ...lc, isConnected: false, status: 'disconnected' };
-        }),
+        saved.length === 0
+          ? saved
+          : saved.map((lc) => {
+              const mc = mainConns[lc.id];
+              if (mc?.isConnected) MQTTService.adoptConnection(lc.id, lc.config, mc);
+              return mc
+                ? {
+                    ...lc,
+                    isConnected: mc.isConnected,
+                    status: mc.isConnected ? 'connected' : 'disconnected',
+                    subscriptions: Object.keys(mc.subscriptions || {}),
+                  }
+                : { ...lc, isConnected: false, status: 'disconnected' };
+            }),
       );
     } catch (err) {
       console.error('Failed to update connections list:', err);
     }
   };
+
+  // Connections live in main and stay open while the window reloads; show them as they are.
+  const syncOnLoad = useRef(updateConnectionsList);
+  useEffect(() => {
+    void syncOnLoad.current();
+  }, []);
 
   const handleConnectionSelect = (connectionId: string) => {
     // Stash the current topic before switching.
@@ -215,7 +225,7 @@ export function useConnections(
 
   const handleConnectionToggle = async (connectionId: string) => {
     try {
-      const mainConns = await MQTTService.refreshConnectionsFromMain();
+      const mainConns = (await MQTTService.refreshConnectionsFromMain()) ?? {};
       const local = connections.find((c) => c.id === connectionId);
       if (!local) {
         showFeedback('Connection not found', 'error');

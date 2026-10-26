@@ -275,6 +275,20 @@ class MQTTService {
     return { success: true };
   }
 
+  /** A connection main kept open while the window reloaded: track it as connected again. */
+  adoptConnection(connectionId: string, config: ConnectionConfig, info: MainConnectionInfo): void {
+    if (this.connections.get(connectionId)?.isConnected) return;
+    this.connections.set(connectionId, {
+      id: connectionId,
+      config,
+      status: 'connected',
+      isConnected: true,
+      createdAt: Date.now(),
+      protocolVersion: info.protocolVersion || config.protocolVersion || 4,
+      subscriptions: Object.keys(info.subscriptions || {}),
+    });
+  }
+
   async refreshConnectionsFromMain(): Promise<Record<string, MainConnectionInfo>> {
     const result = await window.electronAPI.mqtt.getConnections();
     if (result.success) return result.data ?? {};

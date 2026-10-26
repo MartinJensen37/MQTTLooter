@@ -17,6 +17,7 @@ vi.mock('../src/renderer/src/services/MQTTService', () => ({
     },
     off: (_id, event, handler) => events.get(event)?.delete(handler),
     refreshConnectionsFromMain: vi.fn(),
+    adoptConnection: vi.fn(),
     getAllConnections: vi.fn(() => []),
   },
 }));

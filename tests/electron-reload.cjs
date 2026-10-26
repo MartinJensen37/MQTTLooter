@@ -27,6 +27,12 @@ module.exports = async function checkReload({ window, evaluate, waitFor, send })
       () => evaluate("!!document.querySelector('.connection-card')"),
       'reloaded profile',
     );
+    // Main kept the connection open, so the reloaded window shows it connected.
+    await waitFor(
+      () =>
+        evaluate("document.querySelector('.connection-status-text')?.textContent === 'connected'"),
+      'connected state after reload',
+    );
     await evaluate("document.querySelector('.connection-card').click()");
     await waitFor(
       () =>
