@@ -1,5 +1,6 @@
 import { generateSignalSample } from '../utils/valueGenerators';
 import { expandTemplate } from '../../../shared/template-expansion';
+import type { SparkplugOutgoingPayload } from '../../../shared/sparkplug';
 import { defaultConfig, validateDevice } from '../components/SimulationPanel/simulationPanel/model';
 import type {
   SimulatedDevice,
@@ -101,9 +102,12 @@ export interface SimulationCallbacks {
   publish: (message: {
     topic: string;
     payload: string;
+    encoding?: 'utf8' | 'base64';
     qos: number;
     retain: boolean;
   }) => Promise<void> | void;
+  /** Protobuf bytes, as base64, for devices that publish Sparkplug B. */
+  encodeSparkplug?: (payload: SparkplugOutgoingPayload) => Promise<string>;
   sample: (id: number, sample: SimulationSample) => void;
   error: (id: number, message: string) => void;
   busy?: (id: number, busy: boolean) => void;

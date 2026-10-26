@@ -238,3 +238,93 @@ describe('simulation scheduling', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 });
+
+describe('Sparkplug B devices', () => {
+  const publish = vi.fn();
+  // The real encoder runs in main; JSON keeps the payloads readable here.
+  const encodeSparkplug = vi.fn(async (payload: object) => JSON.stringify(payload));
+  let engine: SimulationEngine;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    publish.mockResolvedValue(undefined);
+    engine = new SimulationEngine(
+      { publish, sample: vi.fn(), error: vi.fn(), encodeSparkplug },
+      () => Date.now(),
+    );
+  });
+  afterEach(() => {
+    engine.dispose();
+    vi.useRealTimers();
+    vi.resetAllMocks();
+  });
+  const sent = () =>
+    publish.mock.calls.map(([message]) => ({
+      topic: message.topic,
+      encoding: message.encoding,
+      ...JSON.parse(message.payload),
+    }));
+
+  it('publishes births, aliased data and deaths with sequence numbers', async () => {
+    const pump = {
+      ...device(),
+      outputs: [
+        ...device().outputs,
+        {
+          id: 2,
+          name: 'running',
+          dataType: 'boolean',
+          generator: 'static',
+          config: { value: true },
+        },
+      ],
+      sparkplug: { group: 'Plant', edgeNode: 'Edge1', device: 'Pump' },
+    };
+    expect(validateDevice(pump)).toEqual([]);
+    engine.sync([pump], true);
+    await vi.advanceTimersByTimeAsync(200);
+    engine.sync([{ ...pump, isPublishing: false }], true);
+    await vi.advanceTimersByTimeAsync(0);
+    const messages = sent();
+    expect(messages.map(({ topic }) => topic)).toEqual([
+      'spBv1.0/Plant/NBIRTH/Edge1',
+      'spBv1.0/Plant/DBIRTH/Edge1/Pump',
+      'spBv1.0/Plant/DDATA/Edge1/Pump',
+      'spBv1.0/Plant/DDEATH/Edge1/Pump',
+      'spBv1.0/Plant/NDEATH/Edge1',
+    ]);
+    expect(messages.every(({ encoding }) => encoding === 'base64')).toBe(true);
+    expect(messages.map(({ seq }) => seq)).toEqual([0, 1, 2, 3, undefined]);
+    expect(messages[0].metrics.map(({ name }: { name: string }) => name)).toEqual([
+      'bdSeq',
+      'Node Control/Rebirth',
+    ]);
+    expect(messages[1].metrics).toEqual([
+      { name: 'count', alias: 1, type: 'Double', value: 0 },
+      { name: 'running', alias: 2, type: 'Boolean', value: true },
+    ]);
+    expect(messages[2].metrics[0]).toEqual({ name: '', alias: 1, type: 'Double', value: 1 });
+    expect(messages[4].metrics).toEqual([{ name: 'bdSeq', type: 'UInt64', value: 0 }]);
+    // The next session counts bdSeq up and sends its births again.
+    engine.sync([pump], true);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(sent()[5]).toMatchObject({ topic: 'spBv1.0/Plant/NBIRTH/Edge1', seq: 0 });
+    expect(sent()[5].metrics[0].value).toBe(1);
+  });
+
+  it('puts node signals in the node birth and refuses invalid IDs', async () => {
+    const node = { ...device(), sparkplug: { group: 'Plant', edgeNode: 'Edge1' } };
+    engine.sync([node], true);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(sent().map(({ topic }) => topic)).toEqual([
+      'spBv1.0/Plant/NBIRTH/Edge1',
+      'spBv1.0/Plant/NDATA/Edge1',
+    ]);
+    expect(sent()[0].metrics).toHaveLength(3);
+    expect(validateDevice({ ...node, sparkplug: { group: 'a/b', edgeNode: 'Edge1' } })).toContain(
+      'Sparkplug group, edge node and device IDs need text without /, + or #.',
+    );
+    expect(validateDevice({ ...node, publishMode: 'signals' })).toContain(
+      'Sparkplug devices publish all signals in one message.',
+    );
+  });
+});

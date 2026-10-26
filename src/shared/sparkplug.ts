@@ -56,6 +56,9 @@ export function parseSparkplugTopic(topic: string): SparkplugTopic | undefined {
 export const sparkplugTopic = ({ group, messageType, edgeNode, device }: SparkplugTopic) =>
   [SPARKPLUG_NAMESPACE, group, messageType, edgeNode, ...(device ? [device] : [])].join('/');
 
+/** The metric that asks an edge node to publish its births again. */
+export const REBIRTH_METRIC = 'Node Control/Rebirth';
+
 /** Birth messages carry metric names and aliases; later data may send aliases only. */
 export const isSparkplugBirth = (topic: string) =>
   topic.startsWith(`${SPARKPLUG_NAMESPACE}/`) && /^[^/]+\/[^/]+\/[ND]BIRTH\//.test(topic);

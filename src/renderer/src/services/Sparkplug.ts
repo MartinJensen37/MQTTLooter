@@ -2,6 +2,7 @@ import MQTTService from './MQTTService';
 import { decoderRegistry } from './DecoderRegistry';
 import type { PayloadEncoding } from '../../../shared/payload';
 import {
+  REBIRTH_METRIC,
   SPARKPLUG_DECODER,
   sparkplugTopic,
   type SparkplugOutgoingPayload,
@@ -22,7 +23,7 @@ export interface DecodedSparkplug {
   metrics: Record<string, SparkplugMetricValue>;
 }
 
-export const REBIRTH_METRIC = 'Node Control/Rebirth';
+export { REBIRTH_METRIC };
 
 export async function decodeSparkplug(
   message: string,

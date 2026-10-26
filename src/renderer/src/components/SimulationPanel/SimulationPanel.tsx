@@ -6,6 +6,8 @@ import type { SimulatedDevice, DeviceOutput } from './simulationPanel/types';
 import DeviceConfigPanel from './simulationPanel/DeviceConfigPanel';
 import AddDeviceModal from './simulationPanel/AddDeviceModal';
 import EditOutputModal from './simulationPanel/EditOutputModal';
+import { useSettings } from '../../services/Settings';
+import SparkplugBadge from '../Controls/SparkplugBadge';
 
 interface SimulationPanelProps {
   connectionId?: string | null;
@@ -22,6 +24,7 @@ function SimulationWorkspace({
   selectedTopic,
   showFeedback,
 }: SimulationPanelProps) {
+  const { sparkplug } = useSettings();
   const [loaded] = useState(() => {
     try {
       return {
@@ -51,6 +54,12 @@ function SimulationWorkspace({
   useEffect(() => {
     const engine = new SimulationEngine({
       publish: (message) => callbacks.current.onPublishMessage(message),
+      encodeSparkplug: async (payload) => {
+        const result = await window.electronAPI.sparkplug.encode(payload);
+        if (!result.success || !result.data)
+          throw new Error(result.error || 'The Sparkplug payload could not be encoded');
+        return result.data.message;
+      },
       sample: (id, sample) =>
         setSamples((previous) => ({
           ...previous,
@@ -86,13 +95,21 @@ function SimulationWorkspace({
   }, []);
 
   useEffect(() => {
-    engineRef.current?.sync(simulatedDevices, isConnected);
+    // With Sparkplug B turned off in Settings, devices publish their plain payloads.
+    engineRef.current?.sync(
+      sparkplug
+        ? simulatedDevices
+        : simulatedDevices.map((device) =>
+            device.sparkplug ? { ...device, sparkplug: undefined } : device,
+          ),
+      isConnected,
+    );
     if (!isConnected && simulatedDevices.some((device) => device.isPublishing)) {
       setSimulatedDevices((previous) =>
         previous.map((device) => ({ ...device, isPublishing: false })),
       );
     }
-  }, [simulatedDevices, isConnected]);
+  }, [simulatedDevices, isConnected, sparkplug]);
 
   useEffect(() => {
     if (loaded.error) return;
@@ -269,12 +286,18 @@ function SimulationWorkspace({
                       className={`fas fa-${device.isPublishing ? 'broadcast-tower' : 'microchip'} device-icon ${device.isPublishing ? 'publishing' : ''}`}
                     ></i>
                     <div>
-                      <span className="device-name">{device.name}</span>
+                      <span className="device-name">
+                        {device.name} {sparkplug && device.sparkplug && <SparkplugBadge />}
+                      </span>
                       <small className="device-summary">
                         {device.outputs.length} signals /{' '}
                         {device.isPublishing ? 'Running' : 'Stopped'}
                       </small>
-                      <small className="device-summary">{device.topic}</small>
+                      <small className="device-summary">
+                        {sparkplug && device.sparkplug
+                          ? `spBv1.0/${device.sparkplug.group}/…/${device.sparkplug.edgeNode}${device.sparkplug.device ? `/${device.sparkplug.device}` : ''}`
+                          : device.topic}
+                      </small>
                     </div>
                   </div>
                   <div className="device-actions">

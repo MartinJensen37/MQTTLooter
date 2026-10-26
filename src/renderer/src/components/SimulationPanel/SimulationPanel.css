@@ -491,3 +491,20 @@
   font-family: var(--font-mono);
   font-size: 12px;
 }
+
+.spb-simulation {
+  margin: var(--spacing-md) 0;
+}
+
+.spb-simulation .check-toggle-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spb-simulation-topics {
+  margin: var(--spacing-sm) 0 0;
+  font: 12px/1.6 var(--font-mono);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}

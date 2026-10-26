@@ -236,6 +236,18 @@ export function validateDevice(device: SimulatedDevice): string[] {
     for (const output of device.outputs)
       if (!validTopic(signalTopic(device, output)))
         errors.push(`${output.name}: Invalid resolved topic.`);
+  if (device.sparkplug) {
+    const { group, edgeNode, device: child } = device.sparkplug;
+    const id = (value: unknown) =>
+      typeof value === 'string' &&
+      value.length > 0 &&
+      value.length <= 256 &&
+      !/[/+#\0]/.test(value);
+    if (!id(group) || !id(edgeNode) || (child && !id(child)))
+      errors.push('Sparkplug group, edge node and device IDs need text without /, + or #.');
+    if (device.publishMode === 'signals')
+      errors.push('Sparkplug devices publish all signals in one message.');
+  }
   if (!device.outputs.length) errors.push('Add at least one signal.');
   for (const output of device.outputs)
     errors.push(

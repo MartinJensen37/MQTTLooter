@@ -1,11 +1,50 @@
 import { validateDevice } from '../components/SimulationPanel/simulationPanel/model';
-import type { SimulatedDevice } from '../components/SimulationPanel/simulationPanel/types';
+import type {
+  DeviceOutput,
+  SimulatedDevice,
+  SparkplugTarget,
+} from '../components/SimulationPanel/simulationPanel/types';
 import { sampleDevice, type SignalState, type SimulationCallbacks } from './SimulationSample';
 import { SignalScheduler } from './SignalScheduler';
+import {
+  REBIRTH_METRIC,
+  sparkplugTopic,
+  type SparkplugMessageType,
+  type SparkplugOutgoingMetric,
+  type SparkplugOutgoingPayload,
+} from '../../../shared/sparkplug';
 export { sampleDevice, type SimulationSample } from './SimulationSample';
+interface SparkplugSession {
+  target: SparkplugTarget;
+  seq: number;
+  bdSeq: number;
+}
 interface Session {
   startedAt: number;
   signals: Map<number, SignalState>;
+  /** Set once the session's births are published. */
+  sparkplug?: SparkplugSession;
+}
+
+const SPARKPLUG_TYPES: Record<string, 'Double' | 'Boolean'> = {
+  number: 'Double',
+  boolean: 'Boolean',
+};
+
+/** A signal as a metric with a fixed type per data type; other values travel as text. */
+function sparkplugMetric(
+  output: DeviceOutput,
+  value: unknown,
+  alias: number,
+): SparkplugOutgoingMetric {
+  const type = SPARKPLUG_TYPES[output.dataType] ?? 'String';
+  let converted: boolean | number | string | null = null;
+  if (type === 'Double')
+    converted = typeof value === 'number' && Number.isFinite(value) ? value : null;
+  else if (type === 'Boolean') converted = typeof value === 'boolean' ? value : null;
+  else if (value !== null && value !== undefined)
+    converted = typeof value === 'string' ? value : JSON.stringify(value);
+  return { name: output.name.trim(), alias, type, value: converted };
 }
 interface Loop {
   timer?: ReturnType<typeof setTimeout>;
@@ -21,6 +60,8 @@ export class SimulationEngine {
   private loops = new Map<number, Loop>();
   private sessions = new Map<number, Session>();
   private pending = new Set<number>();
+  // Sparkplug birth/death sequence per device, counting across sessions.
+  private bdSeq = new Map<number, number>();
   constructor(
     private callbacks: SimulationCallbacks,
     private now = () => performance.now(),
@@ -81,9 +122,79 @@ export class SimulationEngine {
   }
 
   private stopCombined(id: number) {
+    const sparkplug = this.sessions.get(id)?.sparkplug;
     clearTimeout(this.loops.get(id)?.timer);
     this.loops.delete(id);
     this.sessions.delete(id);
+    // A stopped edge node announces its death; a lost connection cannot.
+    if (sparkplug && this.connected && !this.disposed)
+      void this.sendDeath(sparkplug).catch(() => {});
+  }
+
+  private async sendSparkplug(
+    target: SparkplugTarget,
+    messageType: SparkplugMessageType,
+    payload: Omit<SparkplugOutgoingPayload, 'timestamp'>,
+  ): Promise<string> {
+    if (!this.callbacks.encodeSparkplug) throw new Error('Sparkplug B encoding is not available.');
+    const topic = sparkplugTopic({
+      group: target.group,
+      edgeNode: target.edgeNode,
+      messageType,
+      device: messageType[0] === 'D' ? target.device : undefined,
+    });
+    const message = await this.callbacks.encodeSparkplug({ timestamp: Date.now(), ...payload });
+    await this.callbacks.publish({
+      topic,
+      payload: message,
+      encoding: 'base64',
+      qos: 0,
+      retain: false,
+    });
+    return topic;
+  }
+
+  /** The first publish of a session sends births with every signal; later ones send data by alias. */
+  private async publishSparkplug(
+    device: SimulatedDevice,
+    session: Session,
+    values: Record<number, unknown>,
+  ): Promise<string> {
+    const target = { ...device.sparkplug!, device: device.sparkplug!.device || undefined };
+    const metrics = device.outputs.map((output, index) =>
+      sparkplugMetric(output, values[output.id], index + 1),
+    );
+    let state = session.sparkplug;
+    if (!state) {
+      const bdSeq = this.bdSeq.get(device.id) ?? 0;
+      this.bdSeq.set(device.id, (bdSeq + 1) % 256);
+      state = { target, seq: 0, bdSeq };
+      const control: SparkplugOutgoingMetric[] = [
+        { name: 'bdSeq', type: 'UInt64', value: bdSeq },
+        { name: REBIRTH_METRIC, type: 'Boolean', value: false },
+      ];
+      let topic = await this.sendSparkplug(target, 'NBIRTH', {
+        seq: 0,
+        metrics: target.device ? control : [...control, ...metrics],
+      });
+      if (target.device)
+        topic = await this.sendSparkplug(target, 'DBIRTH', { seq: ++state.seq, metrics });
+      session.sparkplug = state;
+      return topic;
+    }
+    state.seq = (state.seq + 1) % 256;
+    return this.sendSparkplug(target, target.device ? 'DDATA' : 'NDATA', {
+      seq: state.seq,
+      metrics: metrics.map((metric) => ({ ...metric, name: '' })),
+    });
+  }
+
+  private async sendDeath({ target, seq, bdSeq }: SparkplugSession) {
+    if (target.device)
+      await this.sendSparkplug(target, 'DDEATH', { seq: (seq + 1) % 256, metrics: [] });
+    await this.sendSparkplug(target, 'NDEATH', {
+      metrics: [{ name: 'bdSeq', type: 'UInt64', value: bdSeq }],
+    });
   }
 
   async publishOnce(id: number) {
@@ -99,15 +210,18 @@ export class SimulationEngine {
     this.callbacks.busy?.(id, true);
     try {
       const sample = sampleDevice(device, this.now() - session.startedAt, session.signals);
-      await this.callbacks.publish({
-        topic: device.topic,
-        payload: sample.payload,
-        qos: device.qos ?? 0,
-        retain: device.retain ?? false,
-      });
+      let topic = device.topic;
+      if (device.sparkplug) topic = await this.publishSparkplug(device, session, sample.values);
+      else
+        await this.callbacks.publish({
+          topic,
+          payload: sample.payload,
+          qos: device.qos ?? 0,
+          retain: device.retain ?? false,
+        });
       if (!this.disposed && this.sessions.get(id) === session) {
         session.signals = sample.next;
-        this.callbacks.sample(id, { ...sample, topic: device.topic });
+        this.callbacks.sample(id, { ...sample, topic });
       }
     } catch (error) {
       if (!this.disposed && this.sessions.get(id) === session) {
