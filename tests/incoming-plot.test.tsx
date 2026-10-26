@@ -154,11 +154,23 @@ it('scales fields independently and plots by a validated payload time field', as
   expect(
     [...container.querySelectorAll('.incoming-plot-legend li')].map((item) => item.textContent),
   ).toEqual(['Whole payload×', '/b×']);
+  const input = container.querySelector('[aria-label="Numeric field path"]') as HTMLInputElement;
+  await act(async () => input.focus());
+  const options = () =>
+    [...container.querySelectorAll('[role="listbox"] [role="option"]')].map(
+      (option) => option.textContent,
+    );
+  expect(options()).toEqual(['/a']);
+  // Picking a suggestion adds it straight away; nothing else is left to suggest.
+  await act(async () => (container.querySelector('[role="option"]') as HTMLElement).click());
   expect(
-    [...container.querySelectorAll('datalist option')].map((option) =>
-      option.getAttribute('value'),
-    ),
-  ).toEqual(['/a']);
+    [...container.querySelectorAll('.incoming-plot-legend li')].map((item) => item.textContent),
+  ).toEqual(['Whole payload×', '/b×', '/a×']);
+  await act(async () => input.focus());
+  expect(options()).toEqual([]);
+  expect(container.querySelector('.suggest-input-empty')!.textContent).toContain('No other');
+  await click('Remove plot field /a');
+  await act(async () => vi.advanceTimersByTimeAsync(300));
   const axis = () => [...container.querySelectorAll('svg text')].map((node) => node.textContent);
   expect(axis()).toContain('2000');
   await set('Plot scale', 'independent');
@@ -189,4 +201,35 @@ it('scales fields independently and plots by a validated payload time field', as
     timeUnit: 'iso',
   });
   expect(container.textContent).toContain('2 messages without a valid time and 1 outside');
+});
+
+it('offers the whole payload and spreads the axis of a flat series', async () => {
+  const series = vi.fn(async (query: any) => ({
+    success: true,
+    data: {
+      from: query.from,
+      to: query.to,
+      scanned: 3,
+      truncated: false,
+      availablePaths: [[]],
+      series: query.paths.map((path: string[]) => ({
+        path,
+        points: [
+          { x: query.to - 20, y: 42 },
+          { x: query.to - 10, y: 42 },
+        ],
+        valid: path.length ? 0 : 2,
+        gaps: 0,
+      })),
+    },
+  }));
+  (window as any).electronAPI = { history: { series } };
+  await act(async () => root.render(<IncomingPlot connectionId="a" topic="t" />));
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  const labels = [...container.querySelectorAll('svg text')].map((node) => node.textContent);
+  expect(labels).toContain('41');
+  expect(labels).toContain('43');
+  expect(container.querySelector('.incoming-plot-readout')!.textContent).toContain(
+    'Whole payload: 42',
+  );
 });

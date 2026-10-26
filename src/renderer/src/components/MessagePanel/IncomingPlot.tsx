@@ -1,5 +1,6 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import LinePlot, { PLOT_FRAME } from '../Charts/LinePlot';
+import SuggestInput from '../Controls/SuggestInput';
 import { clockTime } from '../../utils/time';
 import { matchDecoder } from '../../../../shared/decoders';
 import { useTopicDecoders } from '../../services/DecoderRegistry';
@@ -16,6 +17,12 @@ const name = (pointer: string) => pointer || 'Whole payload';
 const time = clockTime;
 const range = (values: number[]) =>
   values.length ? { min: Math.min(...values), max: Math.max(...values) } : { min: 0, max: 1 };
+/** A band around a flat series, so its line sits mid-chart between distinct axis labels. */
+const drawn = ({ min, max }: { min: number; max: number }) => {
+  if (min !== max) return { min, max };
+  const pad = Math.max(1, Math.abs(min) * 0.01);
+  return { min: min - pad, max: max + pad };
+};
 
 export default function IncomingPlot({
   connectionId,
@@ -26,7 +33,6 @@ export default function IncomingPlot({
   topic: string;
   active?: boolean;
 }) {
-  const fieldListId = useId();
   // A matching protobuf decoder turns stored bytes into fields before plotting.
   const decoder = matchDecoder(useTopicDecoders(), topic);
   const decoderId = decoder?.id;
@@ -121,11 +127,11 @@ export default function IncomingPlot({
         id: fieldPointer(series.path),
         color: COLORS[index],
         points: series.points.map((point) => ({ ...point, x: point.x - result.from })),
-        ...(independent && range(series.points.map((point) => point.y))),
+        ...(independent && drawn(range(series.points.map((point) => point.y)))),
       })) ?? [],
     [result, independent],
   );
-  const { min, max } = range(plots.flatMap((plot) => plot.points.map((point) => point.y)));
+  const { min, max } = drawn(range(plots.flatMap((plot) => plot.points.map((point) => point.y))));
   const from = result?.from ?? Date.now() - duration;
   const span = result ? result.to - result.from : duration;
   const cursorTime = from + (hover?.fraction ?? 1) * span;
@@ -163,10 +169,14 @@ export default function IncomingPlot({
       width;
     inspect(Math.min(1, Math.max(0, fraction)), x, 24, true);
   };
-  const addField = () => {
+  // Fields found in the payloads, for the Field and Time suggestions.
+  const available = (result?.availablePaths ?? []).map(fieldPointer);
+  const addField = (text = candidate) => {
     try {
-      const pointer = fieldPointer(pointerPath(candidate));
+      const typed = text.trim();
+      const pointer = /^whole payload$/i.test(typed) ? '' : fieldPointer(pointerPath(typed));
       if (fields.includes(pointer)) throw new Error('This field is already plotted.');
+      if (fields.length >= 4) throw new Error('Up to four fields can be plotted.');
       setFields((previous) => [...previous, pointer]);
       setAutomaticField(false);
       setFieldError('');
@@ -176,9 +186,9 @@ export default function IncomingPlot({
       setFieldError((reason as Error).message);
     }
   };
-  const applyTimeField = () => {
+  const applyTimeField = (text = timeCandidate) => {
     try {
-      const pointer = timeCandidate.trim() ? fieldPointer(pointerPath(timeCandidate.trim())) : '';
+      const pointer = text.trim() ? fieldPointer(pointerPath(text.trim())) : '';
       setTimeField(pointer);
       setTimeCandidate(pointer);
       setFieldError('');
@@ -269,15 +279,20 @@ export default function IncomingPlot({
         </label>
         <label>
           Time{' '}
-          <input
-            className="form-input"
-            aria-label="Payload time field"
+          <SuggestInput
+            label="Payload time field"
             placeholder="Receive time or /field"
             title="Empty uses the receive time. A field such as /time uses the payload's time."
             value={timeCandidate}
-            onChange={(event) => setTimeCandidate(event.target.value)}
-            onBlur={applyTimeField}
-            onKeyDown={(event) => event.key === 'Enter' && applyTimeField()}
+            suggestions={available.filter(Boolean).map((value) => ({ value }))}
+            empty="Type a field such as /time"
+            onChange={setTimeCandidate}
+            onPick={(value) => {
+              setTimeCandidate(value);
+              applyTimeField(value);
+            }}
+            onEnter={applyTimeField}
+            onBlur={() => applyTimeField()}
           />
         </label>
         <select
@@ -295,35 +310,28 @@ export default function IncomingPlot({
       <div className="incoming-plot-fields">
         <label>
           Field{' '}
-          <input
-            type="search"
-            className="form-input search-input"
-            aria-label="Numeric field path"
-            list={fieldListId}
-            placeholder="/field, e.g. /value"
-            title="A JSON field such as /value or /sensors/0/value. Empty plots the whole payload as a number."
+          <SuggestInput
+            label="Numeric field path"
+            placeholder="Choose or type /field"
+            title="Pick a field found in the payloads, or type a JSON pointer such as /sensors/0/value."
             value={candidate}
-            onChange={(event) => {
-              setCandidate(event.target.value);
+            suggestions={available
+              .filter((pointer) => !fields.includes(pointer))
+              .map((value) => ({ value, label: name(value) }))}
+            empty={result ? 'No other numeric fields in this window' : 'Reading fields…'}
+            disabled={fields.length >= 4}
+            onChange={(value) => {
+              setCandidate(value);
               setFieldError('');
             }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && fields.length < 4) addField();
-            }}
+            onPick={(value) => addField(value || 'Whole payload')}
+            onEnter={() => addField()}
           />
-          <datalist id={fieldListId}>
-            {(result?.availablePaths ?? [])
-              .map(fieldPointer)
-              .filter((pointer) => pointer && !fields.includes(pointer))
-              .map((pointer) => (
-                <option key={pointer} value={pointer} />
-              ))}
-          </datalist>
         </label>
         <button
           className="btn btn-sm btn-secondary"
-          disabled={fields.length >= 4 || fields.includes(candidate)}
-          onClick={addField}
+          disabled={fields.length >= 4 || !candidate.trim() || fields.includes(candidate)}
+          onClick={() => addField()}
         >
           Add field
         </button>
@@ -436,7 +444,9 @@ export default function IncomingPlot({
               {name(fieldPointer(series.path))}:{' '}
               {point ? `${point.y} at ${stamp(point.x)}` : 'No numeric samples'}
               {independent && plots[index]?.points.length
-                ? ` (range ${plots[index].min} to ${plots[index].max})`
+                ? (({ min, max }) => ` (range ${min} to ${max})`)(
+                    range(plots[index].points.map((sample) => sample.y)),
+                  )
                 : ''}
             </span>
           );

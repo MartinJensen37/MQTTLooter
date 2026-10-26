@@ -163,7 +163,7 @@ export default function LinePlot({
           {plot.coordinates.map((point, index) =>
             (index === 0 || point.breakBefore) &&
             (index === plot.coordinates.length - 1 || plot.coordinates[index + 1].breakBefore) ? (
-              <circle key={index} cx={point.x} cy={point.y} r={2} fill={plot.color} />
+              <circle key={index} cx={point.x} cy={point.y} r={compact ? 2 : 3} fill={plot.color} />
             ) : null,
           )}
         </g>

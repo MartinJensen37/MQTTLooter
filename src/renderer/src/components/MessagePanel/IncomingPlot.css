@@ -31,6 +31,9 @@
 .incoming-plot-fields .form-input {
   width: min(300px, 60vw);
 }
+.incoming-plot-toolbar .suggest-input .form-input {
+  width: 200px;
+}
 .incoming-plot-readout span {
   border-left: 3px solid;
   padding-left: 6px;

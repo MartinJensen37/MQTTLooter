@@ -402,6 +402,59 @@ select option::checkmark { display: none; }
   pointer-events: none;
 }
 
+/* ── Suggest input: a text field with a list styled like the select menus ── */
+.suggest-input {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.suggest-input .form-input {
+  height: 32px;
+  padding: 0 30px 0 12px;
+  border-radius: var(--radius-pill);
+}
+.suggest-input-toggle {
+  position: absolute;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%236c757d' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat center;
+  cursor: pointer;
+}
+.suggest-input-toggle:hover:not(:disabled) { background-color: var(--bg-muted); }
+.suggest-input-toggle:disabled { cursor: not-allowed; opacity: 0.5; }
+.suggest-input-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  min-width: 100%;
+  max-width: min(480px, 90vw);
+  max-height: 280px;
+  margin: 0;
+  padding: 4px 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+}
+.suggest-input-list li {
+  padding: 7px 14px;
+  overflow: hidden;
+  font: 400 13px var(--font-family);
+  color: var(--text-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.suggest-input-list li.active { background: var(--primary-light); color: var(--primary); }
+.suggest-input-list li.suggest-input-empty { color: var(--text-muted); cursor: default; }
+
 /* ── Sparkplug B marker: solid yellow in both themes ── */
 .spb-badge {
   display: inline-flex;
