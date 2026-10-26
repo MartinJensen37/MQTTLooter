@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './SimulationPanel.css';
 import { SimulationEngine, type SimulationSample } from '../../services/SimulationEngine';
-import { loadDevices, nextId, presetOutputs } from './simulationPanel/model';
+import { loadDevices, nextId, presetOutputs, validateDevice } from './simulationPanel/model';
 import type { SimulatedDevice, DeviceOutput } from './simulationPanel/types';
 import DeviceConfigPanel from './simulationPanel/DeviceConfigPanel';
 import AddDeviceModal from './simulationPanel/AddDeviceModal';
@@ -301,6 +301,27 @@ function SimulationWorkspace({
                     </div>
                   </div>
                   <div className="device-actions">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePublishing(device.id);
+                      }}
+                      className={`btn btn-sm ${device.isPublishing ? 'btn-secondary' : 'btn-success'}`}
+                      disabled={
+                        !device.isPublishing && (!isConnected || validateDevice(device).length > 0)
+                      }
+                      aria-label={`${device.isPublishing ? 'Stop' : 'Start'} ${device.name}`}
+                      title={
+                        device.isPublishing
+                          ? 'Stop loop'
+                          : !isConnected
+                            ? 'Connect to start'
+                            : (validateDevice(device)[0] ?? 'Start loop')
+                      }
+                      style={{ borderRadius: 'var(--radius-pill)' }}
+                    >
+                      <i className={`fas fa-${device.isPublishing ? 'stop' : 'play'}`}></i>
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
