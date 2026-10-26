@@ -1,0 +1,119 @@
+import { memo } from 'react';
+import SparkplugBadge from '../Controls/SparkplugBadge';
+import { parseSparkplugTopic, SPARKPLUG_NAMESPACE } from '../../../../shared/sparkplug';
+import type { FlattenedNode } from '../../services/models/TopicTree';
+
+function TopicTreeNode({
+  node,
+  onClick,
+  isSelected,
+  sparkplug = false,
+}: {
+  node: FlattenedNode;
+  onClick: (node: FlattenedNode) => void;
+  isSelected: boolean;
+  sparkplug?: boolean;
+}) {
+  const indentStyle = { paddingLeft: `${node.depth * 20 + 10}px` };
+
+  const formatRate = (rate: number) => {
+    if (rate >= 1) return `${rate.toFixed(1)}/s`;
+    if (rate > 0) return `${(rate * 60).toFixed(1)}/min`;
+    return '';
+  };
+
+  const formatMessage = (message: FlattenedNode['lastMessage']) => {
+    if (!message || !message.payload) return '';
+    if (message.encoding === 'base64') return `Base64: ${message.payload}`;
+    let payload = message.payload;
+    try {
+      payload = JSON.stringify(JSON.parse(payload));
+    } catch {}
+    return payload;
+  };
+
+  const getExpandIcon = () => {
+    if (!node.hasChildren) return '';
+    return node.isExpanded ? '▼' : '▶';
+  };
+
+  const hasStats = node.messageCount > 0 || node.messageRate > 0;
+  const hasPayload = !!node.lastMessage;
+  const hasDirectMessages = node.hasDirectMessages || node.isLeaf;
+  const hasRetainedMessage = node.lastMessage?.retain;
+  const subtopicCount = node.hasChildren ? node.childCount || 0 : 0;
+  // The namespace and each edge node or device topic, when Sparkplug B is turned on.
+  const sparkplugNode =
+    sparkplug &&
+    (node.fullPath === SPARKPLUG_NAMESPACE || Boolean(parseSparkplugTopic(node.fullPath || '')));
+
+  return (
+    <div
+      className={`topic-tree-node ${node.hasChildren ? 'has-children' : 'is-leaf'} ${hasDirectMessages ? 'has-messages' : ''} ${isSelected ? 'selected' : ''}`}
+      style={indentStyle}
+      title={node.fullPath || 'Empty topic level'}
+      role="button"
+      tabIndex={0}
+      aria-expanded={node.hasChildren ? node.isExpanded : undefined}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick(node);
+        }
+      }}
+      onClick={() => onClick(node)}
+    >
+      <div className="node-content">
+        <div className="node-left">
+          <span className="node-expand-icon">{getExpandIcon()}</span>
+          <span className="node-name">{node.name || '(empty)'}</span>
+          <div className="node-bubbles">
+            {sparkplugNode && <SparkplugBadge />}
+            {node.pinned && (
+              <span title="Pinned topic">
+                <i className="fas fa-thumbtack" aria-label="Pinned" />
+              </span>
+            )}
+            {hasRetainedMessage && (
+              <span className="badge badge-xs badge-retain" title="Has a retained message">
+                <i className="fas fa-save"></i> Retain
+              </span>
+            )}
+            {subtopicCount > 0 && (
+              <span
+                className="subtopic-bubble"
+                title={`${subtopicCount} subtopic${subtopicCount > 1 ? 's' : ''}`}
+              >
+                <i className="fas fa-sitemap"></i> {subtopicCount} Subtopic
+                {subtopicCount > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="node-right">
+          {(hasStats || hasPayload) && (
+            <>
+              {hasStats && (
+                <div className="node-stats">
+                  {node.messageCount > 0 && (
+                    <span className="message-count">{node.messageCount}</span>
+                  )}
+                  {node.messageRate > 0 && (
+                    <span className="message-rate">{formatRate(node.messageRate)}</span>
+                  )}
+                </div>
+              )}
+              {hasStats && hasPayload && <span className="stats-separator">|</span>}
+              {hasPayload && hasDirectMessages && (
+                <div className="node-payload">{formatMessage(node.lastMessage)}</div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default memo(TopicTreeNode);
