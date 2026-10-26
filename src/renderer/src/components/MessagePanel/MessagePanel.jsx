@@ -12,6 +12,7 @@ import { useSettings } from '../../services/Settings';
 import { clockTime, dateTime } from '../../utils/time';
 import { parseSparkplugTopic } from '../../../../shared/sparkplug';
 import SparkplugBadge from '../Controls/SparkplugBadge';
+import SparkplugDetails from './SparkplugDetails';
 
 /**
  * @param {{
@@ -319,6 +320,13 @@ function MessagePanel({
                 </span>
               </div>
             </div>
+            {sparkplug && connectionId && parseSparkplugTopic(selectedTopic.topicPath) && (
+              <SparkplugDetails
+                connectionId={connectionId}
+                topic={selectedTopic.topicPath}
+                showFeedback={showFeedback}
+              />
+            )}
             {!plotContent && (
               <div className="topic-actions-section">
                 {onClearMessages && (

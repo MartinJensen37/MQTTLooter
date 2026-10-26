@@ -1,0 +1,124 @@
+.spb-details {
+  margin-top: var(--spacing-md);
+}
+
+.spb-details .check-toggle-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spb-facts {
+  margin: 0;
+  display: grid;
+  gap: var(--spacing-xs);
+  font-size: 13px;
+}
+
+.spb-facts div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: var(--spacing-sm);
+}
+
+.spb-facts dt {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.spb-facts dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--text-body);
+  overflow-wrap: anywhere;
+}
+
+.spb-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.spb-state-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gray-500);
+}
+
+.spb-state.online {
+  color: var(--success-text);
+}
+
+.spb-state.online .spb-state-dot {
+  background: var(--success);
+}
+
+.spb-state.offline {
+  color: var(--danger-text);
+}
+
+.spb-state.offline .spb-state-dot {
+  background: var(--danger);
+}
+
+.spb-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md) 0;
+}
+
+.spb-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.spb-metrics {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: fixed;
+}
+
+.spb-metrics caption {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-heading);
+  padding-bottom: var(--spacing-xs);
+}
+
+.spb-metrics th,
+.spb-metrics td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-light);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spb-metrics th {
+  color: var(--text-muted);
+  font-weight: 600;
+  background: var(--bg-subtle);
+}
+
+.spb-metrics th:nth-child(1) {
+  width: 40%;
+}
+
+.spb-metrics th:nth-child(2) {
+  width: 15%;
+}
+
+.spb-metrics td:nth-child(3) {
+  font-family: var(--font-mono);
+}
