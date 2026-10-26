@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import CheckToggle from '../Controls/CheckToggle';
 import InfoTip from '../Controls/InfoTip';
+import CloseButton from '../Controls/CloseButton';
 import TopicTreeService from '../../services/TopicTreeService';
 import MQTTService from '../../services/MQTTService';
 import { settings as store, useSettings, type Settings } from '../../services/Settings';
@@ -145,9 +146,7 @@ export default function SettingsDialog({
       >
         <div className="modal-header">
           <h2 id="settings-title">Settings</h2>
-          <button className="modal-close-btn" onClick={onClose} aria-label="Close settings">
-            ×
-          </button>
+          <CloseButton onClick={onClose} label="Close settings" />
         </div>
         <div className="settings-layout">
           <nav className="settings-nav" aria-label="Settings sections">

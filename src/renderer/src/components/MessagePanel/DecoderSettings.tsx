@@ -3,6 +3,7 @@ import { validTopicFilter } from '../../../../shared/history-search';
 import { DECODER_LIMITS } from '../../../../shared/decoders';
 import { decoderRegistry, useDecoders } from '../../services/DecoderRegistry';
 import './DecoderSettings.css';
+import CloseButton from '../Controls/CloseButton';
 
 /** Protobuf decoders: `.proto` files and a message type applied to an MQTT topic filter. */
 export default function DecoderSettings({ onClose }: { onClose: () => void }) {
@@ -100,9 +101,7 @@ export default function DecoderSettings({ onClose }: { onClose: () => void }) {
       >
         <div className="modal-header">
           <h2 id="decoder-dialog-title">Payload decoders</h2>
-          <button className="modal-close-btn" onClick={onClose} aria-label="Close decoders">
-            ×
-          </button>
+          <CloseButton onClick={onClose} label="Close decoders" />
         </div>
         <div className="decoder-dialog-body">
           {decoders.length ? (

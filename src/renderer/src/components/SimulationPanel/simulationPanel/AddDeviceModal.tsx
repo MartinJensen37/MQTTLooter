@@ -1,6 +1,7 @@
 import IntervalField from './IntervalField';
 import React, { useState } from 'react';
 import { PRESETS, presetOutputs, validateDevice } from './model';
+import CloseButton from '../../Controls/CloseButton';
 
 interface Props {
   onClose: () => void;
@@ -52,13 +53,7 @@ function AddDeviceModal({ onClose, onCreateDevice, selectedTopic }: Props) {
       >
         <div className="modal-header">
           <h3 id="add-device-title">Add Simulated Device</h3>
-          <button
-            onClick={onClose}
-            className="btn btn-sm btn-ghost"
-            aria-label="Close device editor"
-          >
-            <i className="fas fa-times"></i>
-          </button>
+          <CloseButton onClick={onClose} label="Close device editor" />
         </div>
 
         <form onSubmit={handleSubmit} className="panel-content device-form">

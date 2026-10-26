@@ -557,22 +557,30 @@ select option::checkmark { display: none; }
   color: var(--text-heading);
 }
 
-.modal-close-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 22px;
-  width: 36px;
-  height: 36px;
-  display: flex;
+/* The one dialog close button: a small gray pill with an ×, red on hover. */
+.close-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  width: 32px;
+  height: 22px;
   padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  color: var(--gray-600);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
-.modal-close-btn:hover { background: var(--bg-muted); color: var(--text-body); }
+.close-btn:hover,
+.close-btn:focus-visible {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+  outline: none;
+}
 
 .modal-footer {
   padding: var(--spacing-md) var(--spacing-xxl);

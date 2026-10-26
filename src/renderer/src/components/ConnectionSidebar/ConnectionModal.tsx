@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './ConnectionModal.css';
+import CloseButton from '../Controls/CloseButton';
 import type { ConnectionFormData, FormErrors, CertFileType } from './connectionModal/types';
 import {
   buildBrokerUrl,
@@ -264,9 +265,7 @@ function ConnectionModal({ connection, onSave, onCancel }: ConnectionModalProps)
       <div className="mqtt-modal-container">
         <div className="mqtt-modal-header">
           <h2>{connection ? 'Edit Connection' : 'New Connection'}</h2>
-          <button className="modal-close-btn" onClick={onCancel} type="button">
-            <i className="fas fa-times"></i>
-          </button>
+          <CloseButton onClick={onCancel} label="Close connection editor" />
         </div>
 
         <form onSubmit={handleSubmit} className="mqtt-modal-form">

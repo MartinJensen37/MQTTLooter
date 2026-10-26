@@ -12,6 +12,7 @@ import DynamicConfigFields from './DynamicConfigFields';
 import SignalWaveform from './SignalWaveform';
 import SimulationPayloadPreview from './SimulationPayloadPreview';
 import CheckToggle from '../../Controls/CheckToggle';
+import CloseButton from '../../Controls/CloseButton';
 
 interface Props {
   output: DeviceOutput;
@@ -137,13 +138,7 @@ export default function EditOutputModal({
       >
         <div className="modal-header">
           <h3 id="signal-title">Configure signal</h3>
-          <button
-            className="btn btn-sm btn-ghost"
-            aria-label="Close signal editor"
-            onClick={onClose}
-          >
-            Close
-          </button>
+          <CloseButton onClick={onClose} label="Close signal editor" />
         </div>
         <form
           className="panel-content output-form"
