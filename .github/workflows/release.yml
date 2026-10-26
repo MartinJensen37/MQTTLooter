@@ -15,8 +15,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -29,8 +29,14 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match package.json version $version" >&2
             exit 1
           fi
+      # The interoperability tests run against a real broker when one is installed.
       - name: Install Mosquitto
-        run: choco install mosquitto --no-progress -y
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://mosquitto.org/files/binary/win64/mosquitto-2.0.22-install-windows-x64.exe -OutFile mosquitto-setup.exe
+          Start-Process ./mosquitto-setup.exe -ArgumentList '/S' -Wait
+          if (!(Test-Path 'C:/Program Files/mosquitto/mosquitto.exe')) { exit 1 }
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
