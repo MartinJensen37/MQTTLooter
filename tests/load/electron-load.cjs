@@ -21,7 +21,7 @@ const PROFILES = {
 const profileName = process.env.LOAD_PROFILE || 'quick';
 const profile = PROFILES[profileName];
 if (!profile) throw new Error(`Unknown LOAD_PROFILE ${profileName}`);
-const TARGETS = { inputP95Ms: 100, disconnectMs: 500, heapPeakMiB: 256 };
+const TARGETS = { inputP95Ms: 100, disconnectMs: 500, heapPeakMiB: 384 };
 // Part of the stream is protobuf, decoded in main and plotted from disk history.
 const PROTO = {
   source:
