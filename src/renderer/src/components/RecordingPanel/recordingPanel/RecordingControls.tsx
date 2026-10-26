@@ -30,16 +30,6 @@ function RecordingControls({
 }: Props) {
   return (
     <div className="recording-fixed-controls">
-      {isRecordingDisabled && storageReady && (
-        <p
-          className="recording-connection-warning"
-          role="status"
-          title="Connect to a broker to record. Saved recordings can still be played."
-        >
-          <i className="fas fa-plug"></i> No active connection
-        </p>
-      )}
-
       <div
         className={`recording-controls-section ${isRecordingDisabled ? 'recording-controls-disabled' : ''}`}
       >
@@ -75,7 +65,7 @@ function RecordingControls({
           {!isRecording ? (
             <button
               onClick={startRecording}
-              className="btn btn-lg btn-success"
+              className="btn btn-md btn-success"
               disabled={isRecordingDisabled || busy}
               title={
                 !storageReady
@@ -88,7 +78,7 @@ function RecordingControls({
               <i className="fas fa-record-vinyl"></i> Record
             </button>
           ) : (
-            <button onClick={stopRecording} className="btn btn-lg btn-danger" disabled={busy}>
+            <button onClick={stopRecording} className="btn btn-md btn-danger" disabled={busy}>
               <i className="fas fa-stop"></i> Stop
             </button>
           )}

@@ -397,6 +397,18 @@ function RecordingPanel({
       <div className="recording-main-header">
         <div className="header-left">
           <h2>Recording & Playback</h2>
+          {isConnected ? (
+            <span className="connection-indicator connected">
+              <i className="fas fa-check-circle"></i> Connected
+            </span>
+          ) : (
+            <span
+              className="connection-indicator disconnected"
+              title="Connect to a broker to record. Saved recordings can still be played."
+            >
+              <i className="fas fa-exclamation-triangle"></i> Disconnected
+            </span>
+          )}
         </div>
         {status?.databaseBytes !== undefined && (
           <span className="recording-storage-usage">

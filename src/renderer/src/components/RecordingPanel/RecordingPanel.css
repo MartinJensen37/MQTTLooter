@@ -60,21 +60,6 @@
 }
 
 /* Connection Warning */
-/* A small pill: recording needs a connection, playback does not. */
-.recording-connection-warning {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 calc(var(--spacing-md) - var(--spacing-xl));
-  padding: 3px 12px;
-  border: 1px solid var(--warning-yellow);
-  border-radius: var(--radius-pill);
-  background: var(--warning-yellow-light);
-  color: var(--warning-yellow-text);
-  font-size: 12px;
-  font-weight: 600;
-}
 
 /* Recording Controls Section */
 .recording-controls-section {
@@ -102,15 +87,18 @@
   flex: 1;
 }
 
+/* A status pill, like the connection pills. */
 .recording-status-indicator {
-  display: flex;
+  align-self: flex-start;
+  display: inline-flex;
   align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-radius: var(--radius-lg);
-  font-weight: 600;
-  font-size: 16px;
-  border: 2px solid;
+  gap: 6px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+  font-size: 11px;
+  border: 1px solid;
   transition: all var(--transition-normal);
 }
 

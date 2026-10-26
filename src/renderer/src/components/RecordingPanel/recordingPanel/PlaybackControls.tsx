@@ -156,7 +156,7 @@ function PlaybackControls({
           {!isPlaying ? (
             <button
               onClick={isPaused ? resumePlayback : startRealtimePlayback}
-              className="btn btn-lg btn-success"
+              className="btn btn-md btn-success"
               title={
                 isRecordingDisabled
                   ? 'Playback will not publish messages (no connection)'
@@ -166,7 +166,7 @@ function PlaybackControls({
               <i className="fas fa-play"></i>
             </button>
           ) : (
-            <button onClick={pausePlayback} className="btn btn-lg btn-warning">
+            <button onClick={pausePlayback} className="btn btn-md btn-warning">
               <i className="fas fa-pause"></i>
             </button>
           )}
