@@ -28,16 +28,22 @@ export default function IncomingPlot({
   connectionId,
   topic,
   active = true,
+  connected = true,
 }: {
   connectionId: string;
   topic: string;
   active?: boolean;
+  /** The broker connection; losing it pauses the plot until it returns. */
+  connected?: boolean;
 }) {
   // A matching protobuf decoder turns stored bytes into fields before plotting.
   const decoder = matchDecoder(useTopicDecoders(), topic);
   const decoderId = decoder?.id;
   const [duration, setDuration] = useState(60_000);
   const [end, setEnd] = useState<number | null>(null);
+  // The pause a disconnect made, undone when the connection returns unless changed meanwhile.
+  const [disconnectPause, setDisconnectPause] = useState<number | null>(null);
+  const wasConnected = useRef(connected);
   const [fields, setFields] = useState(['']);
   const [candidate, setCandidate] = useState('');
   const [result, setResult] = useState<NumericResult>();
@@ -49,6 +55,18 @@ export default function IncomingPlot({
   const dwell = useRef<ReturnType<typeof setTimeout>>();
   const chart = useRef<HTMLDivElement>(null);
   useEffect(() => () => clearTimeout(dwell.current), []);
+  useEffect(() => {
+    if (wasConnected.current === connected) return;
+    wasConnected.current = connected;
+    if (!connected && end === null) {
+      const at = Date.now();
+      setEnd(at);
+      setDisconnectPause(at);
+    } else if (connected && disconnectPause !== null) {
+      if (end === disconnectPause) setEnd(null);
+      setDisconnectPause(null);
+    }
+  }, [connected, end, disconnectPause]);
   const [automaticField, setAutomaticField] = useState(true);
   const [independent, setIndependent] = useState(false);
   const [timeField, setTimeField] = useState('');
@@ -458,6 +476,11 @@ export default function IncomingPlot({
           );
         })}
       </div>
+      {disconnectPause !== null && end === disconnectPause && (
+        <p role="status">
+          Paused while the broker is disconnected. It follows live data again on reconnect.
+        </p>
+      )}
       {!!(result?.timeRejected || result?.outsideWindow) && (
         <p role="status">
           Payload time: {result.timeRejected ?? 0} messages without a valid time and{' '}

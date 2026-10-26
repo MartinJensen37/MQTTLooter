@@ -233,3 +233,39 @@ it('offers the whole payload and spreads the axis of a flat series', async () =>
     'Whole payload: 42',
   );
 });
+
+it('pauses while the broker is disconnected and follows live data again on reconnect', async () => {
+  const series = vi.fn(async (query: any) => ({
+    success: true,
+    data: {
+      from: query.from,
+      to: query.to,
+      scanned: 1,
+      truncated: false,
+      availablePaths: [[]],
+      series: [{ path: [], points: [{ x: query.to, y: 1 }], valid: 1, gaps: 0 }],
+    },
+  }));
+  (window as any).electronAPI = { history: { series } };
+  const render = (connected: boolean) =>
+    act(async () => root.render(<IncomingPlot connectionId="a" topic="t" connected={connected} />));
+  const pauseLabel = () =>
+    [...container.querySelectorAll('.incoming-plot button')].find((button) =>
+      /plot/i.test(button.textContent ?? ''),
+    )!.textContent;
+  await render(true);
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  expect(pauseLabel()).toBe('Pause plot');
+  await render(false);
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  expect(pauseLabel()).toBe('Resume live plot');
+  expect(container.textContent).toContain('Paused while the broker is disconnected');
+  // Paused queries stop polling.
+  const calls = series.mock.calls.length;
+  await act(async () => vi.advanceTimersByTimeAsync(2000));
+  expect(series.mock.calls.length).toBe(calls);
+  await render(true);
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  expect(pauseLabel()).toBe('Pause plot');
+  expect(container.textContent).not.toContain('Paused while the broker is disconnected');
+});

@@ -308,6 +308,7 @@ function Workspace(props: any) {
                 key={`${connectionId}:${stored ? topic : selectedPath}`}
                 connectionId={connectionId}
                 topic={stored ? topic : selectedPath}
+                connected={props.isConnected !== false}
               />
             ) : null
           }

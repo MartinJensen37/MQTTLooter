@@ -289,6 +289,7 @@ function App() {
           selectedTopic={logging.selectedTopic}
           connectionName={getConnectionName(logging.connectionId)}
           onClearMessages={logging.onClearMessages}
+          isConnected={connectedPane(logging)}
           showFeedback={showFeedback}
         />
       </div>
