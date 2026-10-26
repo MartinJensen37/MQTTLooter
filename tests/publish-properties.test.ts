@@ -39,6 +39,10 @@ it('preserves absent, empty, false, zero and repeated properties through drafts'
     buildPublishProperties({ ...draft, correlation: '' }, 5, new Uint8Array())!.correlationData,
   ).toEqual({ encoding: 'base64', data: '' });
   expect(normalizePublishProperties({}, 4)).toBeUndefined();
+  // MQTT.js never sends a packet with an empty user property map.
+  expect(normalizePublishProperties({ userProperties: {} }, 5)).not.toHaveProperty(
+    'userProperties',
+  );
 });
 
 it('rejects malformed properties, unsupported aliases and forbidden outbound subscription identifiers', () => {

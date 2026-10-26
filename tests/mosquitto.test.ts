@@ -105,6 +105,22 @@ describe.skipIf(!binary)('Mosquitto interoperability', () => {
       ).rejects.toThrow(/not authori[sz]ed|bad user ?name or password/i);
   });
 
+  it('connects, subscribes and publishes with the connection editor MQTT 5 defaults', async () => {
+    const id = 'editor-defaults';
+    const { manager, messages } = await client(id, {
+      sessionExpiryInterval: 0,
+      receiveMaximum: 65535,
+      maximumPacketSize: 268435455,
+      topicAliasMaximum: 0,
+      requestResponseInformation: false,
+      requestProblemInformation: true,
+      userProperties: {},
+      subscriptions: [{ topic: 'defaults/#', qos: 0, properties: { userProperties: {} } }],
+    });
+    await manager.publish(id, 'defaults/value', 'sent', { properties: { userProperties: {} } });
+    await until(() => messages.some((message) => message.message === 'sent'), 'message received');
+  });
+
   it('delivers queued QoS 1 messages to a persistent session, and drops them after expiry', async () => {
     const session = (id: string, sessionExpiryInterval: number) =>
       client(id, {

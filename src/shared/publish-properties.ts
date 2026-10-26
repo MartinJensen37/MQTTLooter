@@ -123,7 +123,7 @@ export function normalizePublishProperties(
       if (bytes > PUBLISH_PROPERTY_LIMITS.bytes)
         throw new Error('Publish properties exceed the 64 KiB app limit.');
     }
-    result.userProperties = Object.fromEntries(entries);
+    if (entries.length) result.userProperties = Object.fromEntries(entries);
   }
   if (bytes > PUBLISH_PROPERTY_LIMITS.bytes)
     throw new Error('Publish properties exceed the 64 KiB app limit.');

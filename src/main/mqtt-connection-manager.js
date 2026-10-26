@@ -4,6 +4,13 @@ import { EventEmitter } from 'events';
 import { encodePayload, payloadBytes } from '../shared/payload';
 import { normalizePublishProperties, validatePublishTopic } from '../shared/publish-properties';
 
+// mqtt-packet refuses to encode an empty user property map and MQTT.js then never sends the
+// packet, so a CONNECT would wait for a CONNACK forever. Leave the property out instead.
+function withoutEmptyUserProperties(properties = {}) {
+  const { userProperties, ...rest } = properties;
+  return userProperties && Object.keys(userProperties).length ? properties : rest;
+}
+
 class MQTTConnection extends EventEmitter {
   constructor(id, config) {
     super();
@@ -174,6 +181,7 @@ class MQTTConnection extends EventEmitter {
           ]) {
             if (this.config[key] !== undefined) options.properties[key] = this.config[key];
           }
+          options.properties = withoutEmptyUserProperties(options.properties);
         }
 
         let settled = false;
@@ -311,6 +319,7 @@ class MQTTConnection extends EventEmitter {
       }
 
       const subscribeOptions = { qos };
+      properties = withoutEmptyUserProperties(properties);
       if (this.config.protocolVersion === 5 && Object.keys(properties).length > 0) {
         subscribeOptions.properties = properties;
       }
@@ -341,6 +350,7 @@ class MQTTConnection extends EventEmitter {
         return;
       }
 
+      properties = withoutEmptyUserProperties(properties);
       const unsubscribeOptions =
         this.config.protocolVersion === 5 && Object.keys(properties).length > 0
           ? { properties }
