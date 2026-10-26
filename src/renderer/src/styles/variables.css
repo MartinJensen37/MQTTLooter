@@ -1,39 +1,39 @@
 :root {
   /* === Core palette === */
-  --primary:        #007bff;
-  --primary-hover:  #0056b3;
-  --primary-light:  rgba(0, 123, 255, 0.1);
+  --primary: #007bff;
+  --primary-hover: #0056b3;
+  --primary-light: rgba(0, 123, 255, 0.1);
 
-  --success:        #28a745;
-  --success-hover:  #218838;
-  --success-light:  rgba(40, 167, 69, 0.1);
+  --success: #28a745;
+  --success-hover: #218838;
+  --success-light: rgba(40, 167, 69, 0.1);
 
-  --warning:        #ffc107;
-  --warning-hover:  #e0a800;
-  --warning-light:  rgba(255, 193, 7, 0.2);
-  --warning-text:   #856404;
+  --warning: #ffc107;
+  --warning-hover: #e0a800;
+  --warning-light: rgba(255, 193, 7, 0.2);
+  --warning-text: #856404;
 
-  --danger:         #dc3545;
-  --danger-hover:   #c82333;
-  --danger-light:   rgba(220, 53, 69, 0.1);
+  --danger: #dc3545;
+  --danger-hover: #c82333;
+  --danger-light: rgba(220, 53, 69, 0.1);
 
-  --info:           #17a2b8;
-  --info-hover:     #138496;
+  --info: #17a2b8;
+  --info-hover: #138496;
 
   /* === Legacy aliases (keep until all components migrated) === */
-  --primary-blue:        var(--primary);
-  --primary-blue-hover:  var(--primary-hover);
-  --primary-blue-light:  var(--primary-light);
-  --success-green:       var(--success);
+  --primary-blue: var(--primary);
+  --primary-blue-hover: var(--primary-hover);
+  --primary-blue-light: var(--primary-light);
+  --success-green: var(--success);
   --success-green-hover: var(--success-hover);
   --success-green-light: var(--success-light);
-  --warning-yellow:      var(--warning);
+  --warning-yellow: var(--warning);
   --warning-yellow-hover: var(--warning-hover);
   --warning-yellow-light: var(--warning-light);
   --warning-yellow-text: var(--warning-text);
-  --danger-red:          var(--danger);
-  --danger-red-hover:    var(--danger-hover);
-  --danger-red-light:    var(--danger-light);
+  --danger-red: var(--danger);
+  --danger-red-hover: var(--danger-hover);
+  --danger-red-light: var(--danger-light);
 
   /* === Grays === */
   --gray-100: #f8f9fa;
@@ -47,34 +47,34 @@
   --gray-900: #212529;
 
   /* === Semantic surface tokens === */
-  --bg-surface:   #ffffff;
-  --bg-subtle:    var(--gray-100);
-  --bg-muted:     var(--gray-200);
+  --bg-surface: #ffffff;
+  --bg-subtle: var(--gray-100);
+  --bg-muted: var(--gray-200);
   --border-color: var(--gray-300);
   --border-light: var(--gray-200);
   --text-heading: #2c3e50;
-  --text-body:    var(--gray-700);
-  --text-muted:   var(--gray-600);
+  --text-body: var(--gray-700);
+  --text-muted: var(--gray-600);
 
   /* Translucent surface for bars over scrolling content. */
-  --bg-glass:     rgba(255, 255, 255, 0.9);
+  --bg-glass: rgba(255, 255, 255, 0.9);
   /* Thin borders on tinted backgrounds. */
-  --hairline:     rgba(0, 0, 0, 0.1);
+  --hairline: rgba(0, 0, 0, 0.1);
   /* Same in both themes: gray buttons with white text, tooltips, text on yellow. */
-  --neutral:       #6c757d;
+  --neutral: #6c757d;
   --neutral-hover: #5a6268;
-  --tooltip-bg:    #343a40;
-  --on-warning:    #212529;
+  --tooltip-bg: #343a40;
+  --on-warning: #212529;
 
   /* === Status colours === */
-  --bg-connected:   #d4edda;
-  --bg-connecting:  #fff3cd;
+  --bg-connected: #d4edda;
+  --bg-connecting: #fff3cd;
   --bg-disconnected: var(--gray-100);
-  --bg-error:       #f8d7da;
-  --border-connected:  #c3e6cb;
+  --bg-error: #f8d7da;
+  --border-connected: #c3e6cb;
   --border-connecting: #ffeaa7;
-  --success-text:   #155724;
-  --danger-text:    #721c24;
+  --success-text: #155724;
+  --danger-text: #721c24;
 
   /* === Chart series: a fixed order, validated for color-vision deficiencies on these surfaces.
      Series beyond the eighth share the neutral "other" color rather than repeating hues. === */
@@ -90,30 +90,30 @@
 
   /* === Typography === */
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono:   'SF Mono', Monaco, 'Cascadia Code', 'Consolas', monospace;
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Consolas', monospace;
 
   /* === Spacing === */
-  --spacing-xs:  4px;
-  --spacing-sm:  8px;
-  --spacing-md:  12px;
-  --spacing-lg:  16px;
-  --spacing-xl:  20px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
   --spacing-xxl: 24px;
 
   /* === Border radius === */
-  --radius-sm:   4px;
-  --radius-md:   6px;
-  --radius-lg:   8px;
-  --radius-xl:   12px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
   --radius-pill: 20px;
 
   /* === Shadows === */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.10);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.15);
 
   /* === Transitions === */
-  --transition-fast:   0.15s ease;
+  --transition-fast: 0.15s ease;
   --transition-normal: 0.25s ease;
 }
 
@@ -121,17 +121,17 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --primary:        #4493f8;
-  --primary-hover:  #6cabfa;
-  --primary-light:  rgba(68, 147, 248, 0.18);
-  --success:        #2f9e50;
-  --success-hover:  #3bb361;
-  --success-light:  rgba(47, 158, 80, 0.18);
-  --warning-light:  rgba(255, 193, 7, 0.16);
-  --warning-text:   #f0c95a;
-  --danger:         #e5534b;
-  --danger-hover:   #f06b63;
-  --danger-light:   rgba(229, 83, 75, 0.18);
+  --primary: #4493f8;
+  --primary-hover: #6cabfa;
+  --primary-light: rgba(68, 147, 248, 0.18);
+  --success: #2f9e50;
+  --success-hover: #3bb361;
+  --success-light: rgba(47, 158, 80, 0.18);
+  --warning-light: rgba(255, 193, 7, 0.16);
+  --warning-text: #f0c95a;
+  --danger: #e5534b;
+  --danger-hover: #f06b63;
+  --danger-light: rgba(229, 83, 75, 0.18);
 
   --gray-100: #1c2026;
   --gray-200: #272c33;
@@ -143,19 +143,19 @@
   --gray-800: #dce1e6;
   --gray-900: #eef1f4;
 
-  --bg-surface:   #22272e;
+  --bg-surface: #22272e;
   --text-heading: #e6ebf0;
-  --bg-glass:     rgba(34, 39, 46, 0.92);
-  --hairline:     rgba(255, 255, 255, 0.12);
-  --tooltip-bg:   #4a525c;
+  --bg-glass: rgba(34, 39, 46, 0.92);
+  --hairline: rgba(255, 255, 255, 0.12);
+  --tooltip-bg: #4a525c;
 
-  --bg-connected:   rgba(47, 158, 80, 0.16);
-  --bg-connecting:  rgba(255, 193, 7, 0.12);
-  --bg-error:       rgba(229, 83, 75, 0.16);
-  --border-connected:  rgba(47, 158, 80, 0.45);
+  --bg-connected: rgba(47, 158, 80, 0.16);
+  --bg-connecting: rgba(255, 193, 7, 0.12);
+  --bg-error: rgba(229, 83, 75, 0.16);
+  --border-connected: rgba(47, 158, 80, 0.45);
   --border-connecting: rgba(255, 193, 7, 0.4);
-  --success-text:   #7fd99d;
-  --danger-text:    #ff9d96;
+  --success-text: #7fd99d;
+  --danger-text: #ff9d96;
 
   --series-1: #3987e5;
   --series-2: #d95926;

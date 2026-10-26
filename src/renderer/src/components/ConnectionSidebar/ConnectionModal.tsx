@@ -367,7 +367,11 @@ function ConnectionModal({ connection, onSave, onCancel }: ConnectionModalProps)
           </div>
 
           <div className="mqtt-modal-footer">
-            <button type="button" onClick={onCancel} className="btn btn-md btn-secondary mqtt-cancel-btn">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="btn btn-md btn-secondary mqtt-cancel-btn"
+            >
               Cancel
             </button>
             <button type="submit" className="btn btn-md btn-primary mqtt-save-btn">

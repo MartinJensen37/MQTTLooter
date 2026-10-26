@@ -18,7 +18,7 @@
     "pack": "electron-vite build && electron-builder --dir",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint .",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css}\" \"tests/**/*.{ts,tsx,cjs}\""
   },
   "build": {
     "appId": "com.martinjensen37.mqttlooter",

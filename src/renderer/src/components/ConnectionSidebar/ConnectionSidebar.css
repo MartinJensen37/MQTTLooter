@@ -36,8 +36,15 @@
   padding: var(--spacing-sm);
   margin: -6px;
 }
-.logo-section:hover { border-color: var(--gray-900); }
-.logo-section h1 { margin: 0; font-size: 24px; font-weight: 700; color: var(--gray-900); }
+.logo-section:hover {
+  border-color: var(--gray-900);
+}
+.logo-section h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
 
 .app-logo {
   width: 52px;
@@ -45,7 +52,9 @@
   object-fit: contain;
   transition: transform var(--transition-fast);
 }
-.logo-section:hover .app-logo { transform: scale(1.05); }
+.logo-section:hover .app-logo {
+  transform: scale(1.05);
+}
 
 /* ── Connections section ── */
 .connections-section {
@@ -104,8 +113,15 @@
   text-align: center;
   padding: var(--spacing-xl) var(--spacing-md);
 }
-.no-connections-icon { font-size: 28px; margin-bottom: var(--spacing-sm); opacity: 0.6; }
-.no-connections p    { margin: var(--spacing-xs) 0; font-size: 13px; }
+.no-connections-icon {
+  font-size: 28px;
+  margin-bottom: var(--spacing-sm);
+  opacity: 0.6;
+}
+.no-connections p {
+  margin: var(--spacing-xs) 0;
+  font-size: 13px;
+}
 
 /* ── Footer / add button ── */
 .sidebar-footer {
@@ -132,20 +148,52 @@
   line-height: 1;
   transition: all var(--transition-fast);
 }
-.add-connection-btn:hover { background: var(--success-hover); transform: scale(1.08); }
+.add-connection-btn:hover {
+  background: var(--success-hover);
+  transform: scale(1.08);
+}
 
 /* ── Collapsed sidebar ── */
-.connection-sidebar.collapsed { width: 56px; min-width: 56px; max-width: 56px; }
-.connection-sidebar.collapsed .sidebar-header       { padding: var(--spacing-sm) 6px; }
-.connection-sidebar.collapsed .logo-section         { justify-content: center; margin: 0; padding: 4px; }
-.connection-sidebar.collapsed .logo-section:hover   { background: var(--primary-light); border-color: transparent; }
-.connection-sidebar.collapsed .app-logo             { width: 32px; height: 32px; }
-.connection-sidebar.collapsed .connections-section  { padding: var(--spacing-sm) 6px; }
-.connection-sidebar.collapsed .connections-list     { gap: 5px; align-items: center; }
-.connection-sidebar.collapsed .sidebar-footer       { padding: var(--spacing-sm) 6px; }
-.connection-sidebar.collapsed .add-connection-btn   { width: 32px; height: 32px; font-size: 18px; }
+.connection-sidebar.collapsed {
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+}
+.connection-sidebar.collapsed .sidebar-header {
+  padding: var(--spacing-sm) 6px;
+}
+.connection-sidebar.collapsed .logo-section {
+  justify-content: center;
+  margin: 0;
+  padding: 4px;
+}
+.connection-sidebar.collapsed .logo-section:hover {
+  background: var(--primary-light);
+  border-color: transparent;
+}
+.connection-sidebar.collapsed .app-logo {
+  width: 32px;
+  height: 32px;
+}
+.connection-sidebar.collapsed .connections-section {
+  padding: var(--spacing-sm) 6px;
+}
+.connection-sidebar.collapsed .connections-list {
+  gap: 5px;
+  align-items: center;
+}
+.connection-sidebar.collapsed .sidebar-footer {
+  padding: var(--spacing-sm) 6px;
+}
+.connection-sidebar.collapsed .add-connection-btn {
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+}
 .connection-sidebar.collapsed .section-header,
-.connection-sidebar.collapsed .no-connections       { display: none; }
+.connection-sidebar.collapsed .no-connections {
+  display: none;
+}
 
 /* ── Collapsed connection card dots ── */
 .connection-card.collapsed {
@@ -163,10 +211,22 @@
   border: 2px solid transparent;
   margin: 2px auto;
 }
-.connection-card.collapsed:hover   { transform: scale(1.1); box-shadow: var(--shadow-md); }
-.connection-card.collapsed.selected { border-color: var(--primary); border-width: 3px; }
-.connection-card.collapsed.active   { background: var(--bg-connected); border-color: var(--success); }
-.connection-card.collapsed.inactive { background: var(--bg-disconnected); border-color: var(--gray-500); }
+.connection-card.collapsed:hover {
+  transform: scale(1.1);
+  box-shadow: var(--shadow-md);
+}
+.connection-card.collapsed.selected {
+  border-color: var(--primary);
+  border-width: 3px;
+}
+.connection-card.collapsed.active {
+  background: var(--bg-connected);
+  border-color: var(--success);
+}
+.connection-card.collapsed.inactive {
+  background: var(--bg-disconnected);
+  border-color: var(--gray-500);
+}
 
 .connection-card.collapsed .connection-status-dot {
   width: 14px;
@@ -174,10 +234,21 @@
   border-radius: 50%;
   position: relative;
 }
-.connection-card.collapsed .connection-status-dot.connected   { background: var(--success); box-shadow: 0 0 6px rgba(40,167,69,.5); }
-.connection-card.collapsed .connection-status-dot.disconnected { background: var(--gray-500); }
-.connection-card.collapsed .connection-status-dot.connecting  { background: var(--warning); animation: pulse 1.5s infinite; }
-.connection-card.collapsed .connection-status-dot.error       { background: var(--danger); border: 2px solid white; }
+.connection-card.collapsed .connection-status-dot.connected {
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(40, 167, 69, 0.5);
+}
+.connection-card.collapsed .connection-status-dot.disconnected {
+  background: var(--gray-500);
+}
+.connection-card.collapsed .connection-status-dot.connecting {
+  background: var(--warning);
+  animation: pulse 1.5s infinite;
+}
+.connection-card.collapsed .connection-status-dot.error {
+  background: var(--danger);
+  border: 2px solid white;
+}
 
 .connection-card.collapsed .mqtt-version-indicator {
   position: absolute;
@@ -188,19 +259,44 @@
   border-radius: 50%;
   border: 1px solid var(--bg-surface);
 }
-.connection-card.collapsed .mqtt-version-indicator.mqtt5   { background: #b331ff; }
-.connection-card.collapsed .mqtt-version-indicator.mqtt311 { background: var(--gray-500); }
+.connection-card.collapsed .mqtt-version-indicator.mqtt5 {
+  background: #b331ff;
+}
+.connection-card.collapsed .mqtt-version-indicator.mqtt311 {
+  background: var(--gray-500);
+}
 
 @keyframes pulse {
-  0%   { box-shadow: 0 0 0 0   rgba(255,193,7,.7); }
-  70%  { box-shadow: 0 0 0 8px rgba(255,193,7,0);   }
-  100% { box-shadow: 0 0 0 0   rgba(255,193,7,0);   }
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 193, 7, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+  }
 }
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
-  .connection-sidebar.collapsed { width: 50px; min-width: 50px; max-width: 50px; }
-  .connection-card.collapsed    { width: 32px; height: 32px; margin: 1px auto; }
-  .connection-sidebar.collapsed .add-connection-btn { width: 28px; height: 28px; font-size: 16px; }
-  .connection-sidebar.collapsed .app-logo { width: 26px; height: 26px; }
+  .connection-sidebar.collapsed {
+    width: 50px;
+    min-width: 50px;
+    max-width: 50px;
+  }
+  .connection-card.collapsed {
+    width: 32px;
+    height: 32px;
+    margin: 1px auto;
+  }
+  .connection-sidebar.collapsed .add-connection-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+  .connection-sidebar.collapsed .app-logo {
+    width: 26px;
+    height: 26px;
+  }
 }

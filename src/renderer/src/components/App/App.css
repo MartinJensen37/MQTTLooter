@@ -344,7 +344,9 @@
     radial-gradient(circle, var(--gray-500) 1px, transparent 1.4px) center / 4px 6px repeat-y,
     var(--bg-surface);
   pointer-events: none;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
 }
 .resizer-divider:hover::after,
 .split-divider:hover::after,
@@ -544,41 +546,41 @@
     padding: 0 var(--spacing-lg);
     height: 50px;
   }
-  
+
   .header-left h2 {
     font-size: 18px;
   }
-  
+
   .connection-info {
     display: none;
   }
-  
+
   .tab-btn {
     padding: 6px 12px;
     font-size: 12px;
   }
-  
+
   .tab-btn span {
     display: none;
   }
-  
+
   .notification-stack {
     top: 10px;
     right: 10px;
     left: 10px;
     max-width: none;
   }
-  
+
   .notification {
     min-width: auto;
     font-size: 13px;
     padding: 10px 14px;
   }
-  
+
   .notification i {
     font-size: 14px;
   }
-  
+
   .notification-close {
     width: 20px;
     height: 20px;
@@ -593,12 +595,12 @@
     padding: 12px var(--spacing-lg);
     gap: var(--spacing-sm);
   }
-  
+
   .header-left {
     width: 100%;
     justify-content: center;
   }
-  
+
   .header-controls {
     width: 100%;
     justify-content: center;
@@ -628,14 +630,37 @@
 }
 
 /* Keep panels mounted while giving the device editor the whole workspace. */
-.simulation-workspace > .topic-browser-pane { display: none !important; }
+.simulation-workspace > .topic-browser-pane {
+  display: none !important;
+}
 @media (max-width: 1100px) {
-  .main-header { flex-wrap: wrap; padding: 12px 12px 0; gap: 10px; }
-  .main-header > .header-left { flex: 1 0 100%; }
-  .main-header > .header-controls { width: 100%; }
-  .main-header .main-tabs { width: 100%; }
-  .main-header .tab-btn { flex: 1; min-width: 0; padding: 10px 5px; font-size: 12px; gap: 4px; }
+  .main-header {
+    flex-wrap: wrap;
+    padding: 12px 12px 0;
+    gap: 10px;
+  }
+  .main-header > .header-left {
+    flex: 1 0 100%;
+  }
+  .main-header > .header-controls {
+    width: 100%;
+  }
+  .main-header .main-tabs {
+    width: 100%;
+  }
+  .main-header .tab-btn {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 5px;
+    font-size: 12px;
+    gap: 4px;
+  }
   .main-header .shortcut-hint,
-  .main-header .split-label { display: none; }
-  .main-header .split-controls { margin-left: var(--spacing-xs); gap: var(--spacing-xs); }
+  .main-header .split-label {
+    display: none;
+  }
+  .main-header .split-controls {
+    margin-left: var(--spacing-xs);
+    gap: var(--spacing-xs);
+  }
 }

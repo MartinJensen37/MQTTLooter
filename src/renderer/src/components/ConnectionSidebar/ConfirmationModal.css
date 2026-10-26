@@ -88,16 +88,15 @@
     max-width: 90vw;
     margin: 10px;
   }
-  
+
   .confirmation-header,
   .confirmation-content,
   .confirmation-footer {
     padding-left: 16px;
     padding-right: 16px;
   }
-  
+
   .confirmation-footer {
     flex-direction: column;
   }
-  
 }

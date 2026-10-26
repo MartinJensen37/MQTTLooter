@@ -176,7 +176,11 @@ function ConnectionCard({
             >
               <i className={connection.isConnected ? 'fas fa-stop' : 'fas fa-play'}></i>
             </button>
-            <button className="action-btn edit-btn" onClick={handleEditClick} title="Edit connection">
+            <button
+              className="action-btn edit-btn"
+              onClick={handleEditClick}
+              title="Edit connection"
+            >
               <i className="fas fa-edit"></i>
             </button>
             <button
