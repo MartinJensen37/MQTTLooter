@@ -1,8 +1,32 @@
 // Pure value generators for simulated device outputs. No component state — given a
 // generator name and its config they return a single value, so they're easy to test.
+import type { DeviceOutput } from '../components/SimulationPanel/simulationPanel/types';
 
-function generateNumberValue(generator, config, decimalPrecision = 2, context) {
-  let value;
+/** Generator settings; each generator reads its own fields. */
+type GeneratorConfig = Record<string, any>;
+export type SignalDefinition = Pick<
+  DeviceOutput,
+  'dataType' | 'generator' | 'config' | 'decimalPrecision'
+>;
+export type SignalValue = number | boolean | string;
+
+/** Where a signal is in its run: time since start, samples sent and the previous value. */
+export interface GeneratorContext {
+  elapsedMs: number;
+  sampleIndex: number;
+  previousValue?: number;
+  random: () => number;
+  /** Keep full precision, for signals whose next value builds on this one. */
+  unrounded?: boolean;
+}
+
+function generateNumberValue(
+  generator: string,
+  config: GeneratorConfig,
+  decimalPrecision = 2,
+  context: GeneratorContext,
+): number {
+  let value: number;
 
   switch (generator) {
     case 'static':
@@ -99,7 +123,11 @@ function generateNumberValue(generator, config, decimalPrecision = 2, context) {
   return Number(value.toFixed(decimalPrecision ?? 2));
 }
 
-function generateBooleanValue(generator, config, context) {
+function generateBooleanValue(
+  generator: string,
+  config: GeneratorConfig,
+  context: GeneratorContext,
+): boolean {
   switch (generator) {
     case 'static':
       return Boolean(config.value);
@@ -121,7 +149,11 @@ function generateBooleanValue(generator, config, context) {
   }
 }
 
-function generateStringValue(generator, config, context) {
+function generateStringValue(
+  generator: string,
+  config: GeneratorConfig,
+  context: GeneratorContext,
+): string {
   switch (generator) {
     case 'static':
       return String(config.value ?? 'default');
@@ -149,7 +181,7 @@ function generateStringValue(generator, config, context) {
         return 'default';
       }
       const totalWeight = config.weightedValues.reduce(
-        (sum, item) => sum + Math.max(0, item.weight ?? 1),
+        (sum: number, item: { weight?: number }) => sum + Math.max(0, item.weight ?? 1),
         0,
       );
       let random = context.random() * totalWeight;
@@ -165,16 +197,20 @@ function generateStringValue(generator, config, context) {
   }
 }
 
-function generateEnumValue(generator, config, context) {
+function generateEnumValue(
+  generator: string,
+  config: GeneratorConfig,
+  context: GeneratorContext,
+): string {
   return generateStringValue(generator, config, context);
 }
 
-/**
- * Generate one value for a device output based on its dataType/generator/config.
- * @param {{ dataType: string, generator: string, config: object, decimalPrecision?: number }} output
- */
-export function generateValue(output, options = {}) {
-  const context = {
+/** Generate one value for a device output based on its dataType/generator/config. */
+export function generateValue(
+  output: SignalDefinition,
+  options: Partial<GeneratorContext> = {},
+): SignalValue {
+  const context: GeneratorContext = {
     elapsedMs: 0,
     sampleIndex: 0,
     previousValue: undefined,
@@ -198,7 +234,10 @@ export function generateValue(output, options = {}) {
 }
 
 /** Retain full precision in stateful signals; round only the value sent to MQTT. */
-export function generateSignalSample(output, options = {}) {
+export function generateSignalSample(
+  output: SignalDefinition,
+  options: Partial<GeneratorContext> = {},
+): { rawValue: SignalValue; value: SignalValue } {
   const rawValue = generateValue(output, { ...options, unrounded: true });
   return {
     rawValue,
