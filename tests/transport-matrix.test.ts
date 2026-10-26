@@ -8,7 +8,7 @@ import type { Duplex } from 'node:stream';
 import { createServer as createTlsServer } from 'node:tls';
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
 import { createWebSocketStream, WebSocketServer } from 'ws';
-import { MQTTConnectionManager } from '../src/main/mqtt-connection-manager';
+import { MQTTConnectionManager, type BrokerConfig } from '../src/main/mqtt-connection-manager';
 
 // The packet codec belonging to the installed MQTT client.
 const local = createRequire(import.meta.url);
@@ -109,7 +109,7 @@ const connect = (config: Record<string, unknown>) => {
     username: 'user',
     password: PASSWORD,
     ...config,
-  });
+  } as BrokerConfig);
 };
 const tls = (port: number, options: Record<string, unknown>) => ({
   brokerUrl: `mqtts://127.0.0.1:${port}`,

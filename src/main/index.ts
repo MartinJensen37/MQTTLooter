@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron';
 import { join } from 'path';
 import { autoUpdater } from 'electron-updater';
-import { MQTTConnectionManager } from './mqtt-connection-manager';
+import { MQTTConnectionManager, type BrokerConfig } from './mqtt-connection-manager';
 import { RecordingService } from './recording-service';
 import { CredentialStore } from './credential-store';
 import { DecoderService } from './decoder-service';
@@ -326,7 +326,10 @@ handleIPC('mqtt-connect', async (_event, connectionId, config) => {
       throw new Error('Invalid connection request');
     // Secrets stay in main: the renderer's config omits them once they are stored.
     const secrets = await credentialStore.get(connectionId);
-    const result = await mqttManager.connect(connectionId, mergeSecrets(config, secrets));
+    const result = await mqttManager.connect(
+      connectionId,
+      mergeSecrets(config, secrets) as BrokerConfig,
+    );
     return { success: true, data: result };
   } catch (error) {
     console.error(`IPC: Failed to connect ${connectionId}:`, error);

@@ -1,44 +1,137 @@
-import mqtt from 'mqtt';
+import mqtt, {
+  type IClientOptions,
+  type IClientPublishOptions,
+  type IClientSubscribeOptions,
+  type IConnackPacket,
+  type IPublishPacket,
+  type ISubscriptionGrant,
+  type MqttClient,
+} from 'mqtt';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'events';
-import { encodePayload, payloadBytes } from '../shared/payload';
+import { encodePayload, payloadBytes, type PayloadEncoding } from '../shared/payload';
 import { normalizePublishProperties, validatePublishTopic } from '../shared/publish-properties';
+
+type Properties = Record<string, any>;
+/** MQTT.js passes these on to the TLS socket, including a key passphrase it does not declare. */
+type ClientOptions = IClientOptions & { passphrase?: string };
+
+/** A PEM file chosen in the connection editor. */
+interface PemFile {
+  content?: string;
+}
+
+/** The connection settings this manager reads; the editor saves more for itself. */
+export interface BrokerConfig {
+  brokerUrl: string;
+  wsPath?: string;
+  wsHeaders?: Record<string, string>;
+  clientId?: string;
+  clean?: boolean;
+  keepalive?: number;
+  connectTimeout?: number;
+  reconnectPeriod?: number;
+  protocolVersion?: 4 | 5;
+  username?: string;
+  password?: string;
+  tls?: {
+    enabled?: boolean;
+    rejectUnauthorized?: boolean;
+    servername?: string;
+    ca?: PemFile | null;
+    cert?: PemFile | null;
+    key?: PemFile | null;
+    passphrase?: string;
+    alpnProtocols?: string[];
+  };
+  willEnabled?: boolean;
+  willTopic?: string;
+  willMessage?: string;
+  willQos?: 0 | 1 | 2;
+  willRetain?: boolean;
+  willDelayInterval?: number;
+  willMessageExpiryInterval?: number;
+  autoAssignTopicAlias?: boolean;
+  properties?: Properties;
+  sessionExpiryInterval?: number;
+  receiveMaximum?: number;
+  maximumPacketSize?: number;
+  topicAliasMaximum?: number;
+  requestResponseInformation?: boolean;
+  requestProblemInformation?: boolean;
+  userProperties?: Record<string, string | string[]>;
+  subscriptions?: { topic: string; qos?: 0 | 1 | 2; properties?: Properties }[];
+}
+
+/** What a connect resolves to; `connack` is absent when the connection was already open. */
+export interface ConnectResult {
+  id: string;
+  protocolVersion: number;
+  connack?: IConnackPacket;
+  properties?: IConnackPacket['properties'];
+}
+
+export interface PublishOptions {
+  qos?: 0 | 1 | 2;
+  retain?: boolean;
+  dup?: boolean;
+  encoding?: PayloadEncoding;
+  properties?: unknown;
+}
+
+const MANAGER_EVENTS = [
+  'connected',
+  'disconnected',
+  'message',
+  'error',
+  'reconnecting',
+  'subscribed',
+  'unsubscribed',
+  'published',
+] as const;
 
 // mqtt-packet refuses to encode an empty user property map and MQTT.js then never sends the
 // packet, so a CONNECT would wait for a CONNACK forever. Leave the property out instead.
-function withoutEmptyUserProperties(properties = {}) {
+function withoutEmptyUserProperties(properties: Properties = {}): Properties {
   const { userProperties, ...rest } = properties;
   return userProperties && Object.keys(userProperties).length ? properties : rest;
 }
 
 class MQTTConnection extends EventEmitter {
-  constructor(id, config) {
+  id: string;
+  sessionId = randomUUID();
+  sequence = 0;
+  config: BrokerConfig;
+  client: MqttClient | null = null;
+  isConnected = false;
+  subscriptions = new Map<
+    string,
+    { qos: number; properties: Properties; granted?: ISubscriptionGrant[] }
+  >();
+  eventHandlers = new Map<string, (...args: any[]) => void>();
+  reconnectAttempts = 0;
+  maxReconnectAttempts = 3;
+  isDestroyed = false;
+  pendingConnect: Promise<ConnectResult> | null = null;
+  cancelConnect: ((error: Error) => void) | null = null;
+  connectionTimeout: ReturnType<typeof setTimeout> | undefined;
+  disconnectPromise: Promise<void> | undefined;
+  connectionStats = {
+    messagesReceived: 0,
+    messagesPublished: 0,
+    connectionStartTime: null as number | null,
+    lastMessageTime: null as number | null,
+    bytesReceived: 0,
+    bytesSent: 0,
+  };
+
+  constructor(id: string, config: BrokerConfig) {
     super();
     this.id = id;
-    this.sessionId = randomUUID();
-    this.sequence = 0;
     this.config = config;
-    this.client = null;
-    this.isConnected = false;
-    this.subscriptions = new Map();
-    this.eventHandlers = new Map();
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 3;
-    this.isDestroyed = false;
-    this.pendingConnect = null;
-    this.cancelConnect = null;
-    this.connectionTimeout = null;
-    this.connectionStats = {
-      messagesReceived: 0,
-      messagesPublished: 0,
-      connectionStartTime: null,
-      lastMessageTime: null,
-      bytesReceived: 0,
-      bytesSent: 0,
-    };
   }
 
-  connect() {
+  connect(): Promise<ConnectResult> {
     if (this.pendingConnect) return this.pendingConnect;
     if (this.isConnected)
       return Promise.resolve({ id: this.id, protocolVersion: this.config.protocolVersion || 4 });
@@ -48,7 +141,7 @@ class MQTTConnection extends EventEmitter {
     return this.pendingConnect;
   }
 
-  open() {
+  open(): Promise<ConnectResult> {
     return new Promise((resolve, reject) => {
       if (this.isDestroyed) {
         reject(new Error('Connection has been destroyed'));
@@ -76,8 +169,8 @@ class MQTTConnection extends EventEmitter {
           }
         }
 
-        const options = {
-          clientId: this.config.clientId || `mqttlooter_${Math.random().toString(36).substr(2, 9)}`,
+        const options: ClientOptions = {
+          clientId: this.config.clientId || `mqttlooter_${Math.random().toString(36).slice(2, 11)}`,
           clean: this.config.clean !== undefined ? this.config.clean : true,
           keepalive: this.config.keepalive ?? 60,
           connectTimeout: this.config.connectTimeout || 30000,
@@ -91,51 +184,30 @@ class MQTTConnection extends EventEmitter {
         if (this.config.password) options.password = this.config.password;
 
         // TLS/SSL Configuration
+        const tls = this.config.tls;
         if (
-          this.config.tls &&
-          (this.config.tls.enabled ||
-            brokerUrl.startsWith('mqtts://') ||
-            brokerUrl.startsWith('wss://'))
+          tls &&
+          (tls.enabled || brokerUrl.startsWith('mqtts://') || brokerUrl.startsWith('wss://'))
         ) {
           options.rejectUnauthorized =
-            this.config.tls.rejectUnauthorized !== undefined
-              ? this.config.tls.rejectUnauthorized
-              : true;
+            tls.rejectUnauthorized !== undefined ? tls.rejectUnauthorized : true;
 
           // Server name for SNI
-          if (this.config.tls.servername) {
-            options.servername = this.config.tls.servername;
+          if (tls.servername) options.servername = tls.servername;
+          if (tls.ca?.content) options.ca = Buffer.from(tls.ca.content, 'utf8');
+          if (tls.cert?.content) options.cert = Buffer.from(tls.cert.content, 'utf8');
+          if (tls.key?.content) {
+            options.key = Buffer.from(tls.key.content, 'utf8');
+            if (tls.passphrase) options.passphrase = tls.passphrase;
           }
-
-          // CA Certificate
-          if (this.config.tls.ca && this.config.tls.ca.content) {
-            options.ca = Buffer.from(this.config.tls.ca.content, 'utf8');
-          }
-
-          // Client Certificate
-          if (this.config.tls.cert && this.config.tls.cert.content) {
-            options.cert = Buffer.from(this.config.tls.cert.content, 'utf8');
-          }
-
-          // Private Key
-          if (this.config.tls.key && this.config.tls.key.content) {
-            options.key = Buffer.from(this.config.tls.key.content, 'utf8');
-
-            // Private Key Passphrase
-            if (this.config.tls.passphrase) {
-              options.passphrase = this.config.tls.passphrase;
-            }
-          }
-
-          // ALPN Protocols (if specified)
-          if (this.config.tls.alpnProtocols && this.config.tls.alpnProtocols.length > 0) {
-            options.ALPNProtocols = this.config.tls.alpnProtocols;
+          if (tls.alpnProtocols && tls.alpnProtocols.length > 0) {
+            options.ALPNProtocols = tls.alpnProtocols;
           }
         }
 
         // WebSocket specific options
         if (brokerUrl.startsWith('ws://') || brokerUrl.startsWith('wss://')) {
-          const wsOptions = {};
+          const wsOptions: Record<string, unknown> = {};
           if (this.config.wsHeaders) wsOptions.headers = this.config.wsHeaders;
           // MQTT.js forwards CA, certificate and key to secure WebSockets, but not the server
           // name, so SNI and the host name check would otherwise use the URL's host.
@@ -154,13 +226,14 @@ class MQTTConnection extends EventEmitter {
 
           // MQTT 5.0 will properties
           if (this.config.protocolVersion === 5) {
-            options.will.properties = {};
-            if (this.config.willDelayInterval > 0) {
-              options.will.properties.willDelayInterval = this.config.willDelayInterval;
+            const properties: Properties = {};
+            if ((this.config.willDelayInterval ?? 0) > 0) {
+              properties.willDelayInterval = this.config.willDelayInterval;
             }
-            if (this.config.willMessageExpiryInterval > 0) {
-              options.will.properties.messageExpiryInterval = this.config.willMessageExpiryInterval;
+            if ((this.config.willMessageExpiryInterval ?? 0) > 0) {
+              properties.messageExpiryInterval = this.config.willMessageExpiryInterval;
             }
+            options.will.properties = properties;
           }
         }
 
@@ -169,7 +242,7 @@ class MQTTConnection extends EventEmitter {
           // MQTT.js sizes the alias table from each CONNACK's Topic Alias Maximum and discards
           // it on reconnect, so aliases follow the negotiated limit and session lifecycle.
           if (this.config.autoAssignTopicAlias === true) options.autoAssignTopicAlias = true;
-          options.properties = { ...this.config.properties };
+          const properties: Properties = { ...this.config.properties };
           for (const key of [
             'sessionExpiryInterval',
             'receiveMaximum',
@@ -178,14 +251,14 @@ class MQTTConnection extends EventEmitter {
             'requestResponseInformation',
             'requestProblemInformation',
             'userProperties',
-          ]) {
-            if (this.config[key] !== undefined) options.properties[key] = this.config[key];
+          ] as const) {
+            if (this.config[key] !== undefined) properties[key] = this.config[key];
           }
-          options.properties = withoutEmptyUserProperties(options.properties);
+          options.properties = withoutEmptyUserProperties(properties);
         }
 
         let settled = false;
-        const fail = (error) => {
+        const fail = (error: Error) => {
           if (settled) return;
           settled = true;
           clearTimeout(this.connectionTimeout);
@@ -198,8 +271,9 @@ class MQTTConnection extends EventEmitter {
           fail(new Error(`Connection timeout after ${options.connectTimeout}ms`));
         }, options.connectTimeout);
 
-        this.client = mqtt.connect(brokerUrl, options);
-        const connectHandler = (connack) => {
+        const client = mqtt.connect(brokerUrl, options);
+        this.client = client;
+        const connectHandler = (connack: IConnackPacket) => {
           if (this.isDestroyed) return;
           settled = true;
           clearTimeout(this.connectionTimeout);
@@ -208,9 +282,9 @@ class MQTTConnection extends EventEmitter {
           this.sessionId = randomUUID();
           this.sequence = 0;
           this.reconnectAttempts = 0;
-          this.client.options.reconnectPeriod = this.config.reconnectPeriod ?? 1000;
+          client.options.reconnectPeriod = this.config.reconnectPeriod ?? 1000;
           this.connectionStats.connectionStartTime = Date.now();
-          const data = {
+          const data: ConnectResult = {
             id: this.id,
             connack,
             properties: connack.properties,
@@ -223,14 +297,16 @@ class MQTTConnection extends EventEmitter {
               .filter((sub) => sub.topic)
               .map((sub) => [sub.topic, sub]),
           );
-          this.subscriptions.forEach((sub, topic) => desired.set(topic, { ...sub, topic }));
+          this.subscriptions.forEach((sub, topic) =>
+            desired.set(topic, { ...sub, qos: sub.qos as 0 | 1 | 2, topic }),
+          );
           desired.forEach((sub) => {
             this.subscribe(sub.topic, sub.qos ?? 0, sub.properties || {}).catch((error) => {
               if (!this.isDestroyed) this.emit('error', { id: this.id, error: error.message });
             });
           });
         };
-        const errorHandler = (error) => {
+        const errorHandler = (error: Error & { code?: string | number }) => {
           if (this.isDestroyed) return;
           this.emit('error', { id: this.id, error: error.message, code: error.code });
           fail(error);
@@ -245,7 +321,7 @@ class MQTTConnection extends EventEmitter {
           if (!this.isDestroyed)
             this.emit('reconnecting', { id: this.id, attempt: ++this.reconnectAttempts });
         };
-        const messageHandler = (topic, message, packet) => {
+        const messageHandler = (topic: string, message: Buffer, packet: IPublishPacket) => {
           if (this.isDestroyed) return;
           const timestamp = Date.now();
           this.connectionStats.messagesReceived++;
@@ -271,8 +347,8 @@ class MQTTConnection extends EventEmitter {
           reconnect: reconnectHandler,
           message: messageHandler,
         }).forEach(([event, handler]) => {
-          this.eventHandlers.set(event, handler);
-          this.client.on(event, handler);
+          this.eventHandlers.set(event, handler as (...args: any[]) => void);
+          (client as unknown as EventEmitter).on(event, handler as (...args: any[]) => void);
         });
       } catch (error) {
         clearTimeout(this.connectionTimeout);
@@ -282,7 +358,7 @@ class MQTTConnection extends EventEmitter {
     });
   }
 
-  disconnect() {
+  disconnect(): Promise<void> {
     if (this.disconnectPromise) return this.disconnectPromise;
     this.isDestroyed = true;
     this.isConnected = false;
@@ -294,37 +370,39 @@ class MQTTConnection extends EventEmitter {
         resolve();
         return;
       }
-      this.eventHandlers.forEach((handler, event) => client.removeListener(event, handler));
+      this.eventHandlers.forEach((handler, event) =>
+        (client as unknown as EventEmitter).removeListener(event, handler),
+      );
       this.eventHandlers.clear();
       // A late transport error must not become an unhandled EventEmitter error.
       client.on('error', () => {});
-      let fallback;
       const done = () => {
         clearTimeout(fallback);
         this.client = null;
         this.subscriptions.clear();
         resolve();
       };
-      fallback = setTimeout(done, 1000);
+      const fallback = setTimeout(done, 1000);
       client.end(true, {}, done);
     });
     return this.disconnectPromise;
   }
 
-  subscribe(topic, qos = 0, properties = {}) {
+  subscribe(topic: string, qos: number = 0, properties: Properties = {}) {
     return new Promise((resolve, reject) => {
-      if (!this.client || !this.isConnected || this.isDestroyed) {
+      const client = this.client;
+      if (!client || !this.isConnected || this.isDestroyed) {
         reject(new Error('Not connected'));
         return;
       }
 
-      const subscribeOptions = { qos };
+      const subscribeOptions: IClientSubscribeOptions = { qos: qos as 0 | 1 | 2 };
       properties = withoutEmptyUserProperties(properties);
       if (this.config.protocolVersion === 5 && Object.keys(properties).length > 0) {
         subscribeOptions.properties = properties;
       }
 
-      this.client.subscribe(topic, subscribeOptions, (err, granted) => {
+      client.subscribe(topic, subscribeOptions, (err, granted) => {
         if (err || granted?.some((sub) => sub.qos > 2)) {
           reject(err || new Error(`Subscription rejected: ${topic}`));
         } else {
@@ -343,9 +421,10 @@ class MQTTConnection extends EventEmitter {
     });
   }
 
-  unsubscribe(topic, properties = {}) {
+  unsubscribe(topic: string, properties: Properties = {}) {
     return new Promise((resolve, reject) => {
-      if (!this.client || !this.isConnected || this.isDestroyed) {
+      const client = this.client;
+      if (!client || !this.isConnected || this.isDestroyed) {
         reject(new Error('Not connected'));
         return;
       }
@@ -356,7 +435,7 @@ class MQTTConnection extends EventEmitter {
           ? { properties }
           : undefined;
 
-      this.client.unsubscribe(topic, unsubscribeOptions, (err) => {
+      client.unsubscribe(topic, unsubscribeOptions, (err) => {
         if (err) {
           reject(err);
         } else {
@@ -373,7 +452,7 @@ class MQTTConnection extends EventEmitter {
     });
   }
 
-  publish(topic, message, options = {}) {
+  publish(topic: string, message: string, options: PublishOptions = {}) {
     return new Promise((resolve, reject) => {
       validatePublishTopic(topic);
       if (!options || typeof options !== 'object' || Array.isArray(options))
@@ -388,27 +467,27 @@ class MQTTConnection extends EventEmitter {
         this.config.protocolVersion || 4,
         bytes,
       );
-      if (!this.client || !this.isConnected || this.isDestroyed) {
+      const client = this.client;
+      if (!client || !this.isConnected || this.isDestroyed) {
         reject(new Error('Not connected'));
         return;
       }
 
-      const publishOptions = {
+      const publishOptions: IClientPublishOptions = {
         qos: options.qos || 0,
         retain: options.retain || false,
         dup: options.dup || false,
       };
 
       if (properties) {
-        publishOptions.properties = { ...properties };
-        if (properties.correlationData)
-          publishOptions.properties.correlationData = Buffer.from(
-            properties.correlationData.data,
-            'base64',
-          );
+        const { correlationData, ...rest } = properties;
+        publishOptions.properties = {
+          ...rest,
+          ...(correlationData && { correlationData: Buffer.from(correlationData.data, 'base64') }),
+        } as IClientPublishOptions['properties'];
       }
 
-      this.client.publish(topic, bytes, publishOptions, (err) => {
+      client.publish(topic, bytes, publishOptions, (err) => {
         if (err) {
           reject(err);
         } else {
@@ -465,31 +544,19 @@ class MQTTConnection extends EventEmitter {
 }
 
 class MQTTConnectionManager extends EventEmitter {
-  constructor() {
-    super();
-    this.connections = new Map();
-    this.connectionHandlers = new Map();
-  }
+  connections = new Map<string, MQTTConnection>();
+  connectionHandlers = new Map<string, Record<string, (data: unknown) => void>>();
 
-  createConnection(id, config) {
+  createConnection(id: string, config: BrokerConfig) {
     if (this.connections.has(id)) {
       throw new Error(`Connection with ID ${id} already exists`);
     }
 
     const connection = new MQTTConnection(id, config);
 
-    const handlers = {};
-    [
-      'connected',
-      'disconnected',
-      'message',
-      'error',
-      'reconnecting',
-      'subscribed',
-      'unsubscribed',
-      'published',
-    ].forEach((event) => {
-      const handler = (data) => this.emit(event, data);
+    const handlers: Record<string, (data: unknown) => void> = {};
+    MANAGER_EVENTS.forEach((event) => {
+      const handler = (data: unknown) => this.emit(event, data);
       handlers[event] = handler;
       connection.on(event, handler);
     });
@@ -500,7 +567,7 @@ class MQTTConnectionManager extends EventEmitter {
     return connection;
   }
 
-  async connect(id, config) {
+  async connect(id: string, config: BrokerConfig) {
     let connection = this.connections.get(id);
     if (connection?.isConnected || connection?.pendingConnect) return connection.connect();
     if (connection) await this.disconnect(id);
@@ -513,7 +580,7 @@ class MQTTConnectionManager extends EventEmitter {
     }
   }
 
-  async disconnect(id) {
+  async disconnect(id: string) {
     const connection = this.connections.get(id);
     if (!connection) return true;
     this.connections.delete(id);
@@ -529,52 +596,42 @@ class MQTTConnectionManager extends EventEmitter {
     return true;
   }
 
-  async subscribe(id, topic, qos = 0, properties = {}) {
+  private find(id: string) {
     const connection = this.connections.get(id);
-    if (!connection) {
-      throw new Error(`Connection ${id} not found`);
-    }
-    return await connection.subscribe(topic, qos, properties);
+    if (!connection) throw new Error(`Connection ${id} not found`);
+    return connection;
   }
 
-  async unsubscribe(id, topic, properties = {}) {
-    const connection = this.connections.get(id);
-    if (!connection) {
-      throw new Error(`Connection ${id} not found`);
-    }
-    return await connection.unsubscribe(topic, properties);
+  async subscribe(id: string, topic: string, qos = 0, properties: Properties = {}) {
+    return await this.find(id).subscribe(topic, qos, properties);
   }
 
-  async publish(id, topic, message, options = {}) {
-    const connection = this.connections.get(id);
-    if (!connection) {
-      throw new Error(`Connection ${id} not found`);
-    }
-    return await connection.publish(topic, message, options);
+  async unsubscribe(id: string, topic: string, properties: Properties = {}) {
+    return await this.find(id).unsubscribe(topic, properties);
   }
 
-  getConnection(id) {
+  async publish(id: string, topic: string, message: string, options: PublishOptions = {}) {
+    return await this.find(id).publish(topic, message, options);
+  }
+
+  getConnection(id: string) {
     return this.connections.get(id);
   }
 
   getAllConnections() {
-    const connections = {};
+    const connections: Record<string, ReturnType<MQTTConnection['getStatus']>> = {};
     this.connections.forEach((connection, id) => {
       connections[id] = connection.getStatus();
     });
     return connections;
   }
 
-  getConnectionStatistics(id) {
-    const connection = this.connections.get(id);
-    if (!connection) {
-      throw new Error(`Connection ${id} not found`);
-    }
-    return connection.getStatistics();
+  getConnectionStatistics(id: string) {
+    return this.find(id).getStatistics();
   }
 
   getAllStatistics() {
-    const stats = {};
+    const stats: Record<string, ReturnType<MQTTConnection['getStatistics']>> = {};
     this.connections.forEach((connection, id) => {
       stats[id] = connection.getStatistics();
     });
@@ -592,7 +649,7 @@ class MQTTConnectionManager extends EventEmitter {
   }
 
   cleanup() {
-    this.disconnectAll();
+    void this.disconnectAll();
     this.removeAllListeners();
     this.connectionHandlers.clear();
   }

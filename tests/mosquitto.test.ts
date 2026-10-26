@@ -137,13 +137,13 @@ describe.skipIf(!binary)('Mosquitto interoperability', () => {
     await publisher.manager.publish('publisher', 'persist/offline', 'queued', { qos: 1 });
 
     const resumed = await session('looter-kept', 60);
-    expect(resumed.result.connack.sessionPresent).toBe(true);
+    expect(resumed.result.connack?.sessionPresent).toBe(true);
     await until(
       () => resumed.messages.some((message) => message.message === 'queued'),
       'queued message delivered after reconnect',
     );
     const expired = await session('looter-expiring', 1);
-    expect(expired.result.connack.sessionPresent).toBe(false);
+    expect(expired.result.connack?.sessionPresent).toBe(false);
     await sleep(500);
     expect(expired.messages.some((message) => message.message === 'queued')).toBe(false);
   }, 15_000);
@@ -153,7 +153,7 @@ describe.skipIf(!binary)('Mosquitto interoperability', () => {
       subscriptions: [{ topic: 'alias/#', qos: 1 }],
     });
     const publisher = await client('alias-publisher', { autoAssignTopicAlias: true });
-    expect(publisher.result.connack.properties.topicAliasMaximum).toBe(2);
+    expect(publisher.result.connack?.properties?.topicAliasMaximum).toBe(2);
     const topics = ['alias/a', 'alias/b', 'alias/c'];
     for (let round = 0; round < 3; round++)
       for (const topic of topics)

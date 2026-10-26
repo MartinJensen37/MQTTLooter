@@ -64,7 +64,7 @@ describe('MQTT lifecycle', () => {
     ])
       await expect(manager.publish('a', 'request/topic', '', { properties })).rejects.toThrow();
     await expect(manager.publish('a', 'a/+', '')).rejects.toThrow('wildcards');
-    await expect(manager.publish('a', 'a', '', { qos: 3 })).rejects.toThrow('QoS');
+    await expect(manager.publish('a', 'a', '', { qos: 3 as never })).rejects.toThrow('QoS');
     await expect(
       manager.publish('a', 'a', '/w==', {
         encoding: 'base64',
@@ -107,7 +107,7 @@ describe('MQTT lifecycle', () => {
     const config = {
       brokerUrl: 'wss://localhost/?token=test',
       wsPath: '/mqtt',
-      protocolVersion: 5,
+      protocolVersion: 5 as const,
       clean: false,
       keepalive: 0,
       reconnectPeriod: 0,
