@@ -20,21 +20,6 @@
   --info: #17a2b8;
   --info-hover: #138496;
 
-  /* === Legacy aliases (keep until all components migrated) === */
-  --primary-blue: var(--primary);
-  --primary-blue-hover: var(--primary-hover);
-  --primary-blue-light: var(--primary-light);
-  --success-green: var(--success);
-  --success-green-hover: var(--success-hover);
-  --success-green-light: var(--success-light);
-  --warning-yellow: var(--warning);
-  --warning-yellow-hover: var(--warning-hover);
-  --warning-yellow-light: var(--warning-light);
-  --warning-yellow-text: var(--warning-text);
-  --danger-red: var(--danger);
-  --danger-red-hover: var(--danger-hover);
-  --danger-red-light: var(--danger-light);
-
   /* === Grays === */
   --gray-100: #f8f9fa;
   --gray-200: #e9ecef;

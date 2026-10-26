@@ -44,7 +44,7 @@
   flex-direction: column;
   background: var(--bg-surface);
   border: 1px solid var(--gray-300);
-  border-top: 1px solid var(--primary-blue);
+  border-top: 1px solid var(--primary);
   border-radius: 0 0 var(--radius-md) var(--radius-md);
   position: relative;
   overflow: hidden;
@@ -176,8 +176,8 @@
 
 .tab-btn.active {
   background: var(--bg-surface);
-  color: var(--primary-blue);
-  border-color: var(--primary-blue);
+  color: var(--primary);
+  border-color: var(--primary);
   border-bottom: 1px solid var(--bg-surface);
   z-index: 1;
   transform: translateY(1px);
@@ -185,7 +185,7 @@
 }
 
 .tab-btn.active i {
-  color: var(--primary-blue);
+  color: var(--primary);
 }
 
 .shortcut-hint {
@@ -413,7 +413,7 @@
 
 .tab-btn.secondary {
   border-style: dashed;
-  color: var(--primary-blue);
+  color: var(--primary);
 }
 
 /* Topic Tree Panel */
@@ -460,25 +460,25 @@
 }
 
 .notification.success {
-  background: var(--success-green);
+  background: var(--success);
   color: white;
   border: none;
 }
 
 .notification.error {
-  background: var(--danger-red);
+  background: var(--danger);
   color: white;
   border: none;
 }
 
 .notification.warning {
-  background: var(--warning-yellow);
+  background: var(--warning);
   color: var(--on-warning);
   border: none;
 }
 
 .notification.info {
-  background: var(--primary-blue);
+  background: var(--primary);
   color: white;
   border: none;
 }

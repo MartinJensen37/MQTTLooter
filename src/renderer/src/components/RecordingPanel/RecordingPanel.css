@@ -82,9 +82,9 @@
 }
 
 .recording-status-indicator.recording-active {
-  background: var(--danger-red-light);
-  border-color: var(--danger-red);
-  color: var(--danger-red);
+  background: var(--danger-light);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .recording-status-indicator.recording-active i {
@@ -92,9 +92,9 @@
 }
 
 .recording-status-indicator.recording-stopped {
-  background: var(--success-green-light);
-  border-color: var(--success-green);
-  color: var(--success-green);
+  background: var(--success-light);
+  border-color: var(--success);
+  color: var(--success);
 }
 
 .recording-status-indicator.recording-indicator-disabled {
@@ -174,7 +174,7 @@
   content: '\f1c0';
   font-family: 'Font Awesome 5 Free';
   font-weight: 900;
-  color: var(--primary-blue);
+  color: var(--primary);
 }
 
 /* No Recordings State */
@@ -222,12 +222,12 @@
 
 .recording-saved-item:hover {
   box-shadow: var(--shadow-md);
-  border-color: var(--primary-blue);
+  border-color: var(--primary);
 }
 
 .recording-saved-item.recording-item-expanded {
   box-shadow: var(--shadow-lg);
-  border-color: var(--primary-blue);
+  border-color: var(--primary);
   background: var(--bg-surface);
 }
 
@@ -270,7 +270,7 @@
 }
 
 .recording-item-title i:nth-child(2) {
-  color: var(--primary-blue);
+  color: var(--primary);
   font-size: 14px;
   flex-shrink: 0;
 }
@@ -278,7 +278,7 @@
 /* Recording Name Input and Text */
 .recording-name-input {
   background: var(--bg-surface);
-  border: 1px solid var(--primary-blue);
+  border: 1px solid var(--primary);
   font-size: 16px;
   font-weight: 600;
   color: var(--text-heading);
@@ -296,7 +296,7 @@
 }
 
 .recording-name-text:hover {
-  color: var(--primary-blue);
+  color: var(--primary);
 }
 
 /* Recording Item Actions */
@@ -328,7 +328,7 @@
 }
 
 .recording-item-stats i {
-  color: var(--primary-blue);
+  color: var(--primary);
   width: 14px;
   flex-shrink: 0;
 }
@@ -362,7 +362,7 @@
 }
 
 .recording-playback-warning i {
-  color: var(--warning-yellow);
+  color: var(--warning);
   flex-shrink: 0;
 }
 
@@ -462,7 +462,7 @@
 
 .recording-progress-fill {
   height: 100%;
-  background: var(--primary-blue);
+  background: var(--primary);
   transition: width var(--transition-normal);
 }
 
@@ -539,7 +539,7 @@
 }
 
 .recording-message-position span {
-  color: var(--primary-blue);
+  color: var(--primary);
   font-weight: 500;
 }
 
@@ -729,7 +729,7 @@
 }
 
 .recording-item-live {
-  color: var(--danger-red);
+  color: var(--danger);
 }
 
 /* The pane can be about 330 px wide beside the topic tree at the minimum window size. */
