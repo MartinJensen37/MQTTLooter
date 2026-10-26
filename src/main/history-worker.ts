@@ -23,7 +23,8 @@ const cleanSession = () => {
   for (const suffix of ['', '-journal', '-wal', '-shm'])
     rmSync(databasePath + suffix, { force: true });
 };
-if (!persistent) cleanSession();
+// A worker restarted after a failure keeps this session's history.
+if (!persistent && workerData.restart !== true) cleanSession();
 const database = new HistoryDatabase(databasePath);
 // Plots of protobuf topics decode stored payloads here, next to the data.
 const decoders = new ProtobufDecoders();

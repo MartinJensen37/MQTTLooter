@@ -94,6 +94,14 @@ it('rejects outstanding queries and releases the write queue after a worker cras
   await service.flush();
   expect(service.status().error).toBe('disk failed');
   expect(service.status().delivery.connections.a.dropped).toBe(1);
-  await expect(service.resume()).rejects.toThrow('disk failed');
-  await service.close();
+  // Resume starts a new worker that keeps this session's database, and capture continues.
+  const resumed = service.resume();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(workers).toHaveLength(2);
+  workers[1].reply(workers[1].requests[0], { messages: 0 });
+  expect((await resumed).error).toBeUndefined();
+  const close = service.close();
+  await vi.advanceTimersByTimeAsync(0);
+  for (const request of workers[1].requests.slice(1)) workers[1].reply(request);
+  await close;
 });

@@ -36,17 +36,14 @@ export class HistoryService {
       .catch((error: Error) => this.failCapture(error.message));
   }, HISTORY_QUEUE);
 
-  constructor(directory: string, workerPath = join(__dirname, 'history-worker.js')) {
-    this.worker = new WorkerClient(
-      workerPath,
-      { directory },
-      {
-        name: 'History',
-        maxPending: (request) =>
-          request.action === 'append' || request.action === 'close' ? 16 : 8,
-        onFailure: (message) => this.failCapture(message),
-      },
-    );
+  /** The latest decoder list, sent again to a restarted worker. */
+  private decoders?: HistoryRequest & { action: 'decoders' };
+
+  constructor(
+    private readonly directory: string,
+    private readonly workerPath = join(__dirname, 'history-worker.js'),
+  ) {
+    this.worker = this.startWorker(false);
     void this.request({ action: 'status' })
       .then((status) => {
         this.store = status;
@@ -76,7 +73,22 @@ export class HistoryService {
     this.finishFlush();
   }
 
+  /** `restart` keeps this session's database, which a fresh app start would clear. */
+  private startWorker(restart: boolean): WorkerClient<HistoryRequest> {
+    return new WorkerClient(
+      this.workerPath,
+      { directory: this.directory, restart },
+      {
+        name: 'History',
+        maxPending: (request) =>
+          request.action === 'append' || request.action === 'close' ? 16 : 8,
+        onFailure: (message) => this.failCapture(message),
+      },
+    );
+  }
+
   request(request: HistoryRequest): Promise<any> {
+    if (request.action === 'decoders') this.decoders = request;
     return this.worker.request(request);
   }
 
@@ -89,7 +101,12 @@ export class HistoryService {
     return this.status();
   }
 
+  /** Retry capture; a worker that stopped responding or exited is replaced first. */
   async resume(): Promise<HistoryStatus> {
+    if (this.worker.failure) {
+      this.worker = this.startWorker(true);
+      if (this.decoders) await this.request(this.decoders);
+    }
     this.store = await this.request({ action: 'status' });
     this.error = undefined;
     return this.status();

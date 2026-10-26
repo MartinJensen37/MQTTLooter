@@ -1,9 +1,12 @@
 import { Worker } from 'node:worker_threads';
 
+const TICK_MS = 500;
+
 interface Pending {
   resolve: (data: any) => void;
   reject: (error: Error) => void;
-  timer: ReturnType<typeof setTimeout>;
+  /** Time spent waiting while the app was running. */
+  waited: number;
 }
 
 /** Request/response over a storage worker. A timeout or crash fails every request permanently. */
@@ -12,6 +15,8 @@ export class WorkerClient<Request extends { action: string }> {
   private pending = new Map<number, Pending>();
   private nextId = 0;
   private closing = false;
+  private ticker?: ReturnType<typeof setInterval>;
+  private lastTick = 0;
   failure?: string;
 
   constructor(
@@ -29,7 +34,7 @@ export class WorkerClient<Request extends { action: string }> {
       const pending = this.pending.get(requestId);
       if (!pending) return;
       this.pending.delete(requestId);
-      clearTimeout(pending.timer);
+      this.unwatch();
       if (error) pending.reject(new Error(error));
       else pending.resolve(data);
     });
@@ -39,14 +44,37 @@ export class WorkerClient<Request extends { action: string }> {
     });
   }
 
+  /**
+   * The watchdog counts at most two ticks per tick, so time the computer spends asleep, or the
+   * app spends stalled, never counts against a request: after waking up, the worker gets its
+   * full time to answer.
+   */
+  private tick = () => {
+    const now = Date.now();
+    const elapsed = Math.max(0, Math.min(now - this.lastTick, TICK_MS * 2));
+    this.lastTick = now;
+    for (const pending of this.pending.values()) {
+      pending.waited += elapsed;
+      if (pending.waited >= (this.options.timeoutMs ?? 10_000)) {
+        this.fail(`${this.options.name} worker stopped responding.`);
+        void this.worker.terminate();
+        return;
+      }
+    }
+  };
+
+  private unwatch(): void {
+    if (this.pending.size || !this.ticker) return;
+    clearInterval(this.ticker);
+    this.ticker = undefined;
+  }
+
   private fail(message: string): void {
     if (this.failure) return;
     this.failure = message;
-    for (const pending of this.pending.values()) {
-      clearTimeout(pending.timer);
-      pending.reject(new Error(message));
-    }
+    for (const pending of this.pending.values()) pending.reject(new Error(message));
     this.pending.clear();
+    this.unwatch();
     this.options.onFailure(message);
   }
 
@@ -55,14 +83,12 @@ export class WorkerClient<Request extends { action: string }> {
     if (this.pending.size >= this.options.maxPending(request))
       return Promise.reject(new Error(`Too many ${this.options.name} requests. Try again.`));
     const requestId = ++this.nextId;
+    if (!this.ticker) {
+      this.lastTick = Date.now();
+      this.ticker = setInterval(this.tick, TICK_MS);
+    }
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.fail(
-          `${this.options.name} worker timed out. Capture stopped; restart the app to retry.`,
-        );
-        void this.worker.terminate();
-      }, this.options.timeoutMs ?? 10_000);
-      this.pending.set(requestId, { resolve, reject, timer });
+      this.pending.set(requestId, { resolve, reject, waited: 0 });
       this.worker.postMessage({ requestId, request });
     });
   }

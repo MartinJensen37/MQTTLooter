@@ -318,7 +318,13 @@ export default function IncomingPlot({
             suggestions={available
               .filter((pointer) => !fields.includes(pointer))
               .map((value) => ({ value, label: name(value) }))}
-            empty={result ? 'No other numeric fields in this window' : 'Reading fields…'}
+            empty={
+              error
+                ? 'Fields are unavailable while plot data cannot be read'
+                : result
+                  ? 'No other numeric fields in this window'
+                  : 'Reading fields…'
+            }
             disabled={fields.length >= 4}
             onChange={(value) => {
               setCandidate(value);
