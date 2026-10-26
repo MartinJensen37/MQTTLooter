@@ -10,7 +10,6 @@ interface Connection {
   config?: any;
   status?: string;
   isConnected?: boolean;
-  [key: string]: unknown;
 }
 
 interface Props {

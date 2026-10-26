@@ -1,4 +1,13 @@
-import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Suspense,
+  lazy,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { SplitPane, Pane } from 'react-split-pane';
 import MQTTService from '../../services/MQTTService';
 import TopicTreeService from '../../services/TopicTreeService';
@@ -13,8 +22,31 @@ import { useAppearance } from '../../hooks/useAppearance';
 import { useSettings } from '../../services/Settings';
 import { useConnections } from '../../hooks/useConnections';
 import { useMessages } from '../../hooks/useMessages';
-import { useUIState } from '../../hooks/useUIState';
+import { useUIState, type PanePin } from '../../hooks/useUIState';
+import type { PayloadEncoding } from '../../../../shared/payload';
 import './App.css';
+
+type Tab = 'logging' | 'publishing' | 'recording' | 'simulation';
+interface SelectedTopic {
+  topicPath: string;
+  connectionId: string;
+}
+interface Notification {
+  id: number;
+  message: string;
+  type: string;
+  timestamp: number;
+}
+/** A message from Publishing, Recording playback or Simulation. */
+export interface OutgoingMessage {
+  topic: string;
+  payload: string;
+  encoding?: PayloadEncoding;
+  qos?: 0 | 1 | 2;
+  retain?: boolean;
+  properties?: Record<string, unknown>;
+}
+type ConnectionEvent = { id: string; error?: string; message?: string };
 
 // Loaded when first shown; afterwards they stay mounted like the other panels. Recording stays
 // eager so captures that main stops after a reload are still reported.
@@ -22,14 +54,14 @@ const PublishingPanel = lazy(() => import('../PublishingPanel/PublishingPanel'))
 const SimulationPanel = lazy(() => import('../SimulationPanel/SimulationPanel'));
 const panelLoading = <p className="panel-loading">Loading…</p>;
 
-const TAB_LIST = [
+const TAB_LIST: { id: Tab; icon: string; label: string; key: string }[] = [
   { id: 'logging', icon: 'fa-list', label: 'Logging', key: 'F1' },
   { id: 'publishing', icon: 'fa-paper-plane', label: 'Publishing', key: 'F2' },
   { id: 'recording', icon: 'fa-video', label: 'Recording', key: 'F3' },
   { id: 'simulation', icon: 'fa-microchip', label: 'Simulation', key: 'F4' },
 ];
 
-async function publishTo(connectionId, messageData) {
+async function publishTo(connectionId: string | null, messageData: OutgoingMessage) {
   if (!connectionId) throw new Error('No connection selected');
   if (!MQTTService.isConnected(connectionId)) throw new Error('Selected connection is not active');
   await MQTTService.publish(connectionId, {
@@ -43,8 +75,8 @@ async function publishTo(connectionId, messageData) {
 }
 
 function App() {
-  const [selectedTopic, setSelectedTopic] = useState(null);
-  const [notifications, setNotifications] = useState([]);
+  const [selectedTopic, setSelectedTopic] = useState<SelectedTopic | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   // Tools > Settings in the app menu.
   const [settingsOpen, setSettingsOpen] = useState(false);
   useEffect(() => window.electronAPI?.app?.onOpenSettings(() => setSettingsOpen(true)), []);
@@ -57,26 +89,26 @@ function App() {
   useEffect(() => {
     void window.electronAPI?.app?.setUpdateChannel?.(updateChannel);
   }, [updateChannel]);
-  const mainPanelsRef = useRef(null);
+  const mainPanelsRef = useRef<HTMLDivElement>(null);
   const [panelWidth, setPanelWidth] = useState(0);
   useEffect(() => {
     const observer = new ResizeObserver(([entry]) =>
       setPanelWidth(Math.round(entry.contentRect.width)),
     );
-    observer.observe(mainPanelsRef.current);
+    observer.observe(mainPanelsRef.current!);
     return () => observer.disconnect();
   }, []);
   // Clamp the rendered width without overwriting the user's preferred split on window resize.
   const maxTopicWidth = Math.max(50, panelWidth - 361);
 
   // ── Notifications ────────────────────────────────────────────────────────
-  const showFeedback = useCallback((message, type = 'success') => {
+  const showFeedback = useCallback((message: string, type = 'success') => {
     const id = Date.now() + Math.random();
     setNotifications((prev) => [...prev, { id, message, type, timestamp: Date.now() }]);
     setTimeout(() => setNotifications((prev) => prev.filter((n) => n.id !== id)), 2000);
   }, []);
 
-  const removeNotification = useCallback((id) => {
+  const removeNotification = useCallback((id: number) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
@@ -91,7 +123,9 @@ function App() {
     handleConnectionSelect,
     handleConnectionToggle,
     handleConnectionDelete,
-  } = useConnections(showFeedback, selectedTopic, setSelectedTopic);
+  } = useConnections(showFeedback, selectedTopic, (topic) =>
+    setSelectedTopic(topic as SelectedTopic | null),
+  );
 
   const { connectionMessages, handleClearMessages, liveSelectedTopic } = useMessages(
     selectedConnection,
@@ -129,11 +163,11 @@ function App() {
     if (panePin && !connections.some((connection) => connection.id === panePin.connectionId))
       setPanePin(null);
   }, [connections, panePin, setPanePin]);
-  const tabContainerRef = useRef(null);
+  const tabContainerRef = useRef<HTMLDivElement>(null);
   // Keyboard focus on a tab follows F-key switches to the newly active tab.
   useEffect(() => {
     if (document.activeElement?.classList.contains('tab-btn'))
-      document.querySelector('.main-tabs .tab-btn.active')?.focus();
+      document.querySelector<HTMLElement>('.main-tabs .tab-btn.active')?.focus();
   }, [activeTab]);
   // Below 560 px of content width the panes stack instead of sitting side by side.
   const [stacked, setStacked] = useState(false);
@@ -145,17 +179,17 @@ function App() {
     return () => observer.disconnect();
   }, [splitTab, selectedConnection]);
   // Split view places two tabs side by side with CSS, so no panel is remounted or duplicated.
-  const placement = (tab) =>
+  const placement = (tab: Tab) =>
     tab === activeTab ? 'active' : tab === splitTab ? 'secondary' : 'hidden';
-  const visible = (tab) => tab === activeTab || tab === splitTab;
+  const visible = (tab: Tab) => tab === activeTab || tab === splitTab;
   // Tabs shown at least once; only grows, so recording it during render is harmless.
-  const opened = useRef(new Set());
+  const opened = useRef(new Set<Tab>());
   opened.current.add(activeTab);
   if (splitTab) opened.current.add(splitTab);
-  const startSplitDrag = (event) => {
+  const startSplitDrag = (event: ReactPointerEvent) => {
     event.preventDefault();
-    const rect = tabContainerRef.current.getBoundingClientRect();
-    const move = (moveEvent) =>
+    const rect = tabContainerRef.current!.getBoundingClientRect();
+    const move = (moveEvent: PointerEvent) =>
       setSplitRatio(
         stacked
           ? (moveEvent.clientY - rect.top) / rect.height
@@ -173,7 +207,7 @@ function App() {
   const notices = useRef(new ConnectionNotices());
   useEffect(() => {
     setTopicTreeReady(TopicTreeService.isReady());
-    const handleConnected = (data) => {
+    const handleConnected = (data: ConnectionEvent) => {
       setConnections((prev) =>
         prev.map((c) => (c.id === data.id ? { ...c, status: 'connected', isConnected: true } : c)),
       );
@@ -183,14 +217,14 @@ function App() {
         'success',
       );
     };
-    const handleDisconnected = (data) => {
+    const handleDisconnected = (data: ConnectionEvent) => {
       setConnections((prev) =>
         prev.map((c) =>
           c.id === data.id ? { ...c, status: 'disconnected', isConnected: false } : c,
         ),
       );
     };
-    const handleReconnecting = (data) => {
+    const handleReconnecting = (data: ConnectionEvent) => {
       notices.current.reconnecting(data.id);
       setConnections((prev) =>
         prev.map((c) =>
@@ -198,13 +232,13 @@ function App() {
         ),
       );
     };
-    const handleError = (data) => {
+    const handleError = (data: ConnectionEvent) => {
       const message = data.error || data.message || 'Unknown error';
       if (notices.current.error(data.id, message)) showFeedback(`MQTT error: ${message}`, 'error');
     };
-    const handleTreeCleared = ({ connectionId }) => {
+    const handleTreeCleared = ({ connectionId }: { connectionId: string }) => {
       setSelectedTopic((previous) => (previous?.connectionId === connectionId ? null : previous));
-      setPanePin((previous) =>
+      setPanePin((previous: PanePin | null) =>
         previous?.connectionId === connectionId ? { ...previous, topic: null } : previous,
       );
       setLastSelectedTopics((previous) => {
@@ -228,7 +262,8 @@ function App() {
   }, [setConnections, setTopicTreeReady, setLastSelectedTopics, setPanePin, showFeedback]);
 
   // ── Small handlers ───────────────────────────────────────────────────────
-  const handleTopicSelect = (topicPath) => {
+  const handleTopicSelect = (topicPath: string) => {
+    if (!selectedConnection) return;
     TopicTreeService.selectTopic(selectedConnection, topicPath);
     const topic = { topicPath, connectionId: selectedConnection };
     setSelectedTopic(topic);
@@ -236,22 +271,22 @@ function App() {
   };
 
   const handlePublishMessage = useCallback(
-    (messageData) => publishTo(selectedConnection, messageData),
+    (messageData: OutgoingMessage) => publishTo(selectedConnection, messageData),
     [selectedConnection],
   );
   const pinnedConnection = panePin?.connectionId ?? null;
   const handlePinnedPublish = useCallback(
-    (messageData) => publishTo(pinnedConnection, messageData),
+    (messageData: OutgoingMessage) => publishTo(pinnedConnection, messageData),
     [pinnedConnection],
   );
 
-  const connectionView = (id) => connections.find((c) => c.id === id);
+  const connectionView = (id: string | null) => connections.find((c) => c.id === id);
   const getConnectionName = (id = selectedConnection) =>
     connectionView(id)?.config?.name || 'Unknown Connection';
 
   // ── Render helpers ───────────────────────────────────────────────────────
   // Every panel follows the sidebar, except the one in a pinned second pane.
-  const paneFor = (tab) => {
+  const paneFor = (tab: Tab) => {
     if (!panePin || tab !== splitTab)
       return {
         connectionId: selectedConnection,
@@ -268,8 +303,9 @@ function App() {
       onPublishMessage: handlePinnedPublish,
     };
   };
-  const connectedPane = (pane) => connectionView(pane.connectionId)?.isConnected || false;
-  const pinLabel = (tab) =>
+  const connectedPane = (pane: { connectionId: string | null }) =>
+    connectionView(pane.connectionId)?.isConnected || false;
+  const pinLabel = (tab: Tab) =>
     panePin && tab === splitTab ? (
       <div className="pane-pin">
         <i className="fas fa-thumbtack" aria-hidden="true"></i>
@@ -288,7 +324,7 @@ function App() {
     <div
       ref={tabContainerRef}
       className={`tab-content-container${splitTab ? ' split' : ''}${splitTab && stacked ? ' stacked' : ''}`}
-      style={splitTab ? { '--split': `${splitRatio * 100}%` } : undefined}
+      style={splitTab ? ({ '--split': `${splitRatio * 100}%` } as CSSProperties) : undefined}
     >
       <div className={`tab-content ${placement('logging')}`}>
         {pinLabel('logging')}
@@ -309,7 +345,7 @@ function App() {
           <Suspense fallback={panelLoading}>
             <PublishingPanel
               protocolVersion={
-                connectedPane(publishing)
+                connectedPane(publishing) && publishing.connectionId
                   ? MQTTService.getProtocolVersion(publishing.connectionId)
                   : (connectionView(publishing.connectionId)?.config?.protocolVersion ?? 4)
               }
@@ -450,7 +486,10 @@ function App() {
         ))}
       </div>
 
-      <div className="app-layout" style={{ '--sidebar-width': `${sidebarWidth}px` }}>
+      <div
+        className="app-layout"
+        style={{ '--sidebar-width': `${sidebarWidth}px` } as CSSProperties}
+      >
         <ConnectionSidebar
           connections={connections}
           activeConnections={activeConnections}
@@ -474,8 +513,8 @@ function App() {
           title="Drag to resize; drag fully in to collapse"
           onPointerDown={(event) => {
             event.preventDefault();
-            const left = event.currentTarget.parentElement.getBoundingClientRect().left;
-            const move = (moveEvent) => resizeSidebar(moveEvent.clientX - left);
+            const left = event.currentTarget.parentElement!.getBoundingClientRect().left;
+            const move = (moveEvent: PointerEvent) => resizeSidebar(moveEvent.clientX - left);
             const stop = () => {
               window.removeEventListener('pointermove', move);
               window.removeEventListener('pointerup', stop);
@@ -525,7 +564,7 @@ function App() {
                       aria-label="Second pane"
                       className="custom-select-button form-select form-select-compact"
                       value={splitTab}
-                      onChange={(event) => setSplitTab(event.target.value)}
+                      onChange={(event) => setSplitTab(event.target.value as Tab)}
                     >
                       {TAB_LIST.filter((tab) => tab.id !== activeTab).map((tab) => (
                         <option key={tab.id} value={tab.id}>
@@ -569,7 +608,9 @@ function App() {
                     onMouseDown={(event) => event.preventDefault()}
                     title={splitTab ? 'Close split view' : 'Show a second tab beside this one'}
                     onClick={() =>
-                      setSplitTab(splitTab ? null : TAB_LIST.find((tab) => tab.id !== activeTab).id)
+                      setSplitTab(
+                        splitTab ? null : TAB_LIST.find((tab) => tab.id !== activeTab)!.id,
+                      )
                     }
                   >
                     <i className="fas fa-columns"></i> <span className="split-label">Split</span>

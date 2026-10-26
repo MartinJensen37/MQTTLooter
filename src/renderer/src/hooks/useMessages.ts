@@ -5,7 +5,6 @@ type ShowFeedback = (message: string, type?: string) => void;
 
 interface SelectedTopic {
   topicPath: string;
-  [key: string]: unknown;
 }
 
 /**
