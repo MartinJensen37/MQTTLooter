@@ -1,3 +1,5 @@
+import { dateTime } from './time';
+
 export function generateClientId(): string {
   return `mqttlooter_${Math.random().toString(36).substr(2, 9)}`;
 }
@@ -14,7 +16,7 @@ export function escapeHtml(text: string): string {
 }
 
 export function formatTimestamp(timestamp: number | string | Date): string {
-  return new Date(timestamp).toLocaleString();
+  return dateTime(timestamp);
 }
 
 export function formatBytes(bytes: number): string {

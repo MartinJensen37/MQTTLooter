@@ -1,6 +1,7 @@
 import React from 'react';
 import type { RecordingSummary } from './types';
 import { incompleteDescription } from './recordingHelpers';
+import { dateTime } from '../../../utils/time';
 
 interface Props {
   recording: RecordingSummary;
@@ -110,8 +111,7 @@ function RecordingItem({
           )}
         </div>
         <div className="recording-item-time">
-          {new Date(recording.startTime).toLocaleString()} -{' '}
-          {active ? 'now' : new Date(end).toLocaleString()}
+          {dateTime(recording.startTime)} - {active ? 'now' : dateTime(end)}
         </div>
       </div>
 

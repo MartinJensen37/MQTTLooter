@@ -7,6 +7,7 @@ import { useDecoders } from '../../services/DecoderRegistry';
 import { useSettings } from '../../services/Settings';
 import type { HistoryPage, HistoryQuery, HistoryStatus } from '../../../../shared/history';
 import TopicTreeService from '../../services/TopicTreeService';
+import { clockTime } from '../../utils/time';
 import './MessageWorkspace.css';
 
 export default function MessageWorkspace(props: any) {
@@ -242,7 +243,7 @@ function Workspace(props: any) {
       {missing > 0 && (
         <p className="message-storage-notice">
           Disk history has gaps: {missing.toLocaleString()} messages were not stored
-          {lastGap ? ` (latest ${new Date(lastGap).toLocaleTimeString()})` : ''}.
+          {lastGap ? ` (latest ${clockTime(lastGap)})` : ''}.
         </p>
       )}
       {stored && !searchOpen && (

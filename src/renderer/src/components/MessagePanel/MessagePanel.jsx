@@ -8,6 +8,8 @@ import { exportMessage, exportMessageCSV } from '../../utils/messageExport';
 import { plainLog } from '../../utils/payloadPresentation';
 import { matchDecoder } from '../../../../shared/decoders';
 import { useDecoders } from '../../services/DecoderRegistry';
+import { useSettings } from '../../services/Settings';
+import { clockTime, dateTime } from '../../utils/time';
 
 /**
  * @param {{
@@ -43,8 +45,10 @@ function MessagePanel({
   const panelRef = useRef(null);
   const [previewBytes, setPreviewBytes] = useState(100);
   const [displayMode, setDisplayMode] = useState('cards');
-  // One payload view for every card of the topic; Auto formats JSON and decodes protobuf.
-  const [payloadView, setPayloadView] = useState('auto');
+  // One payload view for every card of the topic; it starts from the Settings default.
+  const { payloadView: defaultView } = useSettings();
+  const [payloadView, setPayloadView] = useState(defaultView);
+  useEffect(() => setPayloadView(defaultView), [defaultView]);
   const { decoders } = useDecoders();
   const topicDecoder = selectedTopic && matchDecoder(decoders, selectedTopic.topicPath);
   // Pinned live topics keep their cached messages under memory pressure.
@@ -170,7 +174,7 @@ function MessagePanel({
     [showFeedback],
   );
 
-  const formatTimestamp = (ts) => new Date(ts).toLocaleString();
+  const formatTimestamp = (ts) => dateTime(ts);
 
   return (
     <div className="message-panel" ref={panelRef}>
@@ -439,8 +443,7 @@ function MessagePanel({
                       <div className="message-header">
                         <div className="message-meta">
                           <span className="timestamp" title={formatTimestamp(msg.timestamp)}>
-                            <i className="fas fa-clock"></i>{' '}
-                            {new Date(msg.timestamp).toLocaleTimeString()}
+                            <i className="fas fa-clock"></i> {clockTime(msg.timestamp)}
                           </span>
                           <span className="topic" title={msg.topic}>
                             <i className="fas fa-tag"></i> {msg.topic}

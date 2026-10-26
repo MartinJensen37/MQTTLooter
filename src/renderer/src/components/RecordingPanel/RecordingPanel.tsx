@@ -12,6 +12,7 @@ import RecordingControls from './recordingPanel/RecordingControls';
 import RecordingItem from './recordingPanel/RecordingItem';
 import PlaybackControls from './recordingPanel/PlaybackControls';
 import CheckToggle from '../Controls/CheckToggle';
+import { dateTime } from '../../utils/time';
 
 interface RecordingPanelProps {
   connectionName?: string;
@@ -221,7 +222,7 @@ function RecordingPanel({
         await api().start(
           activeConnectionId,
           connectionName || 'Unknown',
-          `Recording ${new Date().toLocaleString()}`,
+          `Recording ${dateTime(Date.now())}`,
         ),
       );
       await refresh();

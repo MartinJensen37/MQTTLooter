@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { formatPayloadBytes } from '../../../../../shared/payload';
 import type { PlaybackState, StoredRecordingMessage } from './types';
 import { formatPayload } from './recordingHelpers';
+import { clockTime } from '../../../utils/time';
 
 interface Props {
   playback: PlaybackState;
@@ -228,7 +229,7 @@ function PlaybackControls({
               </div>
               <div>
                 <strong>Time:</strong>
-                <span>{new Date(currentMessage.timestamp).toLocaleTimeString()}</span>
+                <span>{clockTime(currentMessage.timestamp)}</span>
               </div>
               <div>
                 <strong>QoS:</strong>

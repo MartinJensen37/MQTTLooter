@@ -1,5 +1,6 @@
 import React from 'react';
 import type { PublishHistoryItem } from './types';
+import { clockTime } from '../../../utils/time';
 
 interface Props {
   publishHistory: PublishHistoryItem[];
@@ -37,7 +38,7 @@ function PublishHistory({ publishHistory, clearHistory, loadFromHistory }: Props
               </div>
               <div className="history-actions">
                 <span className="history-time">
-                  <i className="fas fa-clock"></i> {new Date(item.timestamp).toLocaleTimeString()}
+                  <i className="fas fa-clock"></i> {clockTime(item.timestamp)}
                 </span>
                 <button
                   onClick={() => loadFromHistory(item)}

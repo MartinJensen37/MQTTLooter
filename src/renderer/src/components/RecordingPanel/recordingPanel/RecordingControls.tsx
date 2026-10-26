@@ -1,4 +1,5 @@
 import React from 'react';
+import { clockTime } from '../../../utils/time';
 
 interface Props {
   isRecording: boolean;
@@ -58,7 +59,7 @@ function RecordingControls({
           </div>
           {isRecording && (
             <div className="recording-live-info">
-              <span>Started: {recordingStart?.toLocaleTimeString()}</span>
+              <span>Started: {recordingStart ? clockTime(recordingStart.getTime()) : ''}</span>
               <span>Messages: {messageCount}</span>
               <span>Topics: {topicCount}</span>
               {dropped > 0 && <span>Not recorded: {dropped}</span>}

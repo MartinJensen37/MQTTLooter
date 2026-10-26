@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import LinePlot, { PLOT_FRAME } from '../Charts/LinePlot';
+import { clockTime } from '../../utils/time';
 import { matchDecoder } from '../../../../shared/decoders';
 import { useDecoders } from '../../services/DecoderRegistry';
 import {
@@ -12,7 +13,7 @@ import './IncomingPlot.css';
 
 const COLORS = ['var(--primary)', 'var(--success)', 'var(--warning)', 'var(--danger)'];
 const name = (pointer: string) => pointer || 'Whole payload';
-const time = (value: number) => new Date(value).toLocaleTimeString();
+const time = clockTime;
 const range = (values: number[]) =>
   values.length ? { min: Math.min(...values), max: Math.max(...values) } : { min: 0, max: 1 };
 
