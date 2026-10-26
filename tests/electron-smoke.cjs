@@ -907,6 +907,22 @@ async function run() {
         );
     },
   });
+  await require('./electron-sparkplug.cjs')({
+    evaluate,
+    waitFor,
+    field,
+    published,
+    menu: (id) => electron.Menu.getApplicationMenu().getMenuItemById(id).click(),
+    send: (topic, payload) => {
+      for (const socket of sockets)
+        socket.write(
+          codec.generate(
+            { cmd: 'publish', topic, payload, qos: 0, retain: false },
+            { protocolVersion: 5 },
+          ),
+        );
+    },
+  });
   await require('./electron-credentials.cjs')({ evaluate, waitFor, field });
   await require('./electron-plots.cjs')({
     evaluate,
@@ -1013,7 +1029,7 @@ async function run() {
   assert.ok(aliasedPublishes > 0, 'topic aliases used');
   assert.deepEqual(errors, []);
   console.log(
-    'Electron smoke passed: MQTT 5, binary payloads, recording recovery, simulator/QoS 1+2, topic search, anchored scrolling, responsive layout and sandbox.',
+    'Electron smoke passed: MQTT 5, binary payloads, recording recovery, simulator/QoS 1+2, Sparkplug B, topic search, anchored scrolling, responsive layout and sandbox.',
   );
 }
 
