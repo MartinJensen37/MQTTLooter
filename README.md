@@ -116,7 +116,7 @@ docs/            Roadmap, release guide and screenshots
 .github/         CI and release workflows
 ```
 
-Remaining work is listed in [docs/ROADMAP.md](docs/ROADMAP.md).
+How the parts fit together is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), contributing in [CONTRIBUTING.md](CONTRIBUTING.md) and remaining work in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Releases and license
 
