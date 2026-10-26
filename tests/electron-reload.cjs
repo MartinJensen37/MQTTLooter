@@ -46,6 +46,18 @@ module.exports = async function checkReload({ window, evaluate, waitFor, send })
         evaluate(`Number(document.querySelector('.payload-preview')?.textContent) > ${checkpoint}`),
       'live messages continue after reload',
     );
+    // The window blocks page navigation, so the same page keeps running and must keep receiving.
+    await evaluate(
+      "window.sameDocument = true; setTimeout(() => { location.href = 'https://example.invalid/'; }); true",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(await evaluate('window.sameDocument'), true, 'navigation was blocked');
+    const blocked = sequence;
+    await waitFor(
+      () =>
+        evaluate(`Number(document.querySelector('.payload-preview')?.textContent) > ${blocked}`),
+      'live messages continue after a blocked navigation',
+    );
     const status = await evaluate('window.electronAPI.mqtt.getTrafficStatus()');
     assert.ok(status.data.connections.smoke.processed > 0);
     const recording = await evaluate('window.electronAPI.recordings.status()');

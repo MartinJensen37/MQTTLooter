@@ -118,9 +118,9 @@ function createWindow() {
     messageDelivery.pause();
     void mqttManager.disconnectAll();
   });
-  mainWindow.webContents.on('did-start-navigation', (_event, _url, inPlace, isMainFrame) => {
-    if (isMainFrame && !inPlace) messageDelivery.pause();
-  });
+  // Pause once a new page has replaced the old one, until it reports ready. A navigation that
+  // will-navigate blocks never commits, and the page that stays must keep receiving.
+  mainWindow.webContents.on('did-navigate', () => messageDelivery.pause());
 
   // electron-vite injects ELECTRON_RENDERER_URL for the dev server; otherwise load the build.
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
