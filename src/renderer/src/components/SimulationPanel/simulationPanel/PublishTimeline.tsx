@@ -5,6 +5,7 @@ import {
   TIMELINE_COLUMNS,
   TIMELINE_LIMITS,
   TIMELINE_SERIES,
+  markWidth,
   type TimelineInput,
   type TimelineResult,
 } from './publishTimelineModel';
@@ -16,7 +17,6 @@ import './PublishTimeline.css';
 const TOTAL_HEIGHT = 64;
 /** Height of one signal lane; the list is virtualized by it. */
 const ROW_HEIGHT = 46;
-const MARK_WIDTH = 3;
 /** A signal's color by its position; signals past the eighth share the "other" color. */
 const seriesColor = (index: number) =>
   index < TIMELINE_SERIES ? `var(--series-${index + 1})` : 'var(--series-other)';
@@ -139,6 +139,7 @@ function Timeline({ device }: { device: SimulatedDevice }) {
   const shown = lanes.rows.slice(start, start + 10);
   // Bursts count messages due at the same moment; randomized schedules add per-interval estimates.
   const peak = Math.max(0, ...lanes.bursts, ...lanes.randomExpected);
+  const mark = markWidth(horizon, lanes.rows);
   const columnsPerBin = TIMELINE_COLUMNS / TIMELINE_LIMITS.bins;
   /** Stacked segments, first signal at the bottom, with a thin gap between neighbors. */
   const stack = (parts: [number, number][]) => {
@@ -302,7 +303,12 @@ function Timeline({ device }: { device: SimulatedDevice }) {
                         <svg
                           viewBox="0 0 640 24"
                           preserveAspectRatio="none"
-                          style={{ '--series-color': seriesColor(start + index) } as CSSProperties}
+                          style={
+                            {
+                              '--series-color': seriesColor(start + index),
+                              '--tick-width': mark,
+                            } as CSSProperties
+                          }
                           role="img"
                           aria-label={`${row.name}: ${row.random ? 'estimated likelihood' : 'scheduled opportunities'}`}
                         >
@@ -392,8 +398,8 @@ function Timeline({ device }: { device: SimulatedDevice }) {
                 stack(parts).map(({ series, y, height }) => (
                   <rect
                     key={`${column}-${series}`}
-                    x={(column * 640) / TIMELINE_COLUMNS - MARK_WIDTH / 2}
-                    width={MARK_WIDTH}
+                    x={(column * 640) / TIMELINE_COLUMNS - mark / 2}
+                    width={mark}
                     y={y}
                     height={height}
                     style={{ fill: seriesColor(series) }}

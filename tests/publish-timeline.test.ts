@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import {
   calculateTimeline,
   chanceOfAny,
+  markWidth,
   TIMELINE_LIMITS,
   type TimelineInput,
 } from '../src/renderer/src/components/SimulationPanel/simulationPanel/publishTimelineModel';
@@ -170,4 +171,16 @@ it('counts messages due at the same moment, however the period meets the bin wid
   });
   expect(Math.max(...mixed.bursts)).toBe(1);
   expect(sum(mixed.randomExpected)).toBeGreaterThan(0);
+});
+
+it('scales mark width with the window, but keeps neighboring sends apart', () => {
+  const sparse = [{ ticks: [1000, 2000, 3000] }];
+  expect(markWidth(5000, sparse)).toBe(6);
+  expect(markWidth(10000, sparse)).toBe(3);
+  expect(markWidth(20000, sparse)).toBe(1.5);
+  expect(markWidth(60000, sparse)).toBe(1);
+  // 100 ms apart in a 10 s window is 6.4 units: at most 60% of that.
+  expect(markWidth(10000, [{ ticks: [100, 200, 300] }])).toBeCloseTo(3);
+  expect(markWidth(5000, [{ ticks: [100, 200, 300] }])).toBe(6);
+  expect(markWidth(20000, [{ ticks: [0, 50] }])).toBe(1);
 });

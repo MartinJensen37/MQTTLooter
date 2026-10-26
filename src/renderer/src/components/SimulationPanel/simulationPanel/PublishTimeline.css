@@ -89,7 +89,7 @@
 }
 .publish-timeline svg line {
   stroke: var(--series-color, var(--primary));
-  stroke-width: 3;
+  stroke-width: var(--tick-width, 3);
 }
 .publish-timeline svg .publish-timeline-cursor {
   stroke: var(--text-muted);

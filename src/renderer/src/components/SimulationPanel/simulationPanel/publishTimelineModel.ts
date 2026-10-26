@@ -160,3 +160,17 @@ export function calculateTimeline(input: TimelineInput): TimelineResult {
     omitted: Math.max(0, (input.totalSignals ?? input.signals.length) - rows.length),
   };
 }
+
+/**
+ * Width of the lanes' ticks and the burst bars, in chart units (640 across). It follows the
+ * preview window, 3 at 10 s, thicker when zoomed in and thinner when zoomed out, and never wider
+ * than 60% of the closest gap between sends, so neighbors stay apart.
+ */
+export function markWidth(horizon: number, rows: { ticks: number[] }[]) {
+  let gap = Infinity;
+  for (const row of rows)
+    for (let index = 1; index < row.ticks.length; index++)
+      gap = Math.min(gap, row.ticks[index] - row.ticks[index - 1]);
+  const byWindow = Math.min(6, Math.max(1, 30_000 / horizon));
+  return Math.max(1, Math.min(byWindow, (gap / horizon) * 640 * 0.6));
+}
