@@ -416,8 +416,7 @@ export class HistoryDatabase {
       if (
         result.scanned &&
         (result.scanned >= SEARCH_LIMITS.rows ||
-          scannedBytes + (payload?.byteLength ?? (stream ? length : 0)) >
-            SEARCH_LIMITS.scanBytes ||
+          scannedBytes + (payload?.byteLength ?? (stream ? length : 0)) > SEARCH_LIMITS.scanBytes ||
           performance.now() - started >= SEARCH_LIMITS.workMs ||
           result.messages.length >= SEARCH_LIMITS.matches)
       ) {
