@@ -47,7 +47,7 @@ Every topic keeps its newest 300 messages in memory (100 to 2,000 in Settings), 
 ![Plotting a JSON field](docs/images/plotting.png)
 
 ### Publishing
-
+*USE MESSSAGE SCHEMAS FOR SIMULATORS AS WELL*
 Publish text, JSON or base64 bytes with QoS, retain and MQTT 5 properties. JSON is validated and can be formatted in place. **Message schemas** store a JSON Schema, topic and options; **Fill payload** generates a message that matches the schema, with typed variables and these placeholders:
 
 | Placeholder | Value |
