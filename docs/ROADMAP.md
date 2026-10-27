@@ -5,22 +5,16 @@ Where MQTTLooter goes next, in priority order within each section. Completed wor
 ## Release process
 
 1. **Code signing.** The release workflow signs with Azure Trusted Signing once its secrets exist; setting up the account is described in [RELEASING.md](RELEASING.md#code-signing).
-2. **Working agreement.** Feature branches and pull requests into `master`, `master` always releasable, a changelog line with each change, and semantic versions.
-3. **Dependency upkeep.** Dependabot for npm packages and GitHub Actions, and an Electron upgrade at least every other Electron major for security fixes.
+2. **Dependency upkeep.** Review Dependabot's pull requests, and upgrade Electron at least every other major for security fixes.
 
 ## Maintainability
 
-- Scope stylesheets per component (CSS modules) and remove the legacy color aliases still kept in `variables.css`.
-- Type the remaining loose boundaries: IPC event payloads and the connection editor's config.
-- A short architecture note covering the processes, workers, IPC and storage.
-- An opt-in diagnostics bundle (logs, versions, settings without secrets) from **Help > About** for bug reports.
+- Scope stylesheets per component. Class names are already prefixed per component; CSS modules would also need the Electron tests to stop selecting by class name.
 
 ## Scalability
 
 - Move the topic tree model into a worker for brokers well beyond what `LOAD_PROFILE=full` measures. At 50,000 topics and 5,000 messages per second the window still answers input within 15 ms (p95), so this waits until a broker needs it. The tree view would then read visible rows by range instead of the whole flattened list.
-- Stream oversized payloads in content search and load large payloads on demand in the inspector.
-- Search across recordings.
-- Minify the renderer build.
+- Search across recordings. The database query is started on the local branch `wip/recording-search`; the IPC handler, the search field in Recording and tests remain.
 
 ## Features
 
