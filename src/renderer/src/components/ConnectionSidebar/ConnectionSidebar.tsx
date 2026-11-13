@@ -4,6 +4,7 @@ import ConnectionModal from './ConnectionModal';
 import ConfirmationModal from './ConfirmationModal';
 import './ConnectionSidebar.css';
 import mqttLooterLogo from '../../assets/MQTTLooter_logo_small.png';
+import mqttLooterLogoWhite from '../../assets/MQTTLooter_logo_small_white.png';
 
 interface Connection {
   id: string;
@@ -150,7 +151,8 @@ function ConnectionSidebar({
           onClick={handleLogoClick}
           title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          <img src={mqttLooterLogo} alt="MQTTLooter" className="app-logo" />
+          <img src={mqttLooterLogo} alt="MQTTLooter" className="app-logo logo-light" />
+          <img src={mqttLooterLogoWhite} alt="" className="app-logo logo-dark" />
           {!isCollapsed && <h1>MQTTLooter</h1>}
         </div>
       </div>

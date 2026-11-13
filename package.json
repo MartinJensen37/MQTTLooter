@@ -54,7 +54,7 @@
           ]
         }
       ],
-      "icon": "assets/MQTTLooter_logo_small.ico",
+      "icon": "assets/MQTTLooter_logo_round.ico",
       "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
@@ -63,9 +63,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "MQTTLooter",
-      "installerIcon": "assets/MQTTLooter_logo_small.ico",
-      "uninstallerIcon": "assets/MQTTLooter_logo_small.ico",
-      "installerHeaderIcon": "assets/MQTTLooter_logo_small.ico",
+      "installerIcon": "assets/MQTTLooter_logo_round.ico",
+      "uninstallerIcon": "assets/MQTTLooter_logo_round.ico",
+      "installerHeaderIcon": "assets/MQTTLooter_logo_round.ico",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
       "artifactName": "${productName}-Setup-${version}.${ext}",

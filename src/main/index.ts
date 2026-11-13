@@ -109,7 +109,7 @@ function createWindow() {
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    icon: join(__dirname, '../../assets/MQTTLooter_logo_small.png'),
+    icon: join(__dirname, '../../assets/MQTTLooter_logo_round.ico'),
     show: false, // shown on ready-to-show to avoid a white flash
     webPreferences: {
       nodeIntegration: false,

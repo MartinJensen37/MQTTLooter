@@ -4,6 +4,7 @@ import { APP_INFO, type AppVersions } from '../../../../shared/app-info';
 import type { ConnectionConfig } from '../../../../shared/connection';
 import { windowDiagnostics } from '../../utils/diagnostics';
 import logo from '../../assets/MQTTLooter_logo_small.png';
+import logoWhite from '../../assets/MQTTLooter_logo_small_white.png';
 import './AboutDialog.css';
 
 /** Help > About: version, runtime, license, a link to the repository and diagnostics. */
@@ -43,7 +44,8 @@ export default function AboutDialog({
           <CloseButton onClick={onClose} label="Close about" />
         </div>
         <div className="about-body">
-          <img className="about-logo" src={logo} alt="" />
+          <img className="about-logo logo-light" src={logo} alt="" />
+          <img className="about-logo logo-dark" src={logoWhite} alt="" />
           <p className="about-name">{APP_INFO.name}</p>
           <p className="about-version">Version {versions?.app ?? '…'}</p>
           {versions && (

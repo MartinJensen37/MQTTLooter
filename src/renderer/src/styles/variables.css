@@ -156,3 +156,14 @@
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.45);
   --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.55);
 }
+
+/* Logo variants: black artwork on light themes, white artwork on dark. */
+.logo-dark {
+  display: none;
+}
+:root[data-theme='dark'] .logo-light {
+  display: none;
+}
+:root[data-theme='dark'] .logo-dark {
+  display: inline;
+}
